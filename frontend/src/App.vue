@@ -86,7 +86,7 @@
             <v-list-item
               v-for="tab in translatedApiTabOptions"
               :key="tab.value"
-              :active="channelStore.activeTab === tab.value"
+              :active="tab.value === 'conversations' ? $route.path === '/conversations' : channelStore.activeTab === tab.value"
               :to="tab.route"
             >
               <v-list-item-title>{{ tab.label }}</v-list-item-title>
@@ -114,6 +114,10 @@
           <span class="api-type-text separator">/</span>
           <router-link to="/channels/gemini" class="api-type-text" :class="{ active: channelStore.activeTab === 'gemini' }">
             {{ t('app.tabs.gemini') }}
+          </router-link>
+          <span class="api-type-text separator">/</span>
+          <router-link to="/conversations" class="api-type-text" :class="{ active: $route.path === '/conversations' }">
+            {{ t('app.tabs.conversations') }}
           </router-link>
           <span class="brand-text d-none d-md-inline">API Proxy - CCX</span>
         </div>
@@ -496,6 +500,7 @@ const apiTabOptions = [
   { value: 'images', labelKey: 'app.tabs.images', route: '/channels/images' },
   { value: 'responses', labelKey: 'app.tabs.responses', route: '/channels/responses' },
   { value: 'gemini', labelKey: 'app.tabs.gemini', route: '/channels/gemini' },
+  { value: 'conversations', labelKey: 'app.tabs.conversations', route: '/conversations' },
 ] as const
 
 const translatedApiTabOptions = computed(() => {

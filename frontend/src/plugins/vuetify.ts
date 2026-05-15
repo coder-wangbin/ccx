@@ -37,6 +37,7 @@ import { VTooltip } from 'vuetify/components/VTooltip'
 
 // 数据展示
 import { VChip } from 'vuetify/components/VChip'
+import { VChipGroup } from 'vuetify/components/VChipGroup'
 import { VAvatar } from 'vuetify/components/VAvatar'
 import { VIcon } from 'vuetify/components/VIcon'
 import { VDivider } from 'vuetify/components/VDivider'
@@ -180,6 +181,8 @@ import {
   mdiKeyAlert,
   mdiCashRemove,
   mdiAccountSwitch,
+  mdiChatOutline,
+  mdiDragHorizontalVariant,
 } from '@mdi/js'
 
 // 图标名称到 SVG path 的映射 (使用 kebab-case)
@@ -372,6 +375,8 @@ const iconMap: Record<string, string> = {
 
   // 渠道配置
   'account-switch': mdiAccountSwitch,
+  'chat-outline': mdiChatOutline,
+  'drag-horizontal-variant': mdiDragHorizontalVariant,
 }
 
 // 自定义 SVG iconset - 处理 mdi-xxx 字符串格式
@@ -505,6 +510,7 @@ export default createVuetify({
     VTooltip,
     // 数据展示
     VChip,
+    VChipGroup,
     VAvatar,
     VIcon,
     VDivider,

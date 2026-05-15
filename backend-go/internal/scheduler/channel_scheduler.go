@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/BenedictKing/ccx/internal/config"
+	"github.com/BenedictKing/ccx/internal/conversation"
 	"github.com/BenedictKing/ccx/internal/metrics"
 	"github.com/BenedictKing/ccx/internal/session"
 	"github.com/BenedictKing/ccx/internal/transitions"
@@ -33,6 +34,8 @@ type ChannelScheduler struct {
 	geminiChannelLogStore    *metrics.ChannelLogStore // Gemini 渠道请求日志
 	chatChannelLogStore      *metrics.ChannelLogStore // Chat 渠道请求日志
 	imagesChannelLogStore    *metrics.ChannelLogStore // Images 渠道请求日志
+	conversationTracker      *conversation.ConversationTracker
+	overrideManager          *conversation.OverrideManager
 }
 
 // ChannelKind 标识调度器所处理的渠道类型
@@ -74,6 +77,22 @@ func NewChannelScheduler(
 		chatChannelLogStore:      metrics.NewChannelLogStore(),
 		imagesChannelLogStore:    metrics.NewChannelLogStore(),
 	}
+}
+
+// SetConversationComponents 设置对话追踪和覆盖管理组件
+func (s *ChannelScheduler) SetConversationComponents(tracker *conversation.ConversationTracker, overrideMgr *conversation.OverrideManager) {
+	s.conversationTracker = tracker
+	s.overrideManager = overrideMgr
+}
+
+// GetConversationTracker 获取对话追踪器
+func (s *ChannelScheduler) GetConversationTracker() *conversation.ConversationTracker {
+	return s.conversationTracker
+}
+
+// GetOverrideManager 获取覆盖管理器
+func (s *ChannelScheduler) GetOverrideManager() *conversation.OverrideManager {
+	return s.overrideManager
 }
 
 // getMetricsManager 根据类型获取对应的指标管理器
@@ -452,6 +471,32 @@ func (s *ChannelScheduler) SelectChannel(
 		log.Printf("[%s-Promotion] 警告: 促销渠道 [%d] %s 已在本次请求中失败，跳过", prefix, promotedChannel.Index, promotedChannel.Name)
 	}
 
+	// 0.5 检查手动序列覆盖
+	if userID != "" && s.overrideManager != nil {
+		if sequence, ok := s.overrideManager.GetOverrideForUser(string(kind), userID); ok {
+			prefix := kindSchedulerLogPrefix(kind)
+			for _, entry := range sequence {
+				if failedChannels[entry.ChannelIndex] {
+					continue
+				}
+				for _, ch := range activeChannels {
+					if ch.Index == entry.ChannelIndex && ch.Status == "active" {
+						upstream := s.getUpstreamByIndex(entry.ChannelIndex, kind)
+						if upstream != nil && s.channelIsHealthy(upstream, kind) {
+							log.Printf("[%s-Override] 手动覆盖选择渠道: [%d] %s (user: %s)", prefix, entry.ChannelIndex, entry.ChannelName, maskUserID(userID))
+							return &SelectionResult{
+								Upstream:     upstream,
+								ChannelIndex: entry.ChannelIndex,
+								Reason:       "manual_override",
+							}, nil
+						}
+					}
+				}
+			}
+			log.Printf("[%s-Override] 覆盖序列中无可用渠道，回退到默认调度 (user: %s)", prefix, maskUserID(userID))
+		}
+	}
+
 	// 1. 检查 Trace 亲和性（促销渠道失败时或无促销渠道时）
 	if userID != "" {
 		compositeKey := string(kind) + ":" + userID
@@ -788,6 +833,13 @@ func (s *ChannelScheduler) UpdateTraceAffinity(userID string, kind ChannelKind) 
 	if userID != "" {
 		compositeKey := string(kind) + ":" + userID
 		s.traceAffinity.UpdateLastUsed(compositeKey)
+	}
+}
+
+// TrackConversation 追踪对话（请求成功后调用）
+func (s *ChannelScheduler) TrackConversation(kind ChannelKind, userID, model string, channelIndex int, channelName, sessionID string) {
+	if s.conversationTracker != nil && userID != "" {
+		s.conversationTracker.Track(string(kind), userID, model, channelIndex, channelName, sessionID)
 	}
 }
 

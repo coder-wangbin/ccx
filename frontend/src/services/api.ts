@@ -1461,6 +1461,59 @@ export class ApiService {
       body: JSON.stringify(request)
     })
   }
+
+  // ============== 会话调度看板 API ==============
+
+  async getConversations(kind?: string): Promise<ConversationsResponse> {
+    const params = kind ? `?kind=${kind}` : ''
+    return this.request(`/conversations${params}`)
+  }
+
+  async setConversationOverride(id: string, sequence: ChannelSequenceEntry[]): Promise<void> {
+    await this.request(`/conversations/${id}/override`, {
+      method: 'POST',
+      body: JSON.stringify({ sequence })
+    })
+  }
+
+  async removeConversationOverride(id: string): Promise<void> {
+    await this.request(`/conversations/${id}/override`, {
+      method: 'DELETE'
+    })
+  }
+}
+
+// 会话调度看板类型
+export interface ChannelSequenceEntry {
+  channelIndex: number
+  channelName: string
+}
+
+export interface ConversationInfo {
+  id: string
+  kind: 'messages' | 'responses' | 'chat' | 'gemini' | 'images'
+  userId: string
+  createdAt: string
+  lastActiveAt: string
+  requestCount: number
+  models: string[]
+  currentChannel: number
+  channelName: string
+  status: 'active' | 'streaming' | 'idle'
+  lastModel: string
+  lastRequestId: string
+}
+
+export interface SequenceOverrideInfo {
+  sequence: ChannelSequenceEntry[]
+  setAt: string
+  expiresAt: string
+}
+
+export interface ConversationsResponse {
+  conversations: ConversationInfo[]
+  total: number
+  overrides: Record<string, SequenceOverrideInfo>
 }
 
 // 健康检查响应类型

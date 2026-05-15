@@ -190,6 +190,11 @@ func handleMultiChannelCompact(
 			// 只有真正成功的请求才设置 Trace 亲和
 			if successKey != "" {
 				channelScheduler.SetTraceAffinity(userID, channelIndex, scheduler.ChannelKindResponses)
+				channelName := ""
+				if upstream != nil {
+					channelName = upstream.Name
+				}
+				channelScheduler.TrackConversation(scheduler.ChannelKindResponses, userID, requestModel, channelIndex, channelName, "")
 			}
 			return
 		}

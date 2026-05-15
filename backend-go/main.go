@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/BenedictKing/ccx/internal/config"
+	"github.com/BenedictKing/ccx/internal/conversation"
 	"github.com/BenedictKing/ccx/internal/handlers"
 	"github.com/BenedictKing/ccx/internal/handlers/chat"
 	"github.com/BenedictKing/ccx/internal/handlers/gemini"
@@ -134,6 +135,12 @@ func main() {
 	channelScheduler := scheduler.NewChannelScheduler(cfgManager, messagesMetricsManager, responsesMetricsManager, geminiMetricsManager, chatMetricsManager, imagesMetricsManager, traceAffinityManager, urlManager)
 	log.Printf("[Scheduler-Init] 多渠道调度器已初始化 (失败率阈值: %.0f%%, 滑动窗口: %d)",
 		messagesMetricsManager.GetFailureThreshold()*100, messagesMetricsManager.GetWindowSize())
+
+	// 初始化对话追踪器和覆盖管理器
+	conversationTracker := conversation.NewConversationTracker(1*time.Hour, 2*time.Hour)
+	overrideManager := conversation.NewOverrideManager(30 * time.Minute)
+	channelScheduler.SetConversationComponents(conversationTracker, overrideManager)
+	log.Printf("[Conversation-Init] 对话追踪器和覆盖管理器已初始化 (idle: 1h, expire: 2h, override TTL: 30m)")
 
 	scheduledRecoveryStop := make(chan struct{})
 	go func() {
@@ -438,6 +445,16 @@ func main() {
 		// 移除计费头设置
 		apiGroup.GET("/settings/strip-billing-header", handlers.GetStripBillingHeader(cfgManager))
 		apiGroup.PUT("/settings/strip-billing-header", handlers.SetStripBillingHeader(cfgManager))
+
+		// 会话调度看板 API
+		convDeps := &handlers.ConversationHandlerDeps{
+			Tracker:          conversationTracker,
+			OverrideManager:  overrideManager,
+			ChannelScheduler: channelScheduler,
+		}
+		apiGroup.GET("/conversations", handlers.GetConversations(convDeps))
+		apiGroup.POST("/conversations/:id/override", handlers.SetConversationOverride(convDeps))
+		apiGroup.DELETE("/conversations/:id/override", handlers.RemoveConversationOverride(convDeps))
 	}
 
 	// 代理端点 - Messages API
