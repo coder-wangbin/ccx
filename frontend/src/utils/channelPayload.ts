@@ -77,7 +77,9 @@ export function buildChannelPayload(form: ChannelFormLike): Omit<Channel, 'index
     stripCodexClientTools: form.codexToolCompat,
     noVision: form.noVision,
     noVisionModels: form.noVisionModels,
-    visionFallbackModel: form.visionFallbackModel,
+    visionFallbackModel: typeof form.visionFallbackModel === 'object' && form.visionFallbackModel !== null
+      ? (form.visionFallbackModel as unknown as { value: string }).value || ''
+      : form.visionFallbackModel || '',
   }
 
   if (deduplicatedUrls.length > 1) {
