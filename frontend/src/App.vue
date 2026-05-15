@@ -2201,8 +2201,13 @@ a.api-type-text {
 }
 
 .v-theme--dark .action-btn-primary {
-  border-color: rgba(255, 255, 255, 0.8) !important;
-  box-shadow: 4px 4px 0 0 rgba(255, 255, 255, 0.8) !important;
+  border-color: rgba(129, 140, 248, 0.5) !important;
+  box-shadow: 4px 4px 0 0 rgba(129, 140, 248, 0.25) !important;
+}
+.v-theme--dark .action-btn-primary:hover {
+  background: rgb(129, 140, 248) !important;
+  border-color: rgba(129, 140, 248, 0.7) !important;
+  box-shadow: 5px 5px 0 0 rgba(129, 140, 248, 0.3) !important;
 }
 
 /* 渠道编排容器 */
@@ -2369,8 +2374,13 @@ a.api-type-text {
 }
 
 .v-theme--dark .action-btn {
-  border-color: rgba(255, 255, 255, 0.7) !important;
-  box-shadow: 4px 4px 0 0 rgba(255, 255, 255, 0.7) !important;
+  border-color: rgba(226, 232, 240, 0.2) !important;
+  box-shadow: 4px 4px 0 0 rgba(0, 0, 0, 0.35) !important;
+}
+.v-theme--dark .action-btn:hover {
+  border-color: rgba(226, 232, 240, 0.35) !important;
+  box-shadow: 5px 5px 0 0 rgba(0, 0, 0, 0.4) !important;
+  background: rgba(226, 232, 240, 0.06) !important;
 }
 
 .action-btn:hover {
@@ -2395,8 +2405,8 @@ a.api-type-text {
 }
 
 .v-theme--dark .load-balance-menu {
-  border-color: rgba(255, 255, 255, 0.7) !important;
-  box-shadow: 4px 4px 0 0 rgba(255, 255, 255, 0.7) !important;
+  border-color: rgba(226, 232, 240, 0.2) !important;
+  box-shadow: 4px 4px 0 0 rgba(0, 0, 0, 0.35) !important;
 }
 
 .load-balance-menu .v-list-item {

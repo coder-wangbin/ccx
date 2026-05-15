@@ -2834,4 +2834,25 @@ onUnmounted(() => {
   }
 }
 
+
+/* 暗色模式彩色按钮：深色文字，保证对比度 */
+:deep(.v-theme--dark .v-btn.v-btn--variant-elevated.v-btn--color-primary),
+:deep(.v-theme--dark .v-btn.v-btn--variant-elevated.v-btn--color-secondary),
+:deep(.v-theme--dark .v-btn.v-btn--variant-flat.v-btn--color-success) {
+  color: #1e1b4b !important;
+}
+
+:deep(.v-theme--dark .v-btn.v-btn--variant-elevated.v-btn--color-primary) {
+  background-color: rgba(129, 140, 248, 0.92) !important;
+}
+
+:deep(.v-theme--dark .v-btn.v-btn--variant-elevated.v-btn--color-secondary) {
+  background-color: rgba(167, 139, 250, 0.92) !important;
+}
+
+:deep(.v-theme--dark .v-btn.v-btn--variant-flat.v-btn--color-success) {
+  background-color: rgba(52, 211, 153, 0.92) !important;
+}
+
+
 </style>
