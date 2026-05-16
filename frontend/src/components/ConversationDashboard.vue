@@ -267,14 +267,18 @@ fetchAllChannels()
   flex: 0 0 auto;
 }
 .conversation-search-field {
-  max-width: 200px;
-  flex: 0 0 auto;
+  max-width: 320px;
+  min-width: 180px;
+  flex: 1 1 auto;
 }
 .conversation-masonry {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(420px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(420px, 100%), 1fr));
   gap: 16px;
   align-items: start;
+  box-sizing: border-box;
+  padding-right: 6px;
+  padding-bottom: 6px;
 }
 .system-status-indicator {
   display: inline-flex;
