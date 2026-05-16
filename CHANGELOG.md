@@ -1,5 +1,10 @@
 ## [Unreleased]
 
+### 修复
+
+- **对话持久化字段补全** - `persistedConversation` 补齐 `RequestCount`、`Models`、`CurrentChannel`、`ChannelName`、`LastModel`、`LastRequestID` 字段，修复服务重启后对话卡片显示 "Channel 0" 和请求次数归零的问题
+- **NEXT 渠道 chip 可读性优化** - 为 ConversationCard 的 NEXT 渠道 chip 添加专用高对比度样式，避免橙色文字在浅色背景上不醒目
+
 ### 新增
 
 - **会话标题持久化与实时补全** - 对话追踪器新增 `.config/conversation_state.json` 本地持久化，保存 `title`、AI 生成标题与最新用户消息兜底摘要，服务重启后驾驶舱卡片仍可保留标题和创建时间；用户每轮输入后实时用最新消息摘要补全卡片标题。

@@ -28,7 +28,10 @@
           v-for="ch in visibleChannels"
           :key="ch.index"
           :title="getChannelTooltip(ch)"
-          :class="{ 'current-channel-chip': ch.index === conversation.currentChannel && !hasOverride }"
+          :class="{
+            'current-channel-chip': ch.index === conversation.currentChannel && !hasOverride,
+            'next-channel-chip': ch.index === nextChannel,
+          }"
           :color="ch.index === conversation.currentChannel ? 'primary' : ch.index === nextChannel ? 'warning' : undefined"
           :variant="ch.index === conversation.currentChannel ? 'flat' : ch.index === nextChannel ? 'tonal' : 'outlined'"
           size="x-small"
@@ -465,6 +468,21 @@ function handleDemote(index: number) {
 .current-channel-chip {
   cursor: default !important;
   opacity: 0.85;
+}
+
+.next-channel-chip {
+  color: #4a2b00 !important;
+  border-color: #8a5a00 !important;
+  font-weight: 700;
+}
+.next-channel-chip :deep(.v-chip__content),
+.next-channel-chip :deep(.v-chip__append) {
+  color: #4a2b00 !important;
+}
+.v-theme--dark .next-channel-chip,
+.v-theme--dark .next-channel-chip :deep(.v-chip__content),
+.v-theme--dark .next-channel-chip :deep(.v-chip__append) {
+  color: #ffe08a !important;
 }
 
 .font-weight-mono {

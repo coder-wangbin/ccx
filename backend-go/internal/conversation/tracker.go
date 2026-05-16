@@ -271,6 +271,11 @@ func (ct *ConversationTracker) loadFromDisk() {
 	}
 
 	for _, item := range items {
+		models := item.Models
+		if models == nil {
+			models = []string{}
+		}
+
 		conv := &Conversation{
 			ID:             item.ID,
 			Kind:           item.Kind,
@@ -280,12 +285,15 @@ func (ct *ConversationTracker) loadFromDisk() {
 			GeneratedTitle: item.GeneratedTitle,
 			FallbackTitle:  item.FallbackTitle,
 			SessionID:      item.SessionID,
+			RequestCount:   item.RequestCount,
+			Models:         models,
 			CurrentChannel: item.CurrentChannel,
 			ChannelName:    item.ChannelName,
+			LastModel:      item.LastModel,
+			LastRequestID:  item.LastRequestID,
 			CreatedAt:      item.CreatedAt,
 			LastActiveAt:   item.LastActiveAt,
 			Status:         "idle",
-			Models:         []string{},
 		}
 		ct.conversations[item.ID] = conv
 
@@ -322,6 +330,10 @@ func (ct *ConversationTracker) flushToDisk() {
 	snapshot := make(map[string]*Conversation, len(ct.conversations))
 	for id, conv := range ct.conversations {
 		c := *conv
+		if len(conv.Models) > 0 {
+			c.Models = make([]string, len(conv.Models))
+			copy(c.Models, conv.Models)
+		}
 		snapshot[id] = &c
 	}
 	ct.mu.Unlock()
