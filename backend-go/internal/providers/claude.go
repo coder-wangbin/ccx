@@ -181,6 +181,61 @@ func shouldStripEmptyTextBlock(block map[string]interface{}) bool {
 	return blockType == "text" && text == ""
 }
 
+func stripThinkingBlocksFromBody(bodyBytes []byte) []byte {
+	decoder := json.NewDecoder(bytes.NewReader(bodyBytes))
+	decoder.UseNumber()
+
+	var data map[string]interface{}
+	if err := decoder.Decode(&data); err != nil {
+		return bodyBytes
+	}
+
+	messages, ok := data["messages"].([]interface{})
+	if !ok {
+		return bodyBytes
+	}
+
+	modified := false
+	for _, msg := range messages {
+		msgMap, ok := msg.(map[string]interface{})
+		if !ok {
+			continue
+		}
+
+		content, ok := msgMap["content"].([]interface{})
+		if !ok {
+			continue
+		}
+
+		filtered := make([]interface{}, 0, len(content))
+		for _, block := range content {
+			blockMap, ok := block.(map[string]interface{})
+			if !ok {
+				filtered = append(filtered, block)
+				continue
+			}
+			blockType, _ := blockMap["type"].(string)
+			if blockType == "thinking" || blockType == "redacted_thinking" {
+				modified = true
+				continue
+			}
+			filtered = append(filtered, block)
+		}
+
+		msgMap["content"] = filtered
+	}
+
+	if !modified {
+		return bodyBytes
+	}
+
+	newBytes, err := utils.MarshalJSONNoEscape(data)
+	if err != nil {
+		return bodyBytes
+	}
+	return newBytes
+}
+
 // convertReasoningContentToThinking 将响应中的 reasoning_content 转为 Claude thinking 内容块
 // 用于兼容 mimo 等返回 OpenAI 风格 reasoning_content 的 Claude 协议上游
 func convertReasoningContentToThinking(bodyBytes []byte) []byte {
@@ -262,6 +317,9 @@ func (p *ClaudeProvider) ConvertToProviderRequest(c *gin.Context, upstream *conf
 	}
 	if upstream.StripEmptyTextBlocks {
 		bodyBytes = stripEmptyTextBlocksFromBody(bodyBytes)
+		if !upstream.PassbackReasoningContent {
+			bodyBytes = stripThinkingBlocksFromBody(bodyBytes)
+		}
 	}
 
 	// 构建目标URL

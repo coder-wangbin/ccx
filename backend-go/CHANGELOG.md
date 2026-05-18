@@ -10,6 +10,9 @@
 
 ### Fixed
 
+- 修复启用严格 Claude 兼容开关的 Messages 渠道会透传历史 `thinking` / `redacted_thinking` 块的问题，避免跨上游复用签名导致 `signature: Field required` 或 `Invalid signature in thinking block`。
+- 补充空 `signature` 清理、畸形 thinking 块移除与 provider 层 thinking 剥离回归测试，确保普通 text 块空签名仍会删除。
+
 - 修复 Responses 转 Chat 时孤儿 reasoning 生成 `content:null` 的 assistant 消息，避免 Codex 停止生成后继续输入触发 DeepSeek `Invalid assistant message: content or tool_calls must be set` 错误。
 - 修复 Responses 转 Chat 时缺少 `type` 但包含 `role/content` 的输入消息被丢弃的问题，避免 Codex 简化 input 触发上游 `messages` 异常。
 - 修复公共 `/v1/models` 与 `/v1/models/:model` 未纳入 Chat 渠道的问题，统一按 `messages → responses → chat` 聚合与回退模型查询，并保留 routePrefix 与已拉黑 key fallback 语义。

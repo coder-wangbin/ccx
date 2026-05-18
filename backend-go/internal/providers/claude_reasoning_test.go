@@ -119,6 +119,43 @@ func TestStripEmptyTextBlocksFromBody(t *testing.T) {
 	}
 }
 
+func TestStripThinkingBlocksFromBody(t *testing.T) {
+	input := `{
+		"messages": [
+			{"role": "assistant", "content": [
+				{"type": "thinking", "thinking": "drop", "signature": "foreign_sig"},
+				{"type": "redacted_thinking", "data": "opaque"},
+				{"type": "text", "text": "answer"},
+				{"type": "tool_use", "id": "toolu_1", "name": "Bash", "input": {"command": "pwd"}}
+			]},
+			{"role": "user", "content": [{"type": "text", "text": "hello"}]}
+		]
+	}`
+
+	result := stripThinkingBlocksFromBody([]byte(input))
+
+	var got map[string]interface{}
+	if err := json.Unmarshal(result, &got); err != nil {
+		t.Fatalf("unmarshal result: %v", err)
+	}
+
+	messages, _ := got["messages"].([]interface{})
+	assistantMsg, _ := messages[0].(map[string]interface{})
+	content, _ := assistantMsg["content"].([]interface{})
+	if len(content) != 2 {
+		t.Fatalf("assistant content len = %d, want 2", len(content))
+	}
+
+	firstBlock, _ := content[0].(map[string]interface{})
+	if firstBlock["type"] != "text" {
+		t.Fatalf("first remaining block type = %v, want text", firstBlock["type"])
+	}
+	secondBlock, _ := content[1].(map[string]interface{})
+	if secondBlock["type"] != "tool_use" {
+		t.Fatalf("second remaining block type = %v, want tool_use", secondBlock["type"])
+	}
+}
+
 // TestConvertThinkingToReasoningContent 测试为缺少 thinking 块的 assistant 消息注入占位 thinking 块
 func TestConvertThinkingToReasoningContent(t *testing.T) {
 	tests := []struct {

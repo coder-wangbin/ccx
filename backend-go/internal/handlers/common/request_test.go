@@ -344,6 +344,105 @@ func TestWithLifecycleTrace_AttachesClientTraceCallbacks(t *testing.T) {
 	}
 }
 
+func TestRemoveEmptySignatures_DoesNotStripThinkingSignatures(t *testing.T) {
+	input := `{
+		"messages": [
+			{
+				"role": "assistant",
+				"content": [
+					{"type": "thinking", "thinking": "keep", "signature": ""},
+					{"type": "redacted_thinking", "data": "opaque", "signature": null},
+					{"type": "text", "text": "ok", "signature": ""}
+				]
+			}
+		]
+	}`
+
+	gotBytes, modified := RemoveEmptySignatures([]byte(input), false, "Messages")
+	if !modified {
+		t.Fatal("expected modified=true")
+	}
+
+	var got map[string]interface{}
+	if err := json.Unmarshal(gotBytes, &got); err != nil {
+		t.Fatalf("unmarshal result failed: %v", err)
+	}
+
+	messages, _ := got["messages"].([]interface{})
+	msg, _ := messages[0].(map[string]interface{})
+	content, _ := msg["content"].([]interface{})
+
+	thinking, _ := content[0].(map[string]interface{})
+	if _, exists := thinking["signature"]; !exists {
+		t.Fatal("thinking signature should be preserved for later thinking sanitization")
+	}
+
+	redacted, _ := content[1].(map[string]interface{})
+	if _, exists := redacted["signature"]; exists {
+		t.Fatal("redacted_thinking empty signature should be removed")
+	}
+
+	textBlock, _ := content[2].(map[string]interface{})
+	if _, exists := textBlock["signature"]; exists {
+		t.Fatal("text signature should be removed")
+	}
+}
+
+func TestSanitizeMalformedThinkingBlocks_RemovesEmptySignatureThinking(t *testing.T) {
+	input := `{
+		"messages": [
+			{
+				"role": "assistant",
+				"content": [
+					{"type": "thinking", "thinking": "drop", "signature": ""},
+					{"type": "text", "text": "ok"}
+				]
+			},
+			{
+				"role": "assistant",
+				"content": [
+					{"type": "thinking", "thinking": "drop", "signature": null},
+					{"type": "thinking", "thinking": "keep"},
+					{"type": "thinking", "thinking": "keep signed", "signature": "sig_123"}
+				]
+			}
+		]
+	}`
+
+	gotBytes, modified := SanitizeMalformedThinkingBlocks([]byte(input), false, "Messages")
+	if !modified {
+		t.Fatal("expected modified=true")
+	}
+
+	var got map[string]interface{}
+	if err := json.Unmarshal(gotBytes, &got); err != nil {
+		t.Fatalf("unmarshal result failed: %v", err)
+	}
+
+	messages, _ := got["messages"].([]interface{})
+	firstMsg, _ := messages[0].(map[string]interface{})
+	firstContent, _ := firstMsg["content"].([]interface{})
+	if len(firstContent) != 1 {
+		t.Fatalf("first content len = %d, want 1", len(firstContent))
+	}
+	firstBlock, _ := firstContent[0].(map[string]interface{})
+	if firstBlock["type"] != "text" {
+		t.Fatalf("first remaining block type = %v, want text", firstBlock["type"])
+	}
+
+	secondMsg, _ := messages[1].(map[string]interface{})
+	secondContent, _ := secondMsg["content"].([]interface{})
+	if len(secondContent) != 2 {
+		t.Fatalf("second content len = %d, want 2", len(secondContent))
+	}
+	for i, block := range secondContent {
+		blockMap, _ := block.(map[string]interface{})
+		if blockMap["thinking"] == "drop" {
+			t.Fatalf("content[%d] retained invalid thinking block", i)
+		}
+	}
+}
+
 func TestSanitizeMalformedThinkingBlocks(t *testing.T) {
 	input := `{
 		"messages": [

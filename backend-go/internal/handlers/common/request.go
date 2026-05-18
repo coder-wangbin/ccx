@@ -391,6 +391,11 @@ func removeEmptySignaturesInMessages(data map[string]interface{}) (bool, int) {
 				continue
 			}
 
+			blockType, _ := blockMap["type"].(string)
+			if blockType == "thinking" {
+				continue
+			}
+
 			if sig, exists := blockMap["signature"]; exists {
 				if sig == nil {
 					delete(blockMap, "signature")
@@ -531,6 +536,7 @@ func sanitizeThinkingInContentBlock(block map[string]interface{}) (modified bool
 		// 仅移除畸形 thinking block：
 		// - 缺少 thinking 字段
 		// - thinking 不是非空字符串
+		// - signature 显式为空或 null
 		thinking, hasThinking := block["thinking"]
 		if !hasThinking {
 			return true, true
@@ -539,8 +545,16 @@ func sanitizeThinkingInContentBlock(block map[string]interface{}) (modified bool
 		if !ok || strings.TrimSpace(thinkingText) == "" {
 			return true, true
 		}
+		if sig, exists := block["signature"]; exists {
+			if sig == nil {
+				return true, true
+			}
+			if str, isStr := sig.(string); isStr && strings.TrimSpace(str) == "" {
+				return true, true
+			}
+		}
 
-		// 保留合法 thinking block（含 signature 与否都透传）
+		// 保留合法 thinking block（无 signature 或非空 signature 透传）
 		return false, false
 	}
 
