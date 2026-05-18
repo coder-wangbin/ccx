@@ -1,3 +1,13 @@
+## [Unreleased]
+
+### 修复
+
+- **Mimo thinking mode 兼容性** - 修复 mimo（小米 MiMo）等 reasoning model 上游在多轮对话切换场景下返回 400 "The reasoning_content in the thinking mode must be passed back to the API" 的问题
+  - 之前实现将 thinking 块转为顶层 `reasoning_content` 字段（OpenAI 风格），实测 mimo 的 Anthropic 协议下不认顶层 `reasoning_content`，仍返回 400
+  - 新实现保留所有原有 thinking 块，对缺少 thinking 块的 assistant 消息注入占位 thinking 块 `{"type":"thinking","thinking":"(no prior reasoning recorded)"}`，让 mimo 通过 thinking mode 校验
+  - 仅在渠道开启 `passbackReasoningContent: true` 时生效，对其他渠道无影响
+  - 注意：旧对话切到 mimo 时模型上下文缺少真实推理内容，可能出现幻觉/指令遵循下降（mimo 官方公告明示的代价）
+
 ## [v2.7.3] - 2026-05-18
 
 ### 优化

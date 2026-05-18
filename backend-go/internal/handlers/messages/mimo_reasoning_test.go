@@ -22,7 +22,7 @@ func TestMessagesHandler_MimoReasoningContentPassback(t *testing.T) {
 		wantDownstream   func(t *testing.T, body []byte)
 	}{
 		{
-			name:            "passbackReasoningContent=true 时 thinking 块转为 reasoning_content",
+			name:            "passbackReasoningContent=true 时保留已有 thinking 块",
 			passbackEnabled: true,
 			requestBody: `{
 				"model": "mimo-v2.5-pro",
@@ -59,21 +59,28 @@ func TestMessagesHandler_MimoReasoningContentPassback(t *testing.T) {
 					t.Fatalf("assistant message shape invalid: %s", string(body))
 				}
 
-				// 验证 reasoning_content 字段存在
-				if reasoningContent, ok := assistant["reasoning_content"].(string); !ok || reasoningContent != "previous reasoning" {
-					t.Fatalf("reasoning_content = %v, want 'previous reasoning'; body=%s", assistant["reasoning_content"], string(body))
+				// 不应注入额外的 reasoning_content 字段（mimo 不认这个）
+				if _, exists := assistant["reasoning_content"]; exists {
+					t.Fatalf("reasoning_content field should not exist; body=%s", string(body))
 				}
 
-				// 验证 thinking 块已从 content 中移除
+				// 已有的 thinking 块应保留
 				content, ok := assistant["content"].([]interface{})
 				if !ok {
 					t.Fatalf("assistant content invalid: %s", string(body))
 				}
+				thinkingCount := 0
 				for _, block := range content {
 					blockMap, _ := block.(map[string]interface{})
 					if blockType, _ := blockMap["type"].(string); blockType == "thinking" {
-						t.Fatalf("thinking block should be removed from content when passbackReasoningContent=true; body=%s", string(body))
+						thinkingCount++
+						if thinking, _ := blockMap["thinking"].(string); thinking != "previous reasoning" {
+							t.Fatalf("thinking content = %q, want 'previous reasoning'; body=%s", thinking, string(body))
+						}
 					}
+				}
+				if thinkingCount != 1 {
+					t.Fatalf("expected exactly 1 thinking block, got %d; body=%s", thinkingCount, string(body))
 				}
 			},
 			wantDownstream: func(t *testing.T, body []byte) {

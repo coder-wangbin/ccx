@@ -49,8 +49,14 @@ func redirectModelInBody(bodyBytes []byte, upstream *config.UpstreamConfig) []by
 	return newBytes
 }
 
-// convertThinkingToReasoningContent 将 assistant 消息中的 thinking 内容块转为 reasoning_content 字段
-// 用于兼容 mimo 等使用 Claude 协议但要求 OpenAI 风格 reasoning_content 回传的上游
+// convertThinkingToReasoningContent 为缺少 thinking 块的 assistant 消息注入占位 thinking 块
+// 用于兼容 mimo 等开启 thinking mode 的 Claude 协议上游：
+//   - mimo 要求历史 assistant 消息必须带 thinking 块，否则返回 400
+//     "The reasoning_content in the thinking mode must be passed back to the API"
+//   - 已有 thinking 块（来自 mimo 上一轮响应）则保持原样
+//   - 缺少 thinking 块（来自非 thinking 渠道历史）则注入占位块以通过校验
+//
+// 注：函数名保留以维持向后兼容，实际行为已改为注入而非"转换"
 func convertThinkingToReasoningContent(bodyBytes []byte) []byte {
 	decoder := json.NewDecoder(bytes.NewReader(bodyBytes))
 	decoder.UseNumber()
@@ -72,8 +78,7 @@ func convertThinkingToReasoningContent(bodyBytes []byte) []byte {
 			continue
 		}
 
-		role, _ := msgMap["role"].(string)
-		if role != "assistant" {
+		if role, _ := msgMap["role"].(string); role != "assistant" {
 			continue
 		}
 
@@ -82,26 +87,22 @@ func convertThinkingToReasoningContent(bodyBytes []byte) []byte {
 			continue
 		}
 
-		var thinkingTexts []string
-		var filteredContent []interface{}
+		hasThinking := false
 		for _, block := range content {
-			blockMap, ok := block.(map[string]interface{})
-			if !ok {
-				filteredContent = append(filteredContent, block)
-				continue
-			}
-			if blockType, _ := blockMap["type"].(string); blockType == "thinking" {
-				if thinking, ok := blockMap["thinking"].(string); ok && thinking != "" {
-					thinkingTexts = append(thinkingTexts, thinking)
+			if blockMap, ok := block.(map[string]interface{}); ok {
+				if blockType, _ := blockMap["type"].(string); blockType == "thinking" {
+					hasThinking = true
+					break
 				}
-			} else {
-				filteredContent = append(filteredContent, block)
 			}
 		}
 
-		if len(thinkingTexts) > 0 {
-			msgMap["reasoning_content"] = strings.Join(thinkingTexts, "\n")
-			msgMap["content"] = filteredContent
+		if !hasThinking {
+			placeholder := map[string]interface{}{
+				"type":     "thinking",
+				"thinking": "(no prior reasoning recorded)",
+			}
+			msgMap["content"] = append([]interface{}{placeholder}, content...)
 			modified = true
 		}
 	}
@@ -254,7 +255,8 @@ func (p *ClaudeProvider) ConvertToProviderRequest(c *gin.Context, upstream *conf
 		bodyBytes = redirectModelInBody(bodyBytes, upstream)
 	}
 
-	// thinking 块 → reasoning_content 转换（兼容 mimo 等要求 OpenAI 风格 reasoning_content 的 Claude 协议上游）
+	// 为缺少 thinking 块的 assistant 消息注入占位 thinking 块
+	// （兼容 mimo 等开启 thinking mode 的 Claude 协议上游，避免历史无 thinking 块时返回 400）
 	if upstream.PassbackReasoningContent {
 		bodyBytes = convertThinkingToReasoningContent(bodyBytes)
 	}

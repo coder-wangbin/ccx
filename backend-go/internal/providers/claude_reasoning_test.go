@@ -119,7 +119,7 @@ func TestStripEmptyTextBlocksFromBody(t *testing.T) {
 	}
 }
 
-// TestConvertThinkingToReasoningContent 测试 thinking 块 → reasoning_content 转换
+// TestConvertThinkingToReasoningContent 测试为缺少 thinking 块的 assistant 消息注入占位 thinking 块
 func TestConvertThinkingToReasoningContent(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -127,7 +127,7 @@ func TestConvertThinkingToReasoningContent(t *testing.T) {
 		wantJSON map[string]interface{}
 	}{
 		{
-			name: "单个 assistant 消息带 thinking 块",
+			name: "已有 thinking 块的 assistant 消息保持原样",
 			input: `{
 				"model": "mimo-v2.5-pro",
 				"messages": [
@@ -145,76 +145,54 @@ func TestConvertThinkingToReasoningContent(t *testing.T) {
 					map[string]interface{}{
 						"role": "assistant",
 						"content": []interface{}{
+							map[string]interface{}{"type": "thinking", "thinking": "let me think", "signature": "sig_123"},
 							map[string]interface{}{"type": "text", "text": "response"},
 						},
-						"reasoning_content": "let me think",
 					},
 				},
 			},
 		},
 		{
-			name: "多个 thinking 块合并",
+			name: "无 thinking 块的 assistant 消息注入占位 thinking 块",
 			input: `{
 				"model": "mimo-v2.5-pro",
 				"messages": [
+					{"role": "user", "content": [{"type": "text", "text": "hello"}]},
 					{"role": "assistant", "content": [
-						{"type": "thinking", "thinking": "first thought"},
-						{"type": "thinking", "thinking": "second thought"},
-						{"type": "text", "text": "answer"}
+						{"type": "text", "text": "answer"},
+						{"type": "tool_use", "id": "toolu_1", "name": "Bash", "input": {"command": "pwd"}}
 					]}
 				]
 			}`,
 			wantJSON: map[string]interface{}{
 				"model": "mimo-v2.5-pro",
 				"messages": []interface{}{
+					map[string]interface{}{"role": "user", "content": []interface{}{map[string]interface{}{"type": "text", "text": "hello"}}},
 					map[string]interface{}{
 						"role": "assistant",
 						"content": []interface{}{
+							map[string]interface{}{"type": "thinking", "thinking": "(no prior reasoning recorded)"},
 							map[string]interface{}{"type": "text", "text": "answer"},
+							map[string]interface{}{"type": "tool_use", "id": "toolu_1", "name": "Bash", "input": map[string]interface{}{"command": "pwd"}},
 						},
-						"reasoning_content": "first thought\nsecond thought",
 					},
 				},
 			},
 		},
 		{
-			name: "无 thinking 块不修改",
+			name: "user 消息不受影响",
 			input: `{
 				"model": "mimo-v2.5-pro",
 				"messages": [
-					{"role": "assistant", "content": [{"type": "text", "text": "answer"}]}
+					{"role": "user", "content": [{"type": "text", "text": "hello"}]}
 				]
 			}`,
 			wantJSON: map[string]interface{}{
 				"model": "mimo-v2.5-pro",
 				"messages": []interface{}{
 					map[string]interface{}{
-						"role":    "assistant",
-						"content": []interface{}{map[string]interface{}{"type": "text", "text": "answer"}},
-					},
-				},
-			},
-		},
-		{
-			name: "空 thinking 块不转换",
-			input: `{
-				"model": "mimo-v2.5-pro",
-				"messages": [
-					{"role": "assistant", "content": [
-						{"type": "thinking", "thinking": "", "signature": "sig_empty"},
-						{"type": "text", "text": "answer"}
-					]}
-				]
-			}`,
-			wantJSON: map[string]interface{}{
-				"model": "mimo-v2.5-pro",
-				"messages": []interface{}{
-					map[string]interface{}{
-						"role": "assistant",
-						"content": []interface{}{
-							map[string]interface{}{"type": "thinking", "thinking": "", "signature": "sig_empty"},
-							map[string]interface{}{"type": "text", "text": "answer"},
-						},
+						"role":    "user",
+						"content": []interface{}{map[string]interface{}{"type": "text", "text": "hello"}},
 					},
 				},
 			},
