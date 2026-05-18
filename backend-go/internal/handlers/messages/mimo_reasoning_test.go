@@ -63,6 +63,18 @@ func TestMessagesHandler_MimoReasoningContentPassback(t *testing.T) {
 				if reasoningContent, ok := assistant["reasoning_content"].(string); !ok || reasoningContent != "previous reasoning" {
 					t.Fatalf("reasoning_content = %v, want 'previous reasoning'; body=%s", assistant["reasoning_content"], string(body))
 				}
+
+				// 验证 thinking 块已从 content 中移除
+				content, ok := assistant["content"].([]interface{})
+				if !ok {
+					t.Fatalf("assistant content invalid: %s", string(body))
+				}
+				for _, block := range content {
+					blockMap, _ := block.(map[string]interface{})
+					if blockType, _ := blockMap["type"].(string); blockType == "thinking" {
+						t.Fatalf("thinking block should be removed from content when passbackReasoningContent=true; body=%s", string(body))
+					}
+				}
 			},
 			wantDownstream: func(t *testing.T, body []byte) {
 				var resp map[string]interface{}

@@ -1,3 +1,9 @@
+## [Unreleased]
+
+### 修复
+
+- **Mimo reasoning_content 回传修复** - 修复 `convertThinkingToReasoningContent` 在将 thinking 块提取为 `reasoning_content` 字段时未从 content 数组中移除 thinking 块的问题；当从 Claude 原生渠道切换到 mimo 渠道时，残留的 thinking 块导致 mimo 上游返回 400 "The reasoning_content in the thinking mode must be passed back to the API" 错误
+
 ## [v2.7.2] - 2026-05-17
 
 ### 新增

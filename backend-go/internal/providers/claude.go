@@ -83,20 +83,25 @@ func convertThinkingToReasoningContent(bodyBytes []byte) []byte {
 		}
 
 		var thinkingTexts []string
+		var filteredContent []interface{}
 		for _, block := range content {
 			blockMap, ok := block.(map[string]interface{})
 			if !ok {
+				filteredContent = append(filteredContent, block)
 				continue
 			}
 			if blockType, _ := blockMap["type"].(string); blockType == "thinking" {
 				if thinking, ok := blockMap["thinking"].(string); ok && thinking != "" {
 					thinkingTexts = append(thinkingTexts, thinking)
 				}
+			} else {
+				filteredContent = append(filteredContent, block)
 			}
 		}
 
 		if len(thinkingTexts) > 0 {
 			msgMap["reasoning_content"] = strings.Join(thinkingTexts, "\n")
+			msgMap["content"] = filteredContent
 			modified = true
 		}
 	}

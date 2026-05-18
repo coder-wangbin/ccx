@@ -145,7 +145,6 @@ func TestConvertThinkingToReasoningContent(t *testing.T) {
 					map[string]interface{}{
 						"role": "assistant",
 						"content": []interface{}{
-							map[string]interface{}{"type": "thinking", "thinking": "let me think", "signature": "sig_123"},
 							map[string]interface{}{"type": "text", "text": "response"},
 						},
 						"reasoning_content": "let me think",
@@ -171,8 +170,6 @@ func TestConvertThinkingToReasoningContent(t *testing.T) {
 					map[string]interface{}{
 						"role": "assistant",
 						"content": []interface{}{
-							map[string]interface{}{"type": "thinking", "thinking": "first thought"},
-							map[string]interface{}{"type": "thinking", "thinking": "second thought"},
 							map[string]interface{}{"type": "text", "text": "answer"},
 						},
 						"reasoning_content": "first thought\nsecond thought",
