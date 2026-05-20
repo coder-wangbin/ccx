@@ -1,3 +1,14 @@
+## [v2.7.9] - 2026-05-20
+
+### 修复
+
+- **Gemini 渠道流式响应下 tool call ID 生成策略优化**：
+  - 在 `backend-go/internal/providers/gemini.go` 中，将 Gemini 流式响应下 functionCall 的 tool ID 生成策略从不稳定的索引拼接形式（如 `toolu_%d`）优化为稳定的、带有 `call_` 前缀的 16 字节随机 hex 字符串（通过 `crypto/rand` 生成），使 ID 在跨多轮对话时更具唯一性且对齐主流（如 OpenAI `call_xxx` 风格），避免在复杂 agent 多轮调用中发生冲突。
+  - 在 `backend-go/internal/providers/gemini_stream_test.go` 中添加对应的测试断言，验证 tool call ID 的 `call_` 前缀生成逻辑。
+- **修复 Gemini 流式响应中 functionCall 场景的 `stop_reason` 映射**：
+  - 在 `backend-go/internal/providers/gemini.go` 中，引入 `hasToolUse` 状态标志。当流式响应中检测到 functionCall 时，将 `message_delta` 的 `stop_reason` 正确映射为 `tool_use`（而不是默认的 `end_turn`），确保下游消费端能够正确感知并启动工具调用执行，完全符合 Claude 规范。
+  - 在 `backend-go/internal/providers/gemini_stream_test.go` 中新增 `TestGeminiHandleStreamResponse_FunctionCallMapsStopReasonToToolUse` 单元测试，模拟 functionCall 流式响应并验证 `stop_reason` 映射。
+
 ## [v2.7.8] - 2026-05-20
 
 ### 重构
