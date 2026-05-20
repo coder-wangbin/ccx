@@ -61,7 +61,28 @@ func main() {
 	})
 	desktopService.setApp(app)
 
-	// 应用持久化窗口状态（如存在），否则回退到默认 Center
+	// macOS 首启请求通知权限（系统自身记忆已授权状态，不会反复弹窗）
+	app.Event.OnApplicationEvent(events.Common.ApplicationStarted, func(*application.ApplicationEvent) {
+		if runtime.GOOS != "darwin" {
+			return
+		}
+		go func() {
+			granted, err := notificationService.CheckNotificationAuthorization()
+			if err != nil {
+				log.Printf("[Desktop-Notify] 检查通知授权失败: %v", err)
+				return
+			}
+			if granted {
+				return
+			}
+			if _, err := notificationService.RequestNotificationAuthorization(); err != nil {
+				log.Printf("[Desktop-Notify] 请求通知授权失败: %v", err)
+			}
+		}()
+	})
+
+	// 应用持久化窗口状态（如存在），否则回退到默认 Center。
+	// X/Y 仅在 InitialPosition=WindowXY 时生效（go doc 确认）。
 	windowOpts := application.WebviewWindowOptions{
 		Title:     "CCX Desktop",
 		Width:     1180,
@@ -76,15 +97,21 @@ func main() {
 		BackgroundColour: application.NewRGB(18, 24, 38),
 		URL:              "/",
 	}
+	var savedMaximised bool
 	persistedState, hasPersistedState, _ := windowstate.Load(manager.DataDir())
 	if hasPersistedState {
 		windowOpts.Width = persistedState.Width
 		windowOpts.Height = persistedState.Height
 		windowOpts.X = persistedState.X
 		windowOpts.Y = persistedState.Y
+		windowOpts.InitialPosition = application.WindowXY
+		savedMaximised = persistedState.Maximised
 	}
 
 	mainWindow := app.Window.NewWithOptions(windowOpts)
+	if savedMaximised {
+		mainWindow.Maximise()
+	}
 	desktopService.setMainWindow(mainWindow)
 
 	saveWindowState := func() {
@@ -274,6 +301,9 @@ func main() {
 		})
 
 		menu.AddSeparator()
+
+		versionItem := menu.Add(fmt.Sprintf("CCX Desktop v%s", Version))
+		versionItem.SetEnabled(false)
 
 		menu.Add("退出").OnClick(func(ctx *application.Context) {
 			app.Quit()
