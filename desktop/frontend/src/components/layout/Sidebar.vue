@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useStatus } from '@/composables/useStatus'
+import Logo from '@/components/layout/Logo.vue'
 import {
   Activity,
   Cpu,
@@ -51,10 +52,9 @@ const handleDaemonAction = async () => {
     <!-- macOS 交通灯避让区 & 标题栏拖拽区域 -->
     <div class="h-14 w-full flex items-center justify-end px-5 shrink-0" data-wails-drag>
       <!-- 将标题完美靠右边对齐，为左侧 macOS 交通灯腾出完全开阔、无阻挡的绝佳操作空间 -->
-      <div class="flex items-center gap-2 mt-2">
-        <div class="p-1 rounded-md bg-blue-600/10 border border-blue-500/20">
-          <Cpu class="w-4 h-4 text-blue-500" />
-        </div>
+      <div class="flex items-center gap-2.5 mt-2.5">
+        <!-- 引入全新设计的高能自旋转 AI 路由发光核心 Logo -->
+        <Logo :size="24" />
         <span class="text-sm font-bold tracking-wider bg-clip-text text-transparent bg-gradient-to-r from-slate-100 to-slate-400">
           CCX CONTROL
         </span>
