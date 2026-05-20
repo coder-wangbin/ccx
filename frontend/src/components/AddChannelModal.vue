@@ -827,8 +827,9 @@
               </div>
             </v-col>
 
-            <!-- 注入 Dummy Thought Signature（仅 Gemini 渠道显示） -->
-            <v-col v-if="props.channelType === 'gemini'" cols="12">
+            <!-- 注入 Dummy Thought Signature（上游为 Gemini 时显示） -->
+            <!-- 注：chat/responses 渠道当前默认始终注入，开关无效，仅 messages/gemini 渠道下按开关生效 -->
+            <v-col v-if="(props.channelType === 'gemini' || props.channelType === 'messages') && form.serviceType === 'gemini'" cols="12">
               <div class="d-flex align-center justify-space-between">
                 <div class="d-flex align-center ga-2">
                   <v-icon color="secondary">mdi-signature</v-icon>
@@ -841,8 +842,8 @@
               </div>
             </v-col>
 
-            <!-- 移除 Thought Signature（仅 Gemini 渠道显示） -->
-            <v-col v-if="props.channelType === 'gemini'" cols="12">
+            <!-- 移除 Thought Signature（上游为 Gemini 时显示，覆盖所有可能落到 Gemini 的入口） -->
+            <v-col v-if="form.serviceType === 'gemini' && (props.channelType === 'gemini' || props.channelType === 'messages' || props.channelType === 'chat' || props.channelType === 'responses')" cols="12">
               <div class="d-flex align-center justify-space-between">
                 <div class="d-flex align-center ga-2">
                   <v-icon color="error">mdi-close-circle</v-icon>

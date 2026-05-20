@@ -29,6 +29,8 @@ func GetUpstreams(cfgManager *config.ConfigManager) gin.HandlerFunc {
 			upstreams[i] = common.BuildChannelView(up, i)
 			upstreams[i]["passbackReasoningContent"] = up.PassbackReasoningContent
 			upstreams[i]["stripEmptyTextBlocks"] = up.StripEmptyTextBlocks
+			upstreams[i]["injectDummyThoughtSignature"] = up.InjectDummyThoughtSignature
+			upstreams[i]["stripThoughtSignature"] = up.StripThoughtSignature
 		}
 
 		c.JSON(200, gin.H{

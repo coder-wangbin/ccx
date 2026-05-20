@@ -222,6 +222,9 @@ func (cm *ConfigManager) UpdateUpstream(index int, updates UpstreamUpdate) (shou
 	if updates.InjectDummyThoughtSignature != nil {
 		upstream.InjectDummyThoughtSignature = *updates.InjectDummyThoughtSignature
 	}
+	if updates.StripThoughtSignature != nil {
+		upstream.StripThoughtSignature = *updates.StripThoughtSignature
+	}
 	if updates.PassbackReasoningContent != nil {
 		upstream.PassbackReasoningContent = *updates.PassbackReasoningContent
 	}

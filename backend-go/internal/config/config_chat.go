@@ -212,6 +212,12 @@ func (cm *ConfigManager) UpdateChatUpstream(index int, updates UpstreamUpdate) (
 	if updates.PassbackReasoningContent != nil {
 		upstream.PassbackReasoningContent = *updates.PassbackReasoningContent
 	}
+	if updates.InjectDummyThoughtSignature != nil {
+		upstream.InjectDummyThoughtSignature = *updates.InjectDummyThoughtSignature
+	}
+	if updates.StripThoughtSignature != nil {
+		upstream.StripThoughtSignature = *updates.StripThoughtSignature
+	}
 	if updates.CodexNativeToolPassthrough != nil {
 		upstream.CodexNativeToolPassthrough = *updates.CodexNativeToolPassthrough
 	}

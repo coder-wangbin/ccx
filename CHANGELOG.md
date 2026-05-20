@@ -27,6 +27,11 @@
   - 修复了 `messages` 接口转上游 `gemini` 类型渠道时，Claude 协议本身不携带 thought_signature 字段，导致严格校验的上游（如 vip.undyingapi.com）返回 `Function call is missing a thought_signature in functionCall parts` 400 的问题。
   - 在 `backend-go/internal/providers/gemini.go` 的 `convertToGeminiRequest` 中按上游 `injectDummyThoughtSignature` / `stripThoughtSignature` 开关注入 part 层级的 `thoughtSignature`，与原生 Gemini 入口（`handlers/gemini/handler.go`）的策略对齐：默认不修改、`injectDummyThoughtSignature` 开启时注入 `DummyThoughtSignature`、`stripThoughtSignature` 优先级更高且在该场景为 no-op（Claude 协议本就无签名）。
   - 在 `gemini_tool_result_test.go` 中新增 `TestGeminiProvider_ConvertToGeminiRequest_InjectDummyThoughtSignature`、`TestGeminiProvider_ConvertToGeminiRequest_DefaultNoSignature`、`TestGeminiProvider_ConvertToGeminiRequest_StripThoughtSignatureNoOp` 三条用例。
+- **补齐多渠道 thought_signature 字段链路**：
+  - `backend-go/internal/config/config_messages.go` 的 `UpdateUpstream` 补充接收 `StripThoughtSignature`（之前漏了，开启了等于无效）。
+  - `backend-go/internal/config/config_chat.go`、`config_responses.go` 的 update 函数补充接收 `InjectDummyThoughtSignature` 和 `StripThoughtSignature`，对齐 [[feedback_channel_config_field]] 的"五类渠道更新函数必须同步应用新字段"规则。
+  - `backend-go/internal/handlers/messages/channels.go`、`chat/channels.go`、`responses/channels.go` 的 `GetUpstreams` 把这两个字段透出给前端；`handlers/channel_metrics_handler.go` 的 dashboard 端点同步补充。
+  - `frontend/src/components/AddChannelModal.vue` 把 `injectDummyThoughtSignature` 开关的显示条件由仅 `props.channelType === 'gemini'` 改为 `(gemini || messages) && form.serviceType === 'gemini'`；`stripThoughtSignature` 开关的显示条件由仅 gemini 改为 `form.serviceType === 'gemini'` 且 channelType 属于 gemini/messages/chat/responses。chat/responses 渠道当前在 handler/converter 层默认无条件注入 dummy 签名，因此前端不暴露 `injectDummy` 开关以避免误导。
 - **`maskKey` 短密钥脱敏过度**：
   - 修复了 `backend-go/main.go` 中启动日志 `maskKey` 对长度 ≤ 4 的密钥直接输出 `****`、完全遮蔽用户能识别的字符的问题。
   - 现在对长度 ≤ 3 的密钥保留首字符（如 `abc` → `a****`），长度 4~8 保留首尾字符，长度 > 8 保留前后各 2 字符。

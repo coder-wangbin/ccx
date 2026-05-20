@@ -192,7 +192,6 @@ func TestGeminiProvider_ConvertMessage_KeepsNonEmptyTextBlock(t *testing.T) {
 	assert.Equal(t, "我将调用工具", textPart["text"])
 }
 
-
 func TestGeminiProvider_ConvertToGeminiRequest_InjectDummyThoughtSignature(t *testing.T) {
 	provider := &GeminiProvider{}
 

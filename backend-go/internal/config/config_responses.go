@@ -221,6 +221,12 @@ func (cm *ConfigManager) UpdateResponsesUpstream(index int, updates UpstreamUpda
 		v := *updates.CodexToolCompat
 		upstream.CodexToolCompat = &v
 	}
+	if updates.InjectDummyThoughtSignature != nil {
+		upstream.InjectDummyThoughtSignature = *updates.InjectDummyThoughtSignature
+	}
+	if updates.StripThoughtSignature != nil {
+		upstream.StripThoughtSignature = *updates.StripThoughtSignature
+	}
 	if updates.CustomHeaders != nil {
 		upstream.CustomHeaders = updates.CustomHeaders
 	}

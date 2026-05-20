@@ -714,10 +714,19 @@ func GetChannelDashboard(cfgManager *config.ConfigManager, sch *scheduler.Channe
 			if channelType == "messages" {
 				channel["passbackReasoningContent"] = up.PassbackReasoningContent
 				channel["stripEmptyTextBlocks"] = up.StripEmptyTextBlocks
+				channel["injectDummyThoughtSignature"] = up.InjectDummyThoughtSignature
+				channel["stripThoughtSignature"] = up.StripThoughtSignature
 			}
 
 			if channelType == "chat" {
 				channel["passbackReasoningContent"] = up.PassbackReasoningContent
+				channel["injectDummyThoughtSignature"] = up.InjectDummyThoughtSignature
+				channel["stripThoughtSignature"] = up.StripThoughtSignature
+			}
+
+			if channelType == "responses" {
+				channel["injectDummyThoughtSignature"] = up.InjectDummyThoughtSignature
+				channel["stripThoughtSignature"] = up.StripThoughtSignature
 			}
 
 			channels[i] = channel
