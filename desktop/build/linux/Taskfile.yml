@@ -36,9 +36,21 @@ tasks:
           PRODUCTION: "true"
     cmds:
       - task: create:appimage
+        vars:
+          ARCH:
+            ref: .ARCH
       - task: create:deb
+        vars:
+          ARCH:
+            ref: .ARCH
       - task: create:rpm
+        vars:
+          ARCH:
+            ref: .ARCH
       - task: create:aur
+        vars:
+          ARCH:
+            ref: .ARCH
 
   create:appimage:
     summary: Creates an AppImage

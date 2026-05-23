@@ -38,6 +38,9 @@ tasks:
     summary: Packages a production build of the application
     cmds:
       - task: '{{if eq (.FORMAT | default "nsis") "msix"}}create:msix:package{{else}}create:nsis:installer{{end}}'
+        vars:
+          ARCH:
+            ref: .ARCH
     vars:
       FORMAT: '{{.FORMAT | default "nsis"}}'
 
