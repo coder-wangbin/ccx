@@ -277,7 +277,11 @@ jobs:
             exit 1
           fi
           mv "$INSTALLER" "bin/CCX-Desktop-${VERSION}-windows-amd64-setup.exe"
-          sha256sum "bin/CCX-Desktop-${VERSION}-windows-amd64-setup.exe" | awk '{print $1}' > "bin/CCX-Desktop-${VERSION}-windows-amd64-setup.exe.sha256"
+          # 立即移出 bin 目录，防止 arm64 步骤的 rm 清除
+          mkdir -p .release-staging
+          mv "bin/CCX-Desktop-${VERSION}-windows-amd64-setup.exe" ".release-staging/"
+          mv "bin/CCX-Desktop-${VERSION}-windows-amd64-setup.exe.sha256" ".release-staging/" 2>/dev/null || true
+          sha256sum ".release-staging/CCX-Desktop-${VERSION}-windows-amd64-setup.exe" | awk '{print $1}' > ".release-staging/CCX-Desktop-${VERSION}-windows-amd64-setup.exe.sha256"
         working-directory: ./desktop
 
       - name: Build Desktop arm64 NSIS
@@ -298,7 +302,10 @@ jobs:
             exit 1
           fi
           mv "$INSTALLER" "bin/CCX-Desktop-${VERSION}-windows-arm64-setup.exe"
-          sha256sum "bin/CCX-Desktop-${VERSION}-windows-arm64-setup.exe" | awk '{print $1}' > "bin/CCX-Desktop-${VERSION}-windows-arm64-setup.exe.sha256"
+          # 将 arm64 也移入 staging，与 amd64 汇合
+          mkdir -p .release-staging
+          mv "bin/CCX-Desktop-${VERSION}-windows-arm64-setup.exe" ".release-staging/"
+          sha256sum ".release-staging/CCX-Desktop-${VERSION}-windows-arm64-setup.exe" | awk '{print $1}' > ".release-staging/CCX-Desktop-${VERSION}-windows-arm64-setup.exe.sha256"
         working-directory: ./desktop
 
       - name: Generate Windows checksums and sign
@@ -307,7 +314,7 @@ jobs:
             cd backend-go
             sha256sum ccx-windows-amd64.exe ccx-windows-arm64.exe
             cd ..
-            for f in desktop/bin/CCX-Desktop-*-windows-*-setup.exe; do
+            for f in desktop/.release-staging/CCX-Desktop-*-windows-*-setup.exe; do
               sha256sum "$f"
             done
           } > checksums-windows.txt
@@ -326,10 +333,10 @@ jobs:
             backend-go/ccx-windows-arm64.exe
             backend-go/ccx-windows-amd64.exe.sha256
             backend-go/ccx-windows-arm64.exe.sha256
-            desktop/bin/CCX-Desktop-*-windows-amd64-setup.exe
-            desktop/bin/CCX-Desktop-*-windows-arm64-setup.exe
-            desktop/bin/CCX-Desktop-*-windows-amd64-setup.exe.sha256
-            desktop/bin/CCX-Desktop-*-windows-arm64-setup.exe.sha256
+            desktop/.release-staging/CCX-Desktop-*-windows-amd64-setup.exe
+            desktop/.release-staging/CCX-Desktop-*-windows-arm64-setup.exe
+            desktop/.release-staging/CCX-Desktop-*-windows-amd64-setup.exe.sha256
+            desktop/.release-staging/CCX-Desktop-*-windows-arm64-setup.exe.sha256
             checksums-windows.txt
             checksums-windows.txt.sigstore.json
           draft: true
