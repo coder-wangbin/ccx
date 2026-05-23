@@ -1,7 +1,7 @@
 ---
 name: version-bump
 description: 升级项目版本号并提交git，支持patch/minor/major版本升级或指定具体版本号，自动从git log生成CHANGELOG
-version: 1.2.0
+version: 1.3.0
 author: https://github.com/BenedictKing/ccx/
 allowed-tools: Bash, Read, Write, Edit
 context: fork
@@ -162,7 +162,40 @@ git add VERSION CHANGELOG.md
 git commit -m "chore: bump version to v{新版本号}"
 ```
 
-### 8. 创建 Tag（默认必须执行）
+### 8. 本地编译与打包验证（必须通过）
+
+> ⚠️ **重要**: 提交后、创建 tag 前，必须通过本地编译验证。编译失败则中止流程，不允许推送。
+
+**执行步骤：**
+
+1. **运行后端测试：**
+   ```bash
+   cd backend-go && make test
+   ```
+   - 测试失败 → ❌ 中止流程，提示用户修复测试后重试
+
+2. **执行完整构建（前端 + 后端）：**
+   ```bash
+   make build
+   ```
+   - 构建失败 → ❌ 中止流程，提示用户修复编译错误后重试
+   - 构建成功 → ✅ 继续后续 tag 和推送流程
+
+3. **验证构建产物：**
+   ```bash
+   ls -lh dist/ccx-go
+   ```
+   - 确认产物存在且大小合理
+
+**中止时的处理：**
+
+如果编译验证失败：
+- 不创建 tag
+- 不推送
+- 已提交的 commit 保留在本地
+- 输出错误信息，提示用户修复后重新执行
+
+### 9. 创建 Tag（默认必须执行）
 
 > ⚠️ 除非用户明确说"不要 tag"，否则必须创建 tag！
 
@@ -170,7 +203,7 @@ git commit -m "chore: bump version to v{新版本号}"
 git tag v{新版本号}
 ```
 
-### 9. 推送到远程（默认必须执行）
+### 10. 推送到远程（默认必须执行）
 
 ```bash
 # 推送 commit
@@ -192,8 +225,9 @@ git push origin v{新版本号}
 2. 计算新版本: `v2.0.15`
 3. 更新 VERSION 文件
 4. 执行 git commit
-5. 创建 git tag: `v2.0.15`
-6. 推送 commit 和 tag 到远程
+5. 本地编译验证（`make test` + `make build`）
+6. 创建 git tag: `v2.0.15`
+7. 推送 commit 和 tag 到远程
 
 ### 场景 2：升级 minor 版本
 
@@ -227,9 +261,10 @@ git push origin v{新版本号}
 2. 计算新版本: `v2.0.30`
 3. 更新 VERSION 文件
 4. 执行 git commit
-5. 创建 git tag: `v2.0.30`
-6. 推送 commit 和 tag 到远程
-7. GitHub Actions 自动触发，编译 6 平台版本并发布到 Releases
+5. 本地编译验证（`make test` + `make build`）
+6. 创建 git tag: `v2.0.30`
+7. 推送 commit 和 tag 到远程
+8. GitHub Actions 自动触发，编译 6 平台版本并发布到 Releases
 
 ### 场景 5：仅打 tag（不升级版本）
 
@@ -263,6 +298,7 @@ git push origin v{新版本号}
 - 升级类型: patch
 
 ✅ Git commit 已创建
+✅ 本地编译验证通过（测试 + 构建）
 ✅ Git tag v2.0.30 已创建
 
 是否推送到远程仓库? (Y/n)
@@ -308,5 +344,7 @@ concurrency:
 - 提交前会显示所有待提交的变更供用户确认
 - 如果工作区有其他未提交的修改，会询问用户是否一并提交
 - 遵循 Conventional Commits 规范，使用 `chore: bump version` 格式
+- **编译验证是强制步骤**：commit 后必须通过 `make test` 和 `make build`，否则不允许创建 tag 和推送
+- 编译验证失败时，已提交的 commit 保留在本地，用户修复后可手动推送
 - 推送 tag 后，GitHub Actions 需要几分钟完成编译和发布
 - 可以在 GitHub Actions 页面查看构建进度
