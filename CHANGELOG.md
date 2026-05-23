@@ -1,4 +1,4 @@
-## [Unreleased]
+## [v2.7.13] - 2026-05-23
 
 ### 新增
 - **Linux ARM64 桌面端支持**：CI 新增 `ubuntu-24.04-arm` runner 构建 arm64 AppImage，updater 移除 arm64 限制。
