@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/BenedictKing/ccx/desktop/internal/backend"
+	"github.com/BenedictKing/ccx/desktop/internal/editor"
 	"github.com/BenedictKing/ccx/desktop/internal/channelpreset"
 	"github.com/BenedictKing/ccx/desktop/internal/configservice"
 	"github.com/BenedictKing/ccx/desktop/internal/updater"
@@ -146,6 +147,29 @@ func (s *DesktopService) SaveEnvFile(content string) error {
 		return err
 	}
 	return os.WriteFile(path, []byte(content), 0o600)
+}
+
+// DetectEditors 返回系统上可用的文本编辑器列表。
+func (s *DesktopService) DetectEditors() []editor.Editor {
+	return editor.Detect()
+}
+
+// OpenEnvFileInEditor 使用指定编辑器打开 .env 文件。
+func (s *DesktopService) OpenEnvFileInEditor(editorPath string) error {
+	path := filepath.Join(s.manager.DataDir(), ".env")
+	if _, err := os.Stat(path); err != nil {
+		if os.IsNotExist(err) {
+			if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+				return err
+			}
+			if err := os.WriteFile(path, []byte{}, 0o600); err != nil {
+				return err
+			}
+		} else {
+			return err
+		}
+	}
+	return editor.Open(editorPath, path)
 }
 
 func (s *DesktopService) StartService() error {

@@ -14,6 +14,9 @@ import * as channelpreset$0 from "./internal/channelpreset/models.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
 import * as configservice$0 from "./internal/configservice/models.js";
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
+import * as editor$0 from "./internal/editor/models.js";
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
@@ -53,6 +56,15 @@ export function CreateCCXChannelFromPreset(req: channelpreset$0.CreateChannelReq
 }
 
 /**
+ * DetectEditors 返回系统上可用的文本编辑器列表。
+ */
+export function DetectEditors(): $CancellablePromise<editor$0.Editor[]> {
+    return $Call.ByID(1308494416).then(($result: any) => {
+        return $$createType3($result);
+    });
+}
+
+/**
  * DownloadAndInstall 下载、校验并触发安装。整个流程通过 update:progress 事件推送进度。
  */
 export function DownloadAndInstall(info: $models.UpdateInfo): $CancellablePromise<void> {
@@ -61,7 +73,7 @@ export function DownloadAndInstall(info: $models.UpdateInfo): $CancellablePromis
 
 export function GetAgentConfigStatus(platform: string): $CancellablePromise<configservice$0.AgentConfigStatus> {
     return $Call.ByID(3013260948, platform).then(($result: any) => {
-        return $$createType2($result);
+        return $$createType4($result);
     });
 }
 
@@ -71,25 +83,25 @@ export function GetAutostartStatus(): $CancellablePromise<boolean> {
 
 export function GetEnvFile(): $CancellablePromise<$models.EnvFileState> {
     return $Call.ByID(4130444060).then(($result: any) => {
-        return $$createType3($result);
+        return $$createType5($result);
     });
 }
 
 export function GetLogs(): $CancellablePromise<string[]> {
     return $Call.ByID(1688970508).then(($result: any) => {
-        return $$createType4($result);
+        return $$createType6($result);
     });
 }
 
 export function GetProviderKeyAssets(): $CancellablePromise<configservice$0.ProviderKeyAsset[]> {
     return $Call.ByID(1999783760).then(($result: any) => {
-        return $$createType6($result);
+        return $$createType8($result);
     });
 }
 
 export function GetProviderPresets(): $CancellablePromise<channelpreset$0.ProviderPreset[]> {
     return $Call.ByID(764436626).then(($result: any) => {
-        return $$createType8($result);
+        return $$createType10($result);
     });
 }
 
@@ -99,13 +111,13 @@ export function GetProxyAccessKey(): $CancellablePromise<string> {
 
 export function GetSavedProviderKeys(): $CancellablePromise<{ [_ in string]?: string }> {
     return $Call.ByID(2703245855).then(($result: any) => {
-        return $$createType9($result);
+        return $$createType11($result);
     });
 }
 
 export function GetStatus(): $CancellablePromise<backend$0.Status> {
     return $Call.ByID(2036427713).then(($result: any) => {
-        return $$createType10($result);
+        return $$createType12($result);
     });
 }
 
@@ -114,8 +126,15 @@ export function GetStatus(): $CancellablePromise<backend$0.Status> {
  */
 export function GetVersion(): $CancellablePromise<$models.VersionInfo> {
     return $Call.ByID(3507009081).then(($result: any) => {
-        return $$createType11($result);
+        return $$createType13($result);
     });
+}
+
+/**
+ * OpenEnvFileInEditor 使用指定编辑器打开 .env 文件。
+ */
+export function OpenEnvFileInEditor(editorPath: string): $CancellablePromise<void> {
+    return $Call.ByID(2255035236, editorPath);
 }
 
 export function OpenWebUIInBrowser(): $CancellablePromise<void> {
@@ -172,13 +191,15 @@ export function WebURL(): $CancellablePromise<string> {
 // Private type creation functions
 const $$createType0 = $models.UpdateInfo.createFrom;
 const $$createType1 = channelpreset$0.CreateChannelResult.createFrom;
-const $$createType2 = configservice$0.AgentConfigStatus.createFrom;
-const $$createType3 = $models.EnvFileState.createFrom;
-const $$createType4 = $Create.Array($Create.Any);
-const $$createType5 = configservice$0.ProviderKeyAsset.createFrom;
-const $$createType6 = $Create.Array($$createType5);
-const $$createType7 = channelpreset$0.ProviderPreset.createFrom;
+const $$createType2 = editor$0.Editor.createFrom;
+const $$createType3 = $Create.Array($$createType2);
+const $$createType4 = configservice$0.AgentConfigStatus.createFrom;
+const $$createType5 = $models.EnvFileState.createFrom;
+const $$createType6 = $Create.Array($Create.Any);
+const $$createType7 = configservice$0.ProviderKeyAsset.createFrom;
 const $$createType8 = $Create.Array($$createType7);
-const $$createType9 = $Create.Map($Create.Any, $Create.Any);
-const $$createType10 = backend$0.Status.createFrom;
-const $$createType11 = $models.VersionInfo.createFrom;
+const $$createType9 = channelpreset$0.ProviderPreset.createFrom;
+const $$createType10 = $Create.Array($$createType9);
+const $$createType11 = $Create.Map($Create.Any, $Create.Any);
+const $$createType12 = backend$0.Status.createFrom;
+const $$createType13 = $models.VersionInfo.createFrom;

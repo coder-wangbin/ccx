@@ -1,6 +1,7 @@
 ## [Unreleased]
 
 ### 新增
+- **桌面端 .env 文件外部编辑器打开**：Env 配置页新增"用编辑器打开"按钮，自动检测系统已安装的编辑器（VS Code、Cursor、Sublime Text、Vim 等），支持 `$EDITOR` / `$VISUAL` 环境变量优先。多个编辑器时提供下拉选择。
 
 - **Desktop 内置 ccx-go 后端**：macOS .app、Windows NSIS、Linux AppImage/deb/rpm 安装包现在内置 ccx-go 后端二进制，用户无需单独下载。Desktop 与 ccx-go 共用版本号。
 - **Release Sigstore 签名**：

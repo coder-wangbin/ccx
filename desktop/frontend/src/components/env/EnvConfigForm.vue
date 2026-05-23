@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Alert } from '@/components/ui/alert'
-import { Check, RefreshCw, Save, X } from 'lucide-vue-next'
+import { Check, RefreshCw, Save, X, ExternalLink } from 'lucide-vue-next'
 import { useEnvFile } from '@/composables/useEnvFile'
 import { detectEnvNewline, getEnvFieldValue, parseEnvFile, serializeEnvFile, type EnvEntry } from '@/lib/env-file'
 
@@ -115,7 +115,7 @@ const supportedKeys = envGroups.flatMap((group) => group.fields.map((field) => f
 const allFields = envGroups.flatMap((group) => group.fields)
 const fieldMap = new Map(allFields.map((field) => [field.key, field]))
 
-const { envFile, envLoading, envSaving, envMessage, envError, loadEnvFile, saveEnvFile } = useEnvFile()
+const { envFile, envLoading, envSaving, envMessage, envError, editors, editorsLoading, openingEditor, loadEnvFile, saveEnvFile, loadEditors, openInEditor } = useEnvFile()
 
 const saveState = ref<'idle' | 'saved' | 'failed'>('idle')
 let saveResetTimer: ReturnType<typeof setTimeout> | null = null
@@ -293,7 +293,10 @@ const inputType = (field: EnvField) => {
   return 'text'
 }
 
-onMounted(load)
+onMounted(() => {
+  load()
+  loadEditors()
+})
 
 onUnmounted(() => {
   if (saveResetTimer) {
@@ -318,6 +321,25 @@ onUnmounted(() => {
             <RefreshCw class="w-4 h-4 mr-1.5" />
             刷新
           </Button>
+
+          <div class="relative" v-if="editors.length > 0">
+            <Button size="sm" variant="outline" :disabled="openingEditor || envSaving" @click="editors.length === 1 ? openInEditor(editors[0].path) : null" :class="editors.length > 1 ? 'pr-8' : ''">
+              <ExternalLink class="w-4 h-4 mr-1.5" />
+              <span v-if="openingEditor">打开中…</span>
+              <span v-else-if="editors.length === 1">用 {{ editors[0].name }} 打开</span>
+              <span v-else>用编辑器打开</span>
+            </Button>
+            <select
+              v-if="editors.length > 1"
+              class="absolute inset-0 w-full opacity-0 cursor-pointer"
+              :disabled="openingEditor || envSaving"
+              @change="($event.target as HTMLSelectElement).value && openInEditor(($event.target as HTMLSelectElement).value); ($event.target as HTMLSelectElement).selectedIndex = 0"
+            >
+              <option value="" disabled selected>选择编辑器…</option>
+              <option v-for="ed in editors" :key="ed.id" :value="ed.path">{{ ed.name }}</option>
+            </select>
+          </div>
+
           <Button size="sm" :variant="saveButtonState.variant" :disabled="isSaveDisabled" @click="save">
             <component :is="saveButtonState.icon" class="w-4 h-4 mr-1.5" :class="{ 'animate-spin': saveButtonState.spinning }" />
             {{ saveButtonState.text }}
