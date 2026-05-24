@@ -81,7 +81,7 @@ func NewManager(options Options) *Manager {
 	if envPort, err := readPortFromEnvFile(filepath.Join(dataDir, ".env")); err == nil && envPort > 0 {
 		port = envPort
 	}
-	return &Manager{
+	m := &Manager{
 		rootDir: rootDir,
 		dataDir: dataDir,
 		port:    port,
@@ -89,6 +89,11 @@ func NewManager(options Options) *Manager {
 			Timeout: 900 * time.Millisecond,
 		},
 	}
+	// 提前探测二进制路径，使 Status() 在未启动时也能返回路径
+	if p, err := m.findBinary(); err == nil {
+		m.binaryPath = p
+	}
+	return m
 }
 
 func (m *Manager) Start(ctx context.Context) error {
