@@ -148,21 +148,21 @@ func Presets() []ProviderPreset {
 		{
 			ID:                  ProviderKimi,
 			Label:               "Kimi / Moonshot",
-			Description:         "Codex Responses 与 Chat 渠道透传，适合加入 CCX 调度池。",
+			Description:         "Messages 原生透传、Codex Responses、Chat 渠道透传三种用法。",
+			DirectAgent:         true,
+			NativeMessages:      true,
 			ChatCompatible:      true,
 			ResponsesCompatible: true,
-			Plans: []ProviderPlan{{
-				ID:          "openai-chat",
-				Label:       "OpenAI-compatible",
-				BaseURL:     "https://api.moonshot.cn/v1",
-				Description: "Moonshot OpenAI 兼容入口",
-				Recommended: true,
-			}},
-			Targets: []ChannelTarget{
-				{Type: TargetResponses, Label: "Codex Responses", Description: "OpenAI Responses 协议，供 Codex 使用"},
-				{Type: TargetChat, Label: "Chat 渠道透传", Description: "OpenAI Chat 协议，供 Chat 客户端使用", Recommended: true},
+			Plans: []ProviderPlan{
+				{ID: "anthropic", Label: "Anthropic-compatible", BaseURL: "https://api.moonshot.cn/anthropic", Description: "Claude Messages 原生入口", Recommended: true},
+				{ID: "openai-chat", Label: "OpenAI-compatible", BaseURL: "https://api.moonshot.cn/v1", Description: "Moonshot OpenAI 兼容入口"},
 			},
-			DefaultTarget: TargetChat,
+			Targets: []ChannelTarget{
+				{Type: TargetMessages, Label: "Messages 原生透传", Description: "Claude Code 直连或 CCX messages 渠道", Recommended: true},
+				{Type: TargetResponses, Label: "Codex Responses", Description: "OpenAI Responses 协议，供 Codex 使用"},
+				{Type: TargetChat, Label: "Chat 渠道透传", Description: "OpenAI Chat 协议，供 Chat 客户端使用"},
+			},
+			DefaultTarget: TargetMessages,
 		},
 		{
 			ID:                  ProviderGLM,
@@ -397,6 +397,12 @@ func applyTargetDefaults(payload *ChannelPayload, provider string, target string
 			payload.CodexToolCompat = false
 			payload.NoVisionModels = []string{"mimo-v2.5-pro"}
 			payload.VisionFallbackModel = "mimo-v2.5"
+		case ProviderKimi:
+			payload.ModelMapping = map[string]string{
+				"haiku":  "kimi-k2-0711-preview",
+				"opus":   "kimi-k2-0711-preview",
+				"sonnet": "kimi-k2-0711-preview",
+			}
 		case ProviderMiniMax:
 			payload.ModelMapping = map[string]string{
 				"haiku":  "MiniMax-M2.7",
