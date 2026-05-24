@@ -2,7 +2,7 @@
 import { computed, ref } from 'vue'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import { Globe } from 'lucide-vue-next'
+import { Globe, RefreshCw } from 'lucide-vue-next'
 import type { DesktopStatus } from '@/types'
 import { GetProxyAccessKey, OpenWebUIInBrowser } from '@bindings/github.com/BenedictKing/ccx/desktop/desktopservice'
 
@@ -34,6 +34,11 @@ const postProxyAccessKey = async () => {
   }
 }
 
+const refreshIframe = () => {
+  if (!iframeRef.value) return
+  iframeRef.value.src = iframeRef.value.src
+}
+
 const openInBrowser = async () => {
   try {
     await OpenWebUIInBrowser()
@@ -45,7 +50,14 @@ const openInBrowser = async () => {
 
 <template>
   <div>
-    <div v-if="status.running && iframeSrc" class="rounded-lg overflow-hidden border border-border" style="min-height: 620px">
+    <div v-if="status.running && iframeSrc">
+      <div class="flex justify-end mb-2">
+        <Button size="sm" variant="secondary" @click="refreshIframe">
+          <RefreshCw class="w-3.5 h-3.5 mr-1.5" />
+          刷新
+        </Button>
+      </div>
+      <div class="rounded-lg overflow-hidden border border-border" style="min-height: 620px">
       <iframe
         ref="iframeRef"
         :src="iframeSrc"
@@ -54,6 +66,7 @@ const openInBrowser = async () => {
         title="CCX Web UI"
         @load="postProxyAccessKey"
       />
+      </div>
     </div>
     <Card v-else>
       <CardContent class="flex flex-col items-start gap-4 py-8">
