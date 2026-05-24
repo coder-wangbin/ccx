@@ -509,7 +509,18 @@ func applyTargetDefaults(payload *ChannelPayload, provider string, target string
 		case ProviderMiniMax:
 			payload.ModelMapping = map[string]string{"gpt": "MiniMax-M2.7"}
 		case ProviderDashScope:
-			payload.ModelMapping = map[string]string{"gpt": "glm-5.1"}
+			payload.ModelMapping = map[string]string{
+				"gpt-5.5":       "glm-5.1",
+				"gpt-5.4":       "deepseek-v4-pro",
+				"gpt-5.4-mini":  "deepseek-v4-flash",
+				"gpt-5.3-codex": "deepseek-v4-flash",
+			}
+			payload.ReasoningMapping = map[string]string{
+				"gpt-5.5":       "high",
+				"gpt-5.4":       "max",
+				"gpt-5.4-mini":  "high",
+				"gpt-5.3-codex": "high",
+			}
 		case ProviderOpenCodeZen, ProviderOpenCodeGo:
 			payload.ModelMapping = map[string]string{"gpt": "glm-5.1"}
 		}
@@ -545,7 +556,18 @@ func applyTargetDefaults(payload *ChannelPayload, provider string, target string
 			payload.StripCodexClientTools = false
 			payload.CodexNativeToolPassthrough = true
 		case ProviderDashScope:
-			payload.ModelMapping = map[string]string{"gpt": "glm-5.1"}
+			payload.ModelMapping = map[string]string{
+				"gpt-5.5":       "glm-5.1",
+				"gpt-5.4":       "deepseek-v4-pro",
+				"gpt-5.4-mini":  "deepseek-v4-flash",
+				"gpt-5.3-codex": "deepseek-v4-flash",
+			}
+			payload.ReasoningMapping = map[string]string{
+				"gpt-5.5":       "high",
+				"gpt-5.4":       "max",
+				"gpt-5.4-mini":  "high",
+				"gpt-5.3-codex": "high",
+			}
 		case ProviderOpenCodeZen, ProviderOpenCodeGo:
 			payload.ModelMapping = map[string]string{"gpt": "glm-5.1"}
 		}
