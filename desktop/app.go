@@ -308,7 +308,8 @@ func (s *DesktopService) CreateCCXChannelFromPreset(req channelpreset.CreateChan
 	if err != nil {
 		return channelpreset.CreateChannelResult{}, err
 	}
-	if err := s.createChannel(ctx, req.Target, payload, adminKey); err != nil {
+	updated, err := s.createChannel(ctx, req.Target, payload, adminKey)
+	if err != nil {
 		return channelpreset.CreateChannelResult{}, err
 	}
 	if err := s.configService.SaveProviderKeyAsset(configservice.ProviderKeyAsset{
@@ -320,12 +321,16 @@ func (s *DesktopService) CreateCCXChannelFromPreset(req channelpreset.CreateChan
 	}); err != nil {
 		return channelpreset.CreateChannelResult{}, err
 	}
+	message := "渠道已添加到 CCX"
+	if updated {
+		message = "同名渠道配置已覆盖更新"
+	}
 	return channelpreset.CreateChannelResult{
 		Provider: req.Provider,
 		Target:   req.Target,
 		Name:     payload.Name,
 		BaseURL:  payload.BaseURL,
-		Message:  "渠道已添加到 CCX",
+		Message:  message,
 	}, nil
 }
 
@@ -344,19 +349,81 @@ func (s *DesktopService) adminAccessKey() (string, error) {
 	return s.manager.EnsureProxyAccessKey()
 }
 
-func (s *DesktopService) createChannel(ctx context.Context, target string, payload channelpreset.ChannelPayload, adminKey string) error {
+// createChannel 创建或更新渠道，返回 (是否更新, error)。
+func (s *DesktopService) createChannel(ctx context.Context, target string, payload channelpreset.ChannelPayload, adminKey string) (bool, error) {
 	body, err := json.Marshal(payload)
 	if err != nil {
-		return err
+		return false, err
 	}
+	baseURL := s.manager.WebURL()
 	path := "/api/" + strings.TrimSpace(target) + "/channels"
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, s.manager.WebURL()+path, bytes.NewReader(body))
+	client := &http.Client{Timeout: 15 * time.Second}
+
+	// 查找同名渠道，存在则覆盖更新
+	if existingID, err := s.findChannelIndexByName(ctx, client, baseURL, path, payload.Name, adminKey); err == nil && existingID >= 0 {
+		return true, s.putChannel(ctx, client, baseURL, fmt.Sprintf("%s/%d", path, existingID), body, adminKey)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, baseURL+path, bytes.NewReader(body))
+	if err != nil {
+		return false, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("x-api-key", adminKey)
+	resp, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+		return false, nil
+	}
+	data, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
+	message := strings.TrimSpace(string(data))
+	if message == "" {
+		message = resp.Status
+	}
+	return false, fmt.Errorf("创建 CCX %s 渠道失败: %s", target, message)
+}
+
+func (s *DesktopService) findChannelIndexByName(ctx context.Context, client *http.Client, baseURL, path, name, adminKey string) (int, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, baseURL+path, nil)
+	if err != nil {
+		return -1, err
+	}
+	req.Header.Set("x-api-key", adminKey)
+	resp, err := client.Do(req)
+	if err != nil {
+		return -1, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return -1, fmt.Errorf("查询渠道列表失败: %s", resp.Status)
+	}
+	var result struct {
+		Channels []struct {
+			Index int    `json:"index"`
+			Name  string `json:"name"`
+		} `json:"channels"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return -1, err
+	}
+	for _, ch := range result.Channels {
+		if ch.Name == name {
+			return ch.Index, nil
+		}
+	}
+	return -1, nil
+}
+
+func (s *DesktopService) putChannel(ctx context.Context, client *http.Client, baseURL, path string, body []byte, adminKey string) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, baseURL+path, bytes.NewReader(body))
 	if err != nil {
 		return err
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("x-api-key", adminKey)
-	client := &http.Client{Timeout: 15 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
 		return err
@@ -370,7 +437,7 @@ func (s *DesktopService) createChannel(ctx context.Context, target string, paylo
 	if message == "" {
 		message = resp.Status
 	}
-	return fmt.Errorf("创建 CCX %s 渠道失败: %s", target, message)
+	return fmt.Errorf("更新 CCX 渠道失败: %s", message)
 }
 
 func parseEnvContent(content string) map[string]string {
