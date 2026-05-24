@@ -297,6 +297,9 @@ func (s *Service) getCodexStatus(port int) (AgentConfigStatus, error) {
 		status.Provider = ProviderCCX
 	} else {
 		status.Provider = ProviderOpenAI
+		// OpenAI 官方模式，不需要目标 URL
+		status.TargetBaseURL = ""
+		status.TargetProvider = ProviderOpenAI
 	}
 	status.MatchesCurrentPort = modelProvider == ProviderCCX && baseURL == target
 	status.Configured = status.MatchesCurrentPort || status.Provider == ProviderOpenAI
