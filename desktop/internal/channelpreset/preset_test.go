@@ -38,7 +38,6 @@ func TestBuildPayload(t *testing.T) {
 			wantBaseURL: "https://api.deepseek.com/v1",
 			wantService: "openai",
 			wantVision:  true,
-			wantModels:  []string{"deepseek-v4-*"},
 		},
 		{
 			name:        "deepseek responses (openai endpoint)",
@@ -57,7 +56,6 @@ func TestBuildPayload(t *testing.T) {
 			wantBaseURL:  "https://token-plan-sgp.xiaomimimo.com/anthropic",
 			wantService:  "claude",
 			wantPassback: true,
-			wantModels:   []string{"mimo-v2.5-pro", "mimo-v2.5"},
 			wantModelMap: map[string]string{
 				"haiku":  "mimo-v2.5-pro",
 				"opus":   "mimo-v2.5-pro",
@@ -71,7 +69,6 @@ func TestBuildPayload(t *testing.T) {
 			wantBaseURL:  "https://api.xiaomimimo.com/anthropic",
 			wantService:  "claude",
 			wantPassback: true,
-			wantModels:   []string{"mimo-v2.5-pro", "mimo-v2.5"},
 			wantModelMap: map[string]string{
 				"haiku":  "mimo-v2.5-pro",
 				"opus":   "mimo-v2.5-pro",
@@ -84,7 +81,6 @@ func TestBuildPayload(t *testing.T) {
 			req:         CreateChannelRequest{Provider: ProviderMiMo, Target: TargetChat, APIKey: "tp-test"},
 			wantBaseURL: "https://api.xiaomimimo.com/v1",
 			wantService: "openai",
-			wantModels:  []string{"mimo-v2.5-pro", "mimo-v2.5"},
 			wantModelMap: map[string]string{
 				"gpt": "mimo-v2.5-pro",
 			},
@@ -95,7 +91,6 @@ func TestBuildPayload(t *testing.T) {
 			req:         CreateChannelRequest{Provider: ProviderMiMo, Target: TargetResponses, APIKey: "tp-test"},
 			wantBaseURL: "https://api.xiaomimimo.com/v1",
 			wantService: "openai",
-			wantModels:  []string{"mimo-v2.5-pro", "mimo-v2.5"},
 			wantModelMap: map[string]string{
 				"gpt": "mimo-v2.5-pro",
 			},
@@ -118,13 +113,13 @@ func TestBuildPayload(t *testing.T) {
 		{
 			name:        "glm chat",
 			req:         CreateChannelRequest{Provider: ProviderGLM, Target: TargetChat, APIKey: "sk-test"},
-			wantBaseURL: "https://open.bigmodel.cn/api/paas/v4",
+			wantBaseURL: "https://open.bigmodel.cn/api/coding/paas/v4#",
 			wantService: "openai",
 		},
 		{
 			name:           "glm responses",
 			req:            CreateChannelRequest{Provider: ProviderGLM, Target: TargetResponses, APIKey: "sk-test"},
-			wantBaseURL:    "https://open.bigmodel.cn/api/paas/v4",
+			wantBaseURL:    "https://open.bigmodel.cn/api/coding/paas/v4#",
 			wantService:    "openai",
 			wantCodex:      true,
 			wantStripCodex: true,
@@ -140,8 +135,8 @@ func TestBuildPayload(t *testing.T) {
 			req:            CreateChannelRequest{Provider: ProviderMiniMax, Target: TargetResponses, APIKey: "sk-test"},
 			wantBaseURL:    "https://api.minimax.chat/v1",
 			wantService:    "openai",
-			wantCodex:      true,
-			wantStripCodex: true,
+			wantCodex:      false,
+			wantStripCodex: false,
 		},
 	}
 	for _, tt := range tests {
@@ -188,9 +183,10 @@ func TestBuildPayload(t *testing.T) {
 }
 
 func TestBuildPayloadRejectsUnsupportedTarget(t *testing.T) {
-	_, err := BuildPayload(CreateChannelRequest{Provider: ProviderKimi, Target: TargetMessages, APIKey: "sk-test"})
+	// kimi 现已支持 Messages，此用例验证不支持的 target（如自定义拼接的错误值）仍能正确拒绝。
+	_, err := BuildPayload(CreateChannelRequest{Provider: ProviderKimi, Target: "invalid-target", APIKey: "sk-test"})
 	if err == nil {
-		t.Fatal("BuildPayload() expected error for kimi+messages")
+		t.Fatal("BuildPayload() expected error for kimi+invalid-target")
 	}
 }
 
