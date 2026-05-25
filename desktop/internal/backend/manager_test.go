@@ -49,8 +49,11 @@ func TestDetectRootDirFallsBackToCwd(t *testing.T) {
 		}
 	})
 
-	if got := detectRootDir(); got != dir {
-		t.Errorf("detectRootDir() = %q, want %q", got, dir)
+	// macOS 下 /var 是 /private/var 的符号链接，t.TempDir() 返回前者但 os.Getwd() 解析到后者，
+	// 用 EvalSymlinks 保证期望值与 os.Getwd() 语义一致。
+	want, _ := filepath.EvalSymlinks(dir)
+	if got := detectRootDir(); got != want {
+		t.Errorf("detectRootDir() = %q, want %q", got, want)
 	}
 }
 
