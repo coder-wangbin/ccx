@@ -384,6 +384,20 @@ func (m *Manager) ReadProxyAccessKey() (string, error) {
 	return "", nil
 }
 
+// IsSetupComplete 判断初始配置是否完成：仅当 PROXY_ACCESS_KEY 已存在时为 true。
+func (m *Manager) IsSetupComplete() bool {
+	key, err := m.ReadProxyAccessKey()
+	if err != nil {
+		return false
+	}
+	return strings.TrimSpace(key) != ""
+}
+
+// GenerateProxyAccessKey 生成一个新的 PROXY_ACCESS_KEY 但不写入任何文件，仅供 UI 预览使用。
+func (m *Manager) GenerateProxyAccessKey() (string, error) {
+	return generateProxyAccessKey()
+}
+
 func (m *Manager) WaitHealthy(ctx context.Context, timeout time.Duration) error {
 	deadline := time.Now().Add(timeout)
 	var lastErr error

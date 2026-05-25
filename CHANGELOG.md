@@ -1,6 +1,21 @@
+## [Unreleased]
+
+### 新增
+
+- **桌面端首次启动引导流程** - 强制要求用户在启动 CCX 服务前完成最小可用配置，避免直接进入主界面后调用失败
+  - 新增 SetupView 全屏引导页：检测 `.env` 中无 `PROXY_ACCESS_KEY` 时显示，预填随机生成的密钥（`ccx-<48hex>`），支持显示/隐藏、复制、重新生成
+  - 完成后自动合并写入 `.env`（保留已有键值与注释），自动启动 CCX 服务并跳转至【渠道中心】标签页
+  - 引导页展示 `.env` 文件路径方便后续调试，提示后续可在【环境参数】页继续修改其他字段
+  - 新增 `IsSetupComplete` / `GenerateProxyAccessKey` 两个 Wails 绑定方法，前者只读判断密钥存在性，后者仅生成预览不写入文件
+  - App 启动时三态渲染（Loading 占位 / Setup 引导页 / 主界面），避免界面切换闪烁
+
 ## [v2.7.29] - 2026-05-25
 
 ### 修复
+
+- **桌面端版本号显示重复 `vv` 前缀** - 修复桌面端左下角及更新弹窗版本号显示为 `vv2.7.29` 的问题
+  - VERSION 文件已自带 `v` 前缀，前端模板不应再硬编码 `v`
+  - 修正 `Sidebar.vue` 左下角版本徽标，以及 `UpdateDialog.vue` 标题处的当前/最新版本对比
 
 - **批量延迟测试在 Chat 标签页报错 `e.forEach is not a function`** - 修复 Chat 渠道批量延迟测试时，前端 `pingAllChatChannels()` 未解包后端 `{"channels": [...]}` 响应导致 `forEach` 调用失败的问题
   - `api.ts` 中 `pingAllChatChannels()` 现在正确提取 `resp.channels` 并映射字段，与 Images/Gemini 处理方式一致

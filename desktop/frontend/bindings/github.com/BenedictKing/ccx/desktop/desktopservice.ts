@@ -71,6 +71,13 @@ export function DownloadAndInstall(info: $models.UpdateInfo): $CancellablePromis
     return $Call.ByID(1836127345, info);
 }
 
+/**
+ * GenerateProxyAccessKey 仅生成预览密钥，不写入任何文件。
+ */
+export function GenerateProxyAccessKey(): $CancellablePromise<string> {
+    return $Call.ByID(1874658839);
+}
+
 export function GetAgentConfigStatus(platform: string): $CancellablePromise<configservice$0.AgentConfigStatus> {
     return $Call.ByID(3013260948, platform).then(($result: any) => {
         return $$createType4($result);
@@ -128,6 +135,13 @@ export function GetVersion(): $CancellablePromise<$models.VersionInfo> {
     return $Call.ByID(3507009081).then(($result: any) => {
         return $$createType13($result);
     });
+}
+
+/**
+ * IsSetupComplete 判断是否已完成初始配置（PROXY_ACCESS_KEY 已存在）。
+ */
+export function IsSetupComplete(): $CancellablePromise<boolean> {
+    return $Call.ByID(375603581);
 }
 
 /**

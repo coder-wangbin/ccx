@@ -129,6 +129,16 @@ func (s *DesktopService) GetProxyAccessKey() (string, error) {
 	return s.manager.EnsureProxyAccessKey()
 }
 
+// IsSetupComplete 判断是否已完成初始配置（PROXY_ACCESS_KEY 已存在）。
+func (s *DesktopService) IsSetupComplete() bool {
+	return s.manager.IsSetupComplete()
+}
+
+// GenerateProxyAccessKey 仅生成预览密钥，不写入任何文件。
+func (s *DesktopService) GenerateProxyAccessKey() (string, error) {
+	return s.manager.GenerateProxyAccessKey()
+}
+
 func (s *DesktopService) GetEnvFile() (EnvFileState, error) {
 	path := filepath.Join(s.manager.DataDir(), ".env")
 	content, err := os.ReadFile(path)

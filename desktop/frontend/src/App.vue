@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, nextTick } from 'vue'
+import { ref, watch, nextTick, onMounted } from 'vue'
 import Sidebar from '@/components/layout/Sidebar.vue'
 import StatusTab from '@/components/status/StatusTab.vue'
 import AgentTab from '@/components/agent/AgentTab.vue'
@@ -7,9 +7,12 @@ import EnvTab from '@/components/env/EnvTab.vue'
 import WebUITab from '@/components/webui/WebUITab.vue'
 import ChannelTab from '@/components/channel/ChannelTab.vue'
 import UpdateDialog from '@/components/update/UpdateDialog.vue'
+import SetupLoading from '@/components/setup/SetupLoading.vue'
+import SetupView from '@/components/setup/SetupView.vue'
 import { useStatus } from '@/composables/useStatus'
 import { useUpdater } from '@/composables/useUpdater'
 import { useWailsEvents } from '@/composables/useWailsEvents'
+import { useSetup } from '@/composables/useSetup'
 import { RefreshCw } from 'lucide-vue-next'
 
 import type { TabValue } from '@/types'
@@ -19,6 +22,21 @@ const { status, actionError, syncStatus } = useStatus()
 useUpdater()
 
 useWailsEvents(activeTab, actionError, syncStatus)
+
+// Setup 引导流程
+const { setupChecked, setupComplete, pendingTab, checkSetup } = useSetup()
+
+onMounted(() => {
+  void checkSetup()
+})
+
+// Setup 完成后跳转到目标标签页
+watch(pendingTab, (tab) => {
+  if (tab) {
+    activeTab.value = tab
+    pendingTab.value = null
+  }
+})
 
 const switchToWeb = () => {
   activeTab.value = 'web'
@@ -46,7 +64,9 @@ const tabTitles: Record<TabValue, string> = {
 </script>
 
 <template>
-  <div class="flex h-screen w-screen bg-[#060a13] text-slate-100 overflow-hidden font-sans">
+  <SetupLoading v-if="!setupChecked" />
+  <SetupView v-else-if="!setupComplete" />
+  <div v-else class="flex h-screen w-screen bg-[#060a13] text-slate-100 overflow-hidden font-sans">
     <!-- 常驻左侧高级磨砂侧边栏 -->
     <Sidebar v-model="activeTab" />
 
