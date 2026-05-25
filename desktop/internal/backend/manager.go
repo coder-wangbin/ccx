@@ -688,9 +688,13 @@ func detectRootDir() string {
 	if err != nil {
 		return "."
 	}
-	for dir := cwd; dir != "." && dir != string(filepath.Separator); dir = filepath.Dir(dir) {
+	for dir := cwd; ; dir = filepath.Dir(dir) {
 		if _, err := os.Stat(filepath.Join(dir, "backend-go", "main.go")); err == nil {
 			return dir
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir || dir == "." {
+			break
 		}
 	}
 	return cwd

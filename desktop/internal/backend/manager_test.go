@@ -34,6 +34,26 @@ func TestNewManagerCustomPort(t *testing.T) {
 	}
 }
 
+func TestDetectRootDirFallsBackToCwd(t *testing.T) {
+	dir := t.TempDir()
+	oldWd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(dir); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := os.Chdir(oldWd); err != nil {
+			t.Errorf("restore cwd: %v", err)
+		}
+	})
+
+	if got := detectRootDir(); got != dir {
+		t.Errorf("detectRootDir() = %q, want %q", got, dir)
+	}
+}
+
 func TestBinaryCandidates(t *testing.T) {
 	root := t.TempDir()
 	m := NewManager(Options{RootDir: root})
