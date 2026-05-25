@@ -22,6 +22,14 @@ export const useDialogStore = defineStore('dialog', () => {
   const selectedChannelForKey = ref<number>(-1)
   const newApiKey = ref('')
 
+  // 通用确认对话框（替代 window.confirm，兼容 Wails iframe 环境）
+  const showConfirmDialog = ref(false)
+  const confirmDialogMessage = ref('')
+  const confirmDialogConfirmText = ref('')
+  const confirmDialogCancelText = ref('')
+  const confirmDialogColor = ref<'primary' | 'error' | 'warning'>('error')
+  let confirmResolver: ((_value: boolean) => void) | null = null
+
   // ===== 操作方法 =====
 
   /**
@@ -77,6 +85,42 @@ export const useDialogStore = defineStore('dialog', () => {
     newApiKey.value = ''
   }
 
+  /**
+   * 打开通用确认对话框，返回 Promise<boolean>
+   * 用于替代原生 window.confirm()，避免在 Wails iframe 环境下失效
+   */
+  function confirm(options: {
+    message: string
+    confirmText?: string
+    cancelText?: string
+    color?: 'primary' | 'error' | 'warning'
+  }): Promise<boolean> {
+    // 若已有未决的确认对话框，先解析为 false 避免泄漏
+    if (confirmResolver) {
+      confirmResolver(false)
+      confirmResolver = null
+    }
+    confirmDialogMessage.value = options.message
+    confirmDialogConfirmText.value = options.confirmText || ''
+    confirmDialogCancelText.value = options.cancelText || ''
+    confirmDialogColor.value = options.color || 'error'
+    showConfirmDialog.value = true
+    return new Promise((resolve) => {
+      confirmResolver = resolve
+    })
+  }
+
+  /**
+   * 解析当前确认对话框的结果（由对话框按钮调用）
+   */
+  function resolveConfirm(value: boolean) {
+    if (confirmResolver) {
+      confirmResolver(value)
+      confirmResolver = null
+    }
+    showConfirmDialog.value = false
+  }
+
   return {
     // 状态
     showAddChannelModal,
@@ -84,6 +128,11 @@ export const useDialogStore = defineStore('dialog', () => {
     showAddKeyModal,
     selectedChannelForKey,
     newApiKey,
+    showConfirmDialog,
+    confirmDialogMessage,
+    confirmDialogConfirmText,
+    confirmDialogCancelText,
+    confirmDialogColor,
 
     // 方法
     openAddChannelModal,
@@ -92,5 +141,7 @@ export const useDialogStore = defineStore('dialog', () => {
     openAddKeyModal,
     closeAddKeyModal,
     resetDialogState,
+    confirm,
+    resolveConfirm,
   }
 })

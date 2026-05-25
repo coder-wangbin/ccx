@@ -425,6 +425,26 @@
       </v-card>
     </v-dialog>
 
+    <!-- 通用确认对话框（替代 window.confirm，兼容 Wails 桌面 iframe） -->
+    <v-dialog v-model="dialogStore.showConfirmDialog" max-width="420" persistent>
+      <v-card rounded="lg">
+        <v-card-title class="d-flex align-center pt-4">
+          <v-icon class="mr-3" :color="dialogStore.confirmDialogColor">mdi-alert-circle-outline</v-icon>
+          {{ t('app.dialog.confirmTitle') }}
+        </v-card-title>
+        <v-card-text class="text-body-1 pt-2">{{ dialogStore.confirmDialogMessage }}</v-card-text>
+        <v-card-actions>
+          <v-spacer/>
+          <v-btn variant="text" @click="dialogStore.resolveConfirm(false)">
+            {{ dialogStore.confirmDialogCancelText || t('app.actions.cancel') }}
+          </v-btn>
+          <v-btn :color="dialogStore.confirmDialogColor" variant="elevated" @click="dialogStore.resolveConfirm(true)">
+            {{ dialogStore.confirmDialogConfirmText || t('app.actions.confirm') }}
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
     <!-- Toast通知 -->
     <v-snackbar
       v-for="toast in toasts"
@@ -650,7 +670,11 @@ const editChannel = (channel: Channel) => {
 }
 
 const deleteChannel = async (channelId: number) => {
-  if (!confirm(t('toast.confirmDeleteChannel'))) return
+  const ok = await dialogStore.confirm({
+    message: t('toast.confirmDeleteChannel'),
+    confirmText: t('app.actions.delete'),
+  })
+  if (!ok) return
 
   try {
     const result = await channelStore.deleteChannel(channelId)
@@ -692,7 +716,11 @@ const addApiKey = async () => {
 }
 
 const _removeApiKey = async (channelId: number, apiKey: string) => {
-  if (!confirm(t('toast.confirmDeleteApiKey'))) return
+  const ok = await dialogStore.confirm({
+    message: t('toast.confirmDeleteApiKey'),
+    confirmText: t('app.actions.delete'),
+  })
+  if (!ok) return
 
   try {
     if (channelStore.activeTab === 'chat') {

@@ -1,3 +1,9 @@
+## [Unreleased]
+
+### 修复
+
+- **桌面 App 内嵌 Web UI 删除渠道不生效** (#115) - Wails 3 的 WKWebView 在 iframe 上下文中对原生 `window.confirm()` 不弹对话框、静默返回 `false`，导致删除请求从未发出；替换为 Vuetify `v-dialog` 实现的通用确认框，兼容桌面 iframe 与浏览器双入口
+
 ## [v2.8.0] - 2026-05-25
 
 ### 修复
