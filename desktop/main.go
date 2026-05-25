@@ -175,15 +175,24 @@ func run() error {
 		}
 	}
 
+	dockIconHidden := false
 	setDockIconVisible := func(visible bool) {
 		if runtime.GOOS != "darwin" {
 			return
 		}
 		if visible {
-			dockService.ShowAppIcon()
-		} else {
-			dockService.HideAppIcon()
+			if !dockIconHidden {
+				return
+			}
+			dockIconHidden = false
+			go dockService.ShowAppIcon()
+			return
 		}
+		if dockIconHidden {
+			return
+		}
+		dockIconHidden = true
+		go dockService.HideAppIcon()
 	}
 
 	hideMainWindow := func() {
