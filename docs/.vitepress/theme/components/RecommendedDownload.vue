@@ -16,12 +16,16 @@
       <a class="secondary-action" :href="releasesUrl" rel="noopener noreferrer">
         {{ text.allDownloads }}
       </a>
+      <a class="secondary-action" :href="privacyUrl">
+        {{ text.privacy }}
+      </a>
     </div>
   </section>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { withBase } from 'vitepress'
 
 type Locale = 'zh' | 'en'
 type Os = 'darwin' | 'windows' | 'linux'
@@ -68,6 +72,7 @@ const copy = {
     description: '自动识别你的系统，优先推荐适合当前设备的安装包。项目通过 SignPath Foundation 进行代码签名。',
     fallbackDescription: '查看最新版本，并选择适合你系统的安装包。项目通过 SignPath Foundation 进行代码签名。',
     allDownloads: '查看全部下载',
+    privacy: '隐私政策',
     download: '下载',
     latest: '最新版',
     version: '版本',
@@ -85,6 +90,7 @@ const copy = {
     description: 'Detects your system and recommends the installer for this device. The project uses the SignPath Foundation for code signing.',
     fallbackDescription: 'Open the latest release and choose the installer for your system. The project uses the SignPath Foundation for code signing.',
     allDownloads: 'All downloads',
+    privacy: 'Privacy Policy',
     download: 'Download',
     latest: 'Latest release',
     version: 'Version',
@@ -115,6 +121,7 @@ const platformLabel = computed(() => {
 })
 const versionLabel = computed(() => latestTag.value ? `${text.value.version}: ${latestTag.value}` : '')
 const downloadUrl = computed(() => assetUrl.value || releasesUrl)
+const privacyUrl = computed(() => withBase(locale.value === 'en' ? '/en/guide/privacy' : '/guide/privacy'))
 const primaryText = computed(() => {
   if (!matchedPlatformName.value) {
     return text.value.latest

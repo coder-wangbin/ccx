@@ -37,6 +37,7 @@ export const enConfig: LocaleSpecificConfig<DefaultTheme.Config> = {
             { text: 'Development', link: '/en/guide/development' },
             { text: 'Release', link: '/en/guide/release' },
             { text: 'Contributing', link: '/en/guide/contributing' },
+            { text: 'Privacy Policy', link: '/en/guide/privacy' },
           ],
         },
       ],

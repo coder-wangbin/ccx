@@ -37,6 +37,7 @@ export const zhConfig: LocaleSpecificConfig<DefaultTheme.Config> = {
             { text: '开发指南', link: '/guide/development' },
             { text: '发布流程', link: '/guide/release' },
             { text: '贡献指南', link: '/guide/contributing' },
+            { text: '隐私政策', link: '/guide/privacy' },
           ],
         },
       ],
