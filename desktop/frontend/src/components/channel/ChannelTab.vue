@@ -183,14 +183,23 @@ const submit = async () => {
       </div>
 
       <div v-if="currentPreset" class="bg-glass border border-white/[0.03] rounded-2xl p-5 space-y-5">
-        <div class="flex flex-wrap items-start justify-between gap-3">
-          <div>
+        <div class="space-y-3">
+          <div class="flex flex-wrap items-center gap-2">
             <h3 class="text-lg font-semibold text-slate-100">{{ currentPreset.label }}</h3>
-            <p class="text-sm text-slate-500 mt-1">{{ currentPreset.description }}</p>
+            <span
+              v-for="badge in capabilityBadges"
+              :key="badge"
+              class="text-[10px] text-blue-300 bg-blue-500/10 border border-blue-500/20 rounded-full px-2 py-0.5"
+            >
+              {{ badge }}
+            </span>
+          </div>
+          <p class="text-sm text-slate-500">{{ currentPreset.description }}</p>
+          <div class="flex items-center gap-4">
             <button
               v-if="providerPromotionLinks[currentPreset.id]"
               type="button"
-              class="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-blue-300 hover:text-blue-200"
+              class="inline-flex items-center gap-1.5 text-xs font-medium text-blue-300 hover:text-blue-200"
               @click="openProviderPromotion(currentPreset.id)"
             >
               通过推广链接注册，领取 5 元平台试用金
@@ -199,21 +208,12 @@ const submit = async () => {
             <button
               v-if="providerConsoleLinks[currentPreset.id]"
               type="button"
-              class="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-slate-400 hover:text-slate-200"
+              class="inline-flex items-center gap-1.5 text-xs font-medium text-slate-400 hover:text-slate-200"
               @click="openProviderConsole(currentPreset.id)"
             >
               访问官方控制台
               <ExternalLink class="h-3 w-3" />
             </button>
-          </div>
-          <div class="flex flex-wrap gap-1.5">
-            <span
-              v-for="badge in capabilityBadges"
-              :key="badge"
-              class="text-[10px] text-blue-300 bg-blue-500/10 border border-blue-500/20 rounded-full px-2 py-0.5"
-            >
-              {{ badge }}
-            </span>
           </div>
         </div>
 
