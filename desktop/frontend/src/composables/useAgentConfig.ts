@@ -18,6 +18,7 @@ const claudeProviderLabels: Record<AgentProvider | 'custom', string> = {
   ccx: 'CCX',
   deepseek: 'DeepSeek',
   mimo: 'MiMo',
+  compshare: 'Compshare',
   kimi: 'Kimi',
   glm: 'GLM',
   minimax: 'MiniMax',
@@ -33,6 +34,7 @@ const codexProviderLabels: Record<AgentProvider | 'custom', string> = {
   openai: 'OpenAI 官方',
   deepseek: 'DeepSeek',
   mimo: 'MiMo',
+  compshare: 'Compshare',
   kimi: 'Kimi',
   glm: 'GLM',
   minimax: 'MiniMax',
@@ -55,6 +57,7 @@ const claudeProviderKeys = ref<Record<AgentProvider, string>>({
   ccx: '',
   deepseek: '',
   mimo: '',
+  compshare: '',
   kimi: '',
   glm: '',
   minimax: '',
@@ -77,7 +80,7 @@ const diffLoading = ref(false)
 const diffPendingPlatform = ref<AgentPlatform>('claude')
 
 const isClaudeProvider = (value?: string): value is AgentProvider => {
-  return value === 'ccx' || value === 'deepseek' || value === 'mimo' || value === 'kimi' || value === 'glm' || value === 'minimax' || value === 'dashscope' || value === 'opencode-zen' || value === 'opencode-go'
+  return value === 'ccx' || value === 'deepseek' || value === 'mimo' || value === 'compshare' || value === 'kimi' || value === 'glm' || value === 'minimax' || value === 'dashscope' || value === 'opencode-zen' || value === 'opencode-go'
 }
 
 const claudeProviderLabel = (value?: string) => {
@@ -98,6 +101,8 @@ const claudeTargetBaseUrl = () => {
       return 'https://api.deepseek.com/anthropic'
     case 'mimo':
       return claudeMimoBaseUrl.value || 'https://api.xiaomimimo.com/anthropic'
+    case 'compshare':
+      return 'https://cp.compshare.cn'
     case 'kimi':
       return 'https://api.moonshot.cn/anthropic'
     case 'glm':

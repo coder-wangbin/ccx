@@ -180,6 +180,7 @@ func TestDetectClaudeProvider(t *testing.T) {
 		{"https://api.deepseek.com/anthropic", ProviderDeepSeek},
 		{"https://api.mimo.xiaomi.com/v1", ProviderMiMo},
 		{"https://xiaomimimo.com/v1", ProviderMiMo},
+		{"https://cp.compshare.cn", ProviderCompshare},
 		{"https://custom-api.example.com/v1", ProviderCustom},
 	}
 	for _, c := range cases {
@@ -204,6 +205,8 @@ func TestNormalizeClaudeProvider(t *testing.T) {
 		{"DeepSeek", ProviderDeepSeek},
 		{"mimo", ProviderMiMo},
 		{"MIMO", ProviderMiMo},
+		{"compshare", ProviderCompshare},
+		{"Compshare", ProviderCompshare},
 		{"custom-provider", "custom-provider"},
 	}
 	for _, c := range cases {
@@ -453,6 +456,29 @@ func TestGetStatusClaude_DeepSeekProvider(t *testing.T) {
 	}
 }
 
+func TestGetStatusClaude_CompshareProvider(t *testing.T) {
+	svc := newTestService(t)
+	settingsPath := filepath.Join(svc.homeDir, ".claude", "settings.json")
+	os.MkdirAll(filepath.Dir(settingsPath), 0o755)
+	data := map[string]any{
+		"env": map[string]any{
+			"ANTHROPIC_BASE_URL": "https://cp.compshare.cn",
+		},
+	}
+	writeJSON(settingsPath, data)
+
+	status, err := svc.GetStatus(PlatformClaude, 3688)
+	if err != nil {
+		t.Fatalf("GetStatus failed: %v", err)
+	}
+	if status.Provider != ProviderCompshare {
+		t.Errorf("provider = %q, want %q", status.Provider, ProviderCompshare)
+	}
+	if !status.Configured {
+		t.Error("should be configured for Compshare")
+	}
+}
+
 func TestApplyAndRestoreClaude(t *testing.T) {
 	svc := newTestService(t)
 	settingsPath := filepath.Join(svc.homeDir, ".claude", "settings.json")
@@ -549,6 +575,14 @@ func TestSaveAndLoadProviderKeys(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SaveProviderKeyAsset failed: %v", err)
 	}
+	err = svc.SaveProviderKeyAsset(ProviderKeyAsset{
+		Provider: ProviderCompshare,
+		APIKey:   "cs-test-key",
+		BaseURL:  "https://cp.compshare.cn",
+	})
+	if err != nil {
+		t.Fatalf("SaveProviderKeyAsset failed: %v", err)
+	}
 
 	keys := svc.GetSavedProviderKeys()
 	if keys["channel:"+ProviderDeepSeek] != "sk-test-key" {
@@ -557,19 +591,35 @@ func TestSaveAndLoadProviderKeys(t *testing.T) {
 	if keys[PlatformClaude+":"+ProviderDeepSeek] != "sk-test-key" {
 		t.Errorf("claude key = %q", keys[PlatformClaude+":"+ProviderDeepSeek])
 	}
+	if keys["channel:"+ProviderCompshare] != "cs-test-key" {
+		t.Errorf("compshare channel key = %q", keys["channel:"+ProviderCompshare])
+	}
+	if keys[PlatformClaude+":"+ProviderCompshare] != "cs-test-key" {
+		t.Errorf("compshare claude key = %q", keys[PlatformClaude+":"+ProviderCompshare])
+	}
 
 	assets := svc.GetProviderKeyAssets()
-	found := false
+	foundDeepSeek := false
+	foundCompshare := false
 	for _, a := range assets {
-		if a.Provider == ProviderDeepSeek {
-			found = true
+		switch a.Provider {
+		case ProviderDeepSeek:
+			foundDeepSeek = true
 			if a.APIKey != "sk-test-key" {
 				t.Errorf("asset APIKey = %q", a.APIKey)
 			}
+		case ProviderCompshare:
+			foundCompshare = true
+			if a.APIKey != "cs-test-key" {
+				t.Errorf("compshare asset APIKey = %q", a.APIKey)
+			}
 		}
 	}
-	if !found {
+	if !foundDeepSeek {
 		t.Error("DeepSeek asset not found")
+	}
+	if !foundCompshare {
+		t.Error("Compshare asset not found")
 	}
 }
 
