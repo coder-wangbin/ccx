@@ -196,17 +196,17 @@ const submit = async () => {
               通过推广链接注册，领取 5 元平台试用金
               <ExternalLink class="h-3 w-3" />
             </button>
-          </div>
-          <div class="flex flex-wrap items-center gap-1.5">
             <button
               v-if="providerConsoleLinks[currentPreset.id]"
               type="button"
-              class="inline-flex items-center gap-1.5 text-xs font-medium text-slate-400 hover:text-slate-200"
+              class="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-slate-400 hover:text-slate-200"
               @click="openProviderConsole(currentPreset.id)"
             >
               访问官方控制台
               <ExternalLink class="h-3 w-3" />
             </button>
+          </div>
+          <div class="flex flex-wrap gap-1.5">
             <span
               v-for="badge in capabilityBadges"
               :key="badge"
