@@ -116,6 +116,7 @@ const syncVersion = async () => {
 }
 
 const check = async () => {
+  if (state.version?.distribution === 'store') return null
   state.checking = true
   state.error = ''
   try {

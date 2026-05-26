@@ -25,9 +25,10 @@ var assets embed.FS
 
 // 构建时通过 -ldflags 注入；保留默认值仅用于 dev 模式
 var (
-	Version   = "dev"
-	BuildTime = "unknown"
-	GitCommit = "unknown"
+	Version      = "dev"
+	BuildTime    = "unknown"
+	GitCommit    = "unknown"
+	Distribution = "github"
 )
 
 func init() {
@@ -72,9 +73,10 @@ func run() error {
 	log.Printf("[Desktop-Boot] single instance lock acquired")
 	desktopService := NewDesktopService(manager)
 	desktopService.setVersion(VersionInfo{
-		Version:   Version,
-		BuildTime: BuildTime,
-		GitCommit: GitCommit,
+		Version:      Version,
+		BuildTime:    BuildTime,
+		GitCommit:    GitCommit,
+		Distribution: Distribution,
 	})
 	log.Printf("[Desktop-Boot] desktop service initialized")
 	dockService := dock.New()
@@ -359,19 +361,24 @@ func run() error {
 			}
 		})
 
-		menu.Add("检查更新…").OnClick(func(ctx *application.Context) {
-			go func() {
-				info, err := desktopService.CheckUpdate()
-				if err != nil {
-					log.Printf("[Desktop-Updater] 检查更新失败: %v", err)
-					app.Event.Emit("desktop:tray-error", fmt.Sprintf("检查更新失败: %v", err))
-					return
-				}
-				if !info.Available {
-					app.Event.Emit("desktop:tray-error", "已经是最新版本")
-				}
-			}()
-		})
+		if desktopService.isStoreDistribution() {
+			updateItem := menu.Add("由 Microsoft Store 更新")
+			updateItem.SetEnabled(false)
+		} else {
+			menu.Add("检查更新…").OnClick(func(ctx *application.Context) {
+				go func() {
+					info, err := desktopService.CheckUpdate()
+					if err != nil {
+						log.Printf("[Desktop-Updater] 检查更新失败: %v", err)
+						app.Event.Emit("desktop:tray-error", fmt.Sprintf("检查更新失败: %v", err))
+						return
+					}
+					if !info.Available {
+						app.Event.Emit("desktop:tray-error", "已经是最新版本")
+					}
+				}()
+			})
+		}
 
 		menu.AddSeparator()
 
@@ -447,26 +454,27 @@ func run() error {
 		}
 	})
 
-	// 启动 5s 后首次检查更新，之后每 30 分钟轮询一次
-	go func() {
-		time.Sleep(5 * time.Second)
-		runCheck := func() {
-			info, err := desktopService.CheckUpdate()
-			if err != nil {
-				log.Printf("[Desktop-Updater] 自动检查失败: %v", err)
-				return
+	if !desktopService.isStoreDistribution() {
+		go func() {
+			time.Sleep(5 * time.Second)
+			runCheck := func() {
+				info, err := desktopService.CheckUpdate()
+				if err != nil {
+					log.Printf("[Desktop-Updater] 自动检查失败: %v", err)
+					return
+				}
+				if info.Available {
+					log.Printf("[Desktop-Updater] 发现新版本 %s", info.LatestVersion)
+				}
 			}
-			if info.Available {
-				log.Printf("[Desktop-Updater] 发现新版本 %s", info.LatestVersion)
-			}
-		}
-		runCheck()
-		ticker := time.NewTicker(30 * time.Minute)
-		defer ticker.Stop()
-		for range ticker.C {
 			runCheck()
-		}
-	}()
+			ticker := time.NewTicker(30 * time.Minute)
+			defer ticker.Stop()
+			for range ticker.C {
+				runCheck()
+			}
+		}()
+	}
 
 	showMainWindow(false)
 	log.Printf("[Desktop-Boot] main window show requested")

@@ -34,9 +34,10 @@ type DesktopService struct {
 }
 
 type VersionInfo struct {
-	Version   string `json:"version"`
-	BuildTime string `json:"buildTime"`
-	GitCommit string `json:"gitCommit"`
+	Version      string `json:"version"`
+	BuildTime    string `json:"buildTime"`
+	GitCommit    string `json:"gitCommit"`
+	Distribution string `json:"distribution"`
 }
 
 type UpdateInfo struct {
@@ -72,8 +73,17 @@ func (s *DesktopService) setMainWindow(window application.Window) {
 }
 
 func (s *DesktopService) setVersion(v VersionInfo) {
+	if v.Distribution == "" {
+		v.Distribution = "github"
+	}
 	s.versionInfo = v
-	s.updater = updater.New(v.Version)
+	if !s.isStoreDistribution() {
+		s.updater = updater.New(v.Version)
+	}
+}
+
+func (s *DesktopService) isStoreDistribution() bool {
+	return strings.EqualFold(s.versionInfo.Distribution, "store")
 }
 
 func (s *DesktopService) setNotifications(svc *notifications.NotificationService) {
@@ -590,6 +600,9 @@ func (s *DesktopService) Shutdown() {
 // CheckUpdate 查询是否有新版本可用。
 func (s *DesktopService) CheckUpdate() (UpdateInfo, error) {
 	info := UpdateInfo{CurrentVersion: s.versionInfo.Version}
+	if s.isStoreDistribution() {
+		return info, nil
+	}
 	if s.updater == nil {
 		return info, fmt.Errorf("updater 未初始化")
 	}
@@ -616,6 +629,9 @@ func (s *DesktopService) CheckUpdate() (UpdateInfo, error) {
 
 // DownloadAndInstall 下载、校验并触发安装。整个流程通过 update:progress 事件推送进度。
 func (s *DesktopService) DownloadAndInstall(info UpdateInfo) error {
+	if s.isStoreDistribution() {
+		return fmt.Errorf("Microsoft Store 版本由 Microsoft Store 自动更新")
+	}
 	if s.updater == nil {
 		return fmt.Errorf("updater 未初始化")
 	}

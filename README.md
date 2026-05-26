@@ -74,7 +74,7 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for the detailed design.
 
 ### Option 1: Binary
 
-1. Download the latest binary from [Releases](https://github.com/BenedictKing/ccx/releases/latest)
+1. Download the latest binary from [Releases](https://github.com/BenedictKing/ccx/releases/latest). Windows users can prefer the Microsoft Store build once published; Store handles signing and updates.
 2. Create a `.env` file next to the binary:
 
 ```bash

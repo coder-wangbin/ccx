@@ -298,12 +298,54 @@ jobs:
           sha256sum ".release-staging/CCX-Desktop-${VERSION}-windows-arm64-setup.exe" | awk '{print $1}' > ".release-staging/CCX-Desktop-${VERSION}-windows-arm64-setup.exe.sha256"
         working-directory: ./desktop
 
+      - name: Build Desktop amd64 Store MSIX
+        env:
+          BUILD_VERSION: ${{ github.ref_name }}
+          GIT_COMMIT: ${{ github.sha }}
+          MSIX_PACKAGE_NAME: ${{ vars.MSIX_PACKAGE_NAME || 'CCX.Desktop' }}
+          MSIX_PUBLISHER: ${{ vars.MSIX_PUBLISHER || 'CN=CCX' }}
+          MSIX_PUBLISHER_DISPLAY_NAME: ${{ vars.MSIX_PUBLISHER_DISPLAY_NAME || 'CCX' }}
+          MSIX_DISPLAY_NAME: ${{ vars.MSIX_DISPLAY_NAME || 'CCX Desktop' }}
+          MSIX_DESCRIPTION: ${{ vars.MSIX_DESCRIPTION || 'Desktop shell for the CCX core gateway service.' }}
+        run: |
+          cp ../backend-go/ccx-windows-amd64.exe bin/ccx-go.exe
+          BUILD_TIME=$(date -u '+%Y-%m-%d_%H:%M:%S')
+          VERSION="${BUILD_VERSION#v}"
+          rm -f bin/*.msix
+          wails3 task windows:package FORMAT=msix ARCH=amd64 BUILD_VERSION="${VERSION}" BUILD_TIME="${BUILD_TIME}" GIT_COMMIT="${GIT_COMMIT}" DISTRIBUTION=store MSIX_PACKAGE_NAME="${MSIX_PACKAGE_NAME}" MSIX_PUBLISHER="${MSIX_PUBLISHER}" MSIX_PUBLISHER_DISPLAY_NAME="${MSIX_PUBLISHER_DISPLAY_NAME}" MSIX_DISPLAY_NAME="${MSIX_DISPLAY_NAME}" MSIX_DESCRIPTION="${MSIX_DESCRIPTION}"
+          mv "bin/ccx-desktop-amd64.msix" "bin/CCX-Desktop-${VERSION}-windows-amd64-store.msix"
+          mkdir -p .release-staging
+          mv "bin/CCX-Desktop-${VERSION}-windows-amd64-store.msix" ".release-staging/"
+          sha256sum ".release-staging/CCX-Desktop-${VERSION}-windows-amd64-store.msix" | awk '{print $1}' > ".release-staging/CCX-Desktop-${VERSION}-windows-amd64-store.msix.sha256"
+        working-directory: ./desktop
+
+      - name: Build Desktop arm64 Store MSIX
+        env:
+          BUILD_VERSION: ${{ github.ref_name }}
+          GIT_COMMIT: ${{ github.sha }}
+          MSIX_PACKAGE_NAME: ${{ vars.MSIX_PACKAGE_NAME || 'CCX.Desktop' }}
+          MSIX_PUBLISHER: ${{ vars.MSIX_PUBLISHER || 'CN=CCX' }}
+          MSIX_PUBLISHER_DISPLAY_NAME: ${{ vars.MSIX_PUBLISHER_DISPLAY_NAME || 'CCX' }}
+          MSIX_DISPLAY_NAME: ${{ vars.MSIX_DISPLAY_NAME || 'CCX Desktop' }}
+          MSIX_DESCRIPTION: ${{ vars.MSIX_DESCRIPTION || 'Desktop shell for the CCX core gateway service.' }}
+        run: |
+          cp ../backend-go/ccx-windows-arm64.exe bin/ccx-go.exe
+          BUILD_TIME=$(date -u '+%Y-%m-%d_%H:%M:%S')
+          VERSION="${BUILD_VERSION#v}"
+          rm -f bin/*.msix
+          wails3 task windows:package FORMAT=msix ARCH=arm64 BUILD_VERSION="${VERSION}" BUILD_TIME="${BUILD_TIME}" GIT_COMMIT="${GIT_COMMIT}" DISTRIBUTION=store MSIX_PACKAGE_NAME="${MSIX_PACKAGE_NAME}" MSIX_PUBLISHER="${MSIX_PUBLISHER}" MSIX_PUBLISHER_DISPLAY_NAME="${MSIX_PUBLISHER_DISPLAY_NAME}" MSIX_DISPLAY_NAME="${MSIX_DISPLAY_NAME}" MSIX_DESCRIPTION="${MSIX_DESCRIPTION}"
+          mv "bin/ccx-desktop-arm64.msix" "bin/CCX-Desktop-${VERSION}-windows-arm64-store.msix"
+          mkdir -p .release-staging
+          mv "bin/CCX-Desktop-${VERSION}-windows-arm64-store.msix" ".release-staging/"
+          sha256sum ".release-staging/CCX-Desktop-${VERSION}-windows-arm64-store.msix" | awk '{print $1}' > ".release-staging/CCX-Desktop-${VERSION}-windows-arm64-store.msix.sha256"
+        working-directory: ./desktop
+
       - name: Generate Windows checksums
         run: |
           {
             sha256sum backend-go/ccx-windows-amd64.exe backend-go/ccx-windows-arm64.exe \
               | awk '{split($2,a,"/"); $2=a[length(a)]; print}'
-            for f in desktop/.release-staging/CCX-Desktop-*-windows-*-setup.exe; do
+            for f in desktop/.release-staging/CCX-Desktop-*-windows-*-setup.exe desktop/.release-staging/CCX-Desktop-*-windows-*-store.msix; do
               sha256sum "$f" | awk '{split($2,a,"/"); $2=a[length(a)]; print}'
             done
           } > checksums-windows.txt
@@ -326,6 +368,10 @@ jobs:
             desktop/.release-staging/CCX-Desktop-*-windows-arm64-setup.exe
             desktop/.release-staging/CCX-Desktop-*-windows-amd64-setup.exe.sha256
             desktop/.release-staging/CCX-Desktop-*-windows-arm64-setup.exe.sha256
+            desktop/.release-staging/CCX-Desktop-*-windows-amd64-store.msix
+            desktop/.release-staging/CCX-Desktop-*-windows-arm64-store.msix
+            desktop/.release-staging/CCX-Desktop-*-windows-amd64-store.msix.sha256
+            desktop/.release-staging/CCX-Desktop-*-windows-arm64-store.msix.sha256
             checksums-windows.txt
             checksums-windows.txt.sigstore.json
           draft: true

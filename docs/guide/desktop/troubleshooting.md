@@ -78,7 +78,9 @@ sudo dnf update ccx-desktop
 
 ### 更新下载失败
 
-检查网络连接。如果使用代理，确保 GitHub Releases 可访问。可手动从 [Releases 页面](https://github.com/BenedictKing/ccx/releases) 下载安装。
+GitHub 安装包版会访问 GitHub Releases 检查和下载更新。检查网络连接；如果使用代理，确保 GitHub Releases 可访问。可手动从 [Releases 页面](https://github.com/BenedictKing/ccx/releases) 下载安装。
+
+Microsoft Store 版由 Store 负责更新，不使用应用内 GitHub 更新器。如果 Store 更新失败，请在 Microsoft Store 的库页面重试或重新安装。
 
 ## 配置问题
 

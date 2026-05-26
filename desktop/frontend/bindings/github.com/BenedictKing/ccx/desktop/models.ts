@@ -83,6 +83,7 @@ export class VersionInfo {
     "version": string;
     "buildTime": string;
     "gitCommit": string;
+    "distribution": string;
 
     /** Creates a new VersionInfo instance. */
     constructor($$source: Partial<VersionInfo> = {}) {
@@ -94,6 +95,9 @@ export class VersionInfo {
         }
         if (!("gitCommit" in $$source)) {
             this["gitCommit"] = "";
+        }
+        if (!("distribution" in $$source)) {
+            this["distribution"] = "";
         }
 
         Object.assign(this, $$source);

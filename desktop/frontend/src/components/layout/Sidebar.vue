@@ -21,6 +21,8 @@ const modelValue = defineModel<TabValue>({ required: true })
 const { status, loading, autostartEnabled, startService, stopService, setAutostart } = useStatus()
 const { state: updaterState, check: checkUpdate } = useUpdater()
 
+const isStoreDistribution = computed(() => updaterState.version?.distribution === 'store')
+
 const menuItems = [
   { id: 'status', label: '网关监控', icon: Activity, desc: '实时状态及核心日志' },
   { id: 'agent', label: 'Agent 配置', icon: Settings, desc: '本地开发代理控制' },
@@ -156,16 +158,18 @@ const handleDaemonAction = async () => {
           <div class="flex justify-between items-center">
             <span>当前版本</span>
             <button
-              @click="checkUpdate()"
-              :disabled="updaterState.checking"
+              @click="!isStoreDistribution && checkUpdate()"
+              :disabled="updaterState.checking || isStoreDistribution"
               :class="[
-                'flex items-center gap-1 px-1.5 py-0.5 rounded border transition-all duration-200 cursor-pointer',
-                'bg-slate-900/80 text-slate-300 border-white/[0.02] hover:text-blue-400 hover:border-blue-500/20',
+                'flex items-center gap-1 px-1.5 py-0.5 rounded border transition-all duration-200',
+                isStoreDistribution
+                  ? 'bg-slate-900/80 text-slate-500 border-white/[0.02] cursor-default'
+                  : 'bg-slate-900/80 text-slate-300 border-white/[0.02] hover:text-blue-400 hover:border-blue-500/20 cursor-pointer',
                 updaterState.checking && 'opacity-60 cursor-wait'
               ]"
-              :title="updaterState.checking ? '检查中…' : '点击检查更新'"
+              :title="isStoreDistribution ? 'Microsoft Store 版本由 Store 自动更新' : updaterState.checking ? '检查中…' : '点击检查更新'"
             >
-              <RefreshCw class="w-2.5 h-2.5" :class="updaterState.checking && 'animate-spin'" />
+              <RefreshCw v-if="!isStoreDistribution" class="w-2.5 h-2.5" :class="updaterState.checking && 'animate-spin'" />
               <span>{{ updaterState.version?.version || '—' }}</span>
             </button>
           </div>

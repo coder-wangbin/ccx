@@ -140,4 +140,23 @@ git push origin vX.Y.Z
 
 现有 `.sha256` sidecar 文件保留不变，desktop/backend updater 行为不受影响。
 
+## Windows Store / MSIX
+
+Windows release job 同时生成 Store/MSIX 验证产物：
+
+- `CCX-Desktop-{version}-windows-amd64-store.msix`
+- `CCX-Desktop-{version}-windows-arm64-store.msix`
+
+MSIX 包使用 `DISTRIBUTION=store` 构建，桌面端不会初始化 GitHub Releases 自动更新器，更新由 Microsoft Store 负责。正式提交 Store 前，需要在 GitHub repository variables 中配置 Partner Center 的包身份：
+
+| 变量 | 来源 |
+|------|------|
+| `MSIX_PACKAGE_NAME` | Partner Center 的 Package/Identity Name |
+| `MSIX_PUBLISHER` | Partner Center 的 Publisher，例如 `CN=...` |
+| `MSIX_PUBLISHER_DISPLAY_NAME` | 发布者显示名 |
+| `MSIX_DISPLAY_NAME` | Store/App 显示名 |
+| `MSIX_DESCRIPTION` | 包描述 |
+
+当前流程只生成 MSIX 包并上传到 Draft Release，不自动提交 Partner Center。Store 提交仍需在 Partner Center 手工上传、填写商店信息并等待认证。
+
 用户验证方式见 [验证发布产物](./verification.md)。

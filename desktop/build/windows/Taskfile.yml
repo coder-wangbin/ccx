@@ -26,7 +26,7 @@ tasks:
       - cmd: rm -f *.syso
         platforms: [linux, darwin]
     vars:
-      VERSION_LDFLAGS: '-X main.Version={{.BUILD_VERSION | default "dev"}} -X main.BuildTime={{.BUILD_TIME | default "unknown"}} -X main.GitCommit={{.GIT_COMMIT | default "unknown"}}'
+      VERSION_LDFLAGS: '-X main.Version={{.BUILD_VERSION | default "dev"}} -X main.BuildTime={{.BUILD_TIME | default "unknown"}} -X main.GitCommit={{.GIT_COMMIT | default "unknown"}} -X main.Distribution={{.DISTRIBUTION | default "github"}}'
       BUILD_FLAGS: '{{if eq .PRODUCTION "true"}}-tags production -trimpath -buildvcs=false -ldflags="-w -s -H windowsgui {{.VERSION_LDFLAGS}}"{{else}}-buildvcs=false -gcflags=all="-l" -ldflags="{{.VERSION_LDFLAGS}}"{{end}}'
     env:
       GOOS: windows
@@ -41,6 +41,24 @@ tasks:
         vars:
           ARCH:
             ref: .ARCH
+          BUILD_VERSION:
+            ref: .BUILD_VERSION
+          BUILD_TIME:
+            ref: .BUILD_TIME
+          GIT_COMMIT:
+            ref: .GIT_COMMIT
+          DISTRIBUTION:
+            ref: .DISTRIBUTION
+          MSIX_PACKAGE_NAME:
+            ref: .MSIX_PACKAGE_NAME
+          MSIX_PUBLISHER:
+            ref: .MSIX_PUBLISHER
+          MSIX_PUBLISHER_DISPLAY_NAME:
+            ref: .MSIX_PUBLISHER_DISPLAY_NAME
+          MSIX_DISPLAY_NAME:
+            ref: .MSIX_DISPLAY_NAME
+          MSIX_DESCRIPTION:
+            ref: .MSIX_DESCRIPTION
     vars:
       FORMAT: '{{.FORMAT | default "nsis"}}'
 
@@ -88,27 +106,34 @@ tasks:
           ARCH:
             ref: .ARCH
           PRODUCTION: "true"
+          BUILD_VERSION:
+            ref: .BUILD_VERSION
+          BUILD_TIME:
+            ref: .BUILD_TIME
+          GIT_COMMIT:
+            ref: .GIT_COMMIT
+          DISTRIBUTION: '{{.DISTRIBUTION | default "store"}}'
     cmds:
-      - |-
-        wails3 tool msix \
-          --config "{{.ROOT_DIR}}/wails.json" \
-          --name "{{.APP_NAME}}" \
-          --executable "{{.ROOT_DIR}}/{{.BIN_DIR}}/{{.APP_NAME}}.exe" \
-          --arch "{{.ARCH}}" \
-          --out "{{.ROOT_DIR}}/{{.BIN_DIR}}/{{.APP_NAME}}-{{.ARCH}}.msix" \
-          {{if .CERT_PATH}}--cert "{{.CERT_PATH}}"{{end}} \
-          {{if .PUBLISHER}}--publisher "{{.PUBLISHER}}"{{end}} \
-          {{if .USE_MSIX_TOOL}}--use-msix-tool{{else}}--use-makeappx{{end}}
+      - cmd: powershell -NoProfile -ExecutionPolicy Bypass -File "{{.ROOT_DIR}}/build/windows/msix/package.ps1" -RootDir "{{.ROOT_DIR}}" -Arch "{{.ARCH}}" -Version "{{.BUILD_VERSION | default "0.1.0"}}" -PackageName "{{.MSIX_PACKAGE_NAME}}" -Publisher "{{.MSIX_PUBLISHER}}" -PublisherDisplayName "{{.MSIX_PUBLISHER_DISPLAY_NAME}}" -DisplayName "{{.MSIX_DISPLAY_NAME}}" -Description "{{.MSIX_DESCRIPTION}}" -OutPath "{{.ROOT_DIR}}/{{.BIN_DIR}}/{{.APP_NAME}}-{{.ARCH}}.msix"
+        platforms: [windows]
+      - cmd: echo "MSIX packaging requires Windows SDK makeappx.exe on Windows." && exit 1
+        platforms: [linux, darwin]
     vars:
       ARCH: '{{.ARCH}}'
-      CERT_PATH: '{{.CERT_PATH | default ""}}'
-      PUBLISHER: '{{.PUBLISHER | default ""}}'
-      USE_MSIX_TOOL: '{{.USE_MSIX_TOOL | default "false"}}'
+      BUILD_VERSION: '{{.BUILD_VERSION | default "0.1.0"}}'
+      MSIX_PACKAGE_NAME: '{{.MSIX_PACKAGE_NAME | default "CCX.Desktop"}}'
+      MSIX_PUBLISHER: '{{.MSIX_PUBLISHER | default "CN=CCX"}}'
+      MSIX_PUBLISHER_DISPLAY_NAME: '{{.MSIX_PUBLISHER_DISPLAY_NAME | default "CCX"}}'
+      MSIX_DISPLAY_NAME: '{{.MSIX_DISPLAY_NAME | default "CCX Desktop"}}'
+      MSIX_DESCRIPTION: '{{.MSIX_DESCRIPTION | default "Desktop shell for the CCX core gateway service."}}'
 
   install:msix:tools:
-    summary: Installs tools required for MSIX packaging
+    summary: Checks tools required for MSIX packaging
     cmds:
-      - wails3 tool msix-install-tools
+      - cmd: powershell -NoProfile -Command "if (Get-Command makeappx.exe -ErrorAction SilentlyContinue) { exit 0 }; $kits = Join-Path ${env:ProgramFiles(x86)} 'Windows Kits\10\bin'; if (Test-Path $kits) { $tool = Get-ChildItem -Path $kits -Filter makeappx.exe -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1; if ($tool) { exit 0 } }; throw 'makeappx.exe not found. Install the Windows SDK.'"
+        platforms: [windows]
+      - cmd: echo "MSIX packaging requires Windows SDK makeappx.exe on Windows."
+        platforms: [linux, darwin]
 
   run:
     cmds:

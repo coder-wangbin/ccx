@@ -112,6 +112,7 @@ shasum -a 256 ccx-darwin-arm64
 | `checksums-{platform}.txt` | 单平台 SHA256 清单 |
 | `checksums-{platform}.txt.sigstore.json` | 单平台 Sigstore bundle |
 | `{artifact}.sha256` | 单个产物的 SHA256（仅含 hex hash，供 updater 自动校验） |
+| `CCX-Desktop-*-windows-*-store.msix` | Windows Store/MSIX 提交与验证包，公开安装优先使用 Microsoft Store |
 
 ## 了解更多
 

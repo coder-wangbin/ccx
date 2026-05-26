@@ -4,14 +4,17 @@ CCX Desktop 是一个桌面后台应用，提供本地 CCX 网关管理、Agent 
 
 ## 下载
 
-从 [GitHub Releases](https://github.com/BenedictKing/ccx/releases) 下载对应平台的安装包：
+Windows 用户推荐优先使用 Microsoft Store 版本（上架后提供），由 Store 负责签名与自动更新。开发者或无法使用 Store 的环境，可继续从 [GitHub Releases](https://github.com/BenedictKing/ccx/releases) 下载对应平台安装包：
 
 | 平台 | 文件名格式 |
 |------|-----------|
 | macOS (Apple Silicon) | `CCX-Desktop-{version}-darwin-arm64.dmg` |
 | macOS (Intel) | `CCX-Desktop-{version}-darwin-amd64.dmg` |
-| Windows | `CCX-Desktop-{version}-windows-{arch}-setup.exe` |
+| Windows (GitHub) | `CCX-Desktop-{version}-windows-{arch}-setup.exe` |
+| Windows (Store/MSIX) | `CCX-Desktop-{version}-windows-{arch}-store.msix` |
 | Linux | `CCX-Desktop-{version}-linux-amd64.AppImage` |
+
+`*-store.msix` 主要用于 Microsoft Store 提交与验证。公开安装优先使用 Microsoft Store；直接 sideload `.msix` 仍可能需要受信任签名环境。
 
 Release 页面同时附带 `.sha256` 校验文件，可验证下载完整性：
 
@@ -29,9 +32,12 @@ shasum -a 256 -c CCX-Desktop-*.sha256
 
 ### Windows
 
-1. 双击 `-setup.exe` 安装程序
-2. 按提示完成安装
-3. 如果 SmartScreen 弹出警告，点击"更多信息 → 仍要运行"
+推荐渠道：
+
+1. Microsoft Store 版本：从 Store 安装，签名与更新由 Microsoft Store 处理。
+2. GitHub 版本：双击 `-setup.exe` 安装程序并按提示完成安装。
+
+如果 GitHub 版本触发 SmartScreen 警告，点击"更多信息 → 仍要运行"。如果不希望处理签名/SmartScreen 提示，优先使用 Store 版本。
 
 ### Linux (AppImage)
 
@@ -79,13 +85,15 @@ cd backend-go && make build
 
 ## 自动更新
 
-CCX Desktop 内置自动更新：
+GitHub 安装包版内置自动更新：
 
 - 启动 5 秒后自动检查一次
 - 之后每 30 分钟检查一次
 - 也可在侧边栏底部点击版本号手动检查
 
-更新流程：
+Microsoft Store 版不走 GitHub Releases 自动更新，侧边栏和托盘会提示由 Store 更新。
+
+GitHub 版更新流程：
 
 1. 发现新版本 → 弹出更新对话框
 2. 下载安装包（带进度条）
@@ -103,7 +111,7 @@ CCX Desktop 关闭窗口后会最小化到系统托盘，托盘菜单提供：
 - 打开 Web UI
 - 复制 Web UI 地址和 PROXY_ACCESS_KEY
 - 开机自启开关
-- 检查更新
+- 检查更新（Store 版本显示由 Microsoft Store 更新）
 
 ## 环境配置
 
