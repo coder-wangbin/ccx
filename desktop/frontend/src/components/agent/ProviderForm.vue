@@ -31,7 +31,7 @@ const mimoPlanOptions = [
 
 const dashScopePlanOptions = [
   { label: '按量', value: 'https://dashscope.aliyuncs.com/apps/anthropic' },
-  { label: 'Coding Plan 订阅制', value: 'https://coding.dashscope.aliyuncs.com/apps/anthropic' },
+  { label: '订阅套餐', value: 'https://coding.dashscope.aliyuncs.com/apps/anthropic' },
 ]
 
 const onProviderChange = (e: Event) => {
