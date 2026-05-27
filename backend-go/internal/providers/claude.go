@@ -180,6 +180,145 @@ func convertThinkingToReasoningContent(bodyBytes []byte) []byte {
 	return newBytes
 }
 
+// convertReasoningContentToThinkingBlocks 将真实 reasoning_content 投影为 Claude thinking 块。
+//
+// 严格 Claude thinking 上游会校验历史 assistant 的 content[].thinking，而不是顶层
+// reasoning_content。该函数只回传真正存在的 reasoning；历史占位不会被伪造成 thinking。
+func convertReasoningContentToThinkingBlocks(bodyBytes []byte, keepTopLevelReasoning bool) []byte {
+	decoder := json.NewDecoder(bytes.NewReader(bodyBytes))
+	decoder.UseNumber()
+
+	var data map[string]interface{}
+	if err := decoder.Decode(&data); err != nil {
+		return bodyBytes
+	}
+
+	messages, ok := data["messages"].([]interface{})
+	if !ok {
+		return bodyBytes
+	}
+
+	modified := false
+	for _, rawMsg := range messages {
+		msgMap, ok := rawMsg.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		if role, _ := msgMap["role"].(string); role != "assistant" {
+			continue
+		}
+
+		topLevelReasoning, _ := msgMap["reasoning_content"].(string)
+		hasRealTopLevelReasoning := isRealReasoningText(topLevelReasoning)
+		if !keepTopLevelReasoning && topLevelReasoning != "" {
+			delete(msgMap, "reasoning_content")
+			modified = true
+		}
+		if keepTopLevelReasoning && strings.TrimSpace(topLevelReasoning) == legacyThinkingPlaceholder {
+			delete(msgMap, "reasoning_content")
+			modified = true
+		}
+
+		content, hasContentArray := msgMap["content"].([]interface{})
+		if !hasContentArray {
+			if !hasRealTopLevelReasoning {
+				continue
+			}
+			newContent := []interface{}{map[string]interface{}{
+				"type":     "thinking",
+				"thinking": topLevelReasoning,
+			}}
+			if text, ok := msgMap["content"].(string); ok && text != "" {
+				newContent = append(newContent, map[string]interface{}{"type": "text", "text": text})
+			}
+			msgMap["content"] = newContent
+			modified = true
+			continue
+		}
+
+		filteredContent := make([]interface{}, 0, len(content)+1)
+		hasRealThinkingBlock := false
+		contentModified := false
+		blockReasoningParts := make([]string, 0, 1)
+		for _, rawBlock := range content {
+			blockMap, ok := rawBlock.(map[string]interface{})
+			if !ok {
+				filteredContent = append(filteredContent, rawBlock)
+				continue
+			}
+
+			blockType, _ := blockMap["type"].(string)
+			blockType = strings.TrimSpace(blockType)
+			if blockType == "thinking" {
+				thinking, _ := blockMap["thinking"].(string)
+				if !isRealReasoningText(thinking) {
+					modified = true
+					contentModified = true
+					continue
+				}
+				hasRealThinkingBlock = true
+				filteredContent = append(filteredContent, blockMap)
+				continue
+			}
+
+			if reasoning, exists := blockMap["reasoning_content"].(string); exists {
+				if isRealReasoningText(reasoning) {
+					blockReasoningParts = append(blockReasoningParts, reasoning)
+				}
+				delete(blockMap, "reasoning_content")
+				modified = true
+				contentModified = true
+			}
+			filteredContent = append(filteredContent, blockMap)
+		}
+
+		reasoningForThinking := ""
+		switch {
+		case hasRealThinkingBlock:
+		case hasRealTopLevelReasoning:
+			reasoningForThinking = topLevelReasoning
+		case len(blockReasoningParts) > 0:
+			reasoningForThinking = strings.Join(blockReasoningParts, "")
+		}
+		if reasoningForThinking != "" {
+			filteredContent = append([]interface{}{map[string]interface{}{
+				"type":     "thinking",
+				"thinking": reasoningForThinking,
+			}}, filteredContent...)
+			modified = true
+			contentModified = true
+		}
+
+		if len(filteredContent) == 0 {
+			filteredContent = []interface{}{map[string]interface{}{
+				"type": "text",
+				"text": missingAssistantResponseText,
+			}}
+			modified = true
+			contentModified = true
+		}
+		if contentModified {
+			msgMap["content"] = filteredContent
+		}
+	}
+
+	if !modified {
+		return bodyBytes
+	}
+	data["messages"] = messages
+
+	newBytes, err := utils.MarshalJSONNoEscape(data)
+	if err != nil {
+		return bodyBytes
+	}
+	return newBytes
+}
+
+func isRealReasoningText(text string) bool {
+	trimmed := strings.TrimSpace(text)
+	return trimmed != "" && trimmed != legacyThinkingPlaceholder
+}
+
 func summarizeAssistantReasoningState(bodyBytes []byte) string {
 	decoder := json.NewDecoder(bytes.NewReader(bodyBytes))
 	decoder.UseNumber()
@@ -437,9 +576,13 @@ func (p *ClaudeProvider) ConvertToProviderRequest(c *gin.Context, upstream *conf
 		bodyBytes = convertThinkingToReasoningContent(bodyBytes)
 		log.Printf("[Claude-Reasoning-Debug] after_passback channel=%s summary=%s", upstream.Name, summarizeAssistantReasoningState(bodyBytes))
 	}
+	if upstream.PassbackThinkingBlocks {
+		bodyBytes = convertReasoningContentToThinkingBlocks(bodyBytes, upstream.PassbackReasoningContent)
+		log.Printf("[Claude-Reasoning-Debug] after_thinking_passback channel=%s summary=%s", upstream.Name, summarizeAssistantReasoningState(bodyBytes))
+	}
 	if upstream.StripEmptyTextBlocks {
 		bodyBytes = stripEmptyTextBlocksFromBody(bodyBytes)
-		if !upstream.PassbackReasoningContent {
+		if !upstream.PassbackReasoningContent && !upstream.PassbackThinkingBlocks {
 			bodyBytes = stripThinkingBlocksFromBody(bodyBytes)
 		}
 	}

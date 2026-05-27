@@ -13,6 +13,7 @@ export interface ChannelFormLike {
   injectDummyThoughtSignature: boolean
   stripThoughtSignature: boolean
   passbackReasoningContent: boolean
+  passbackThinkingBlocks: boolean
   description: string
   apiKeys: string[]
   modelMapping: Record<string, string>
@@ -59,6 +60,7 @@ export function buildChannelPayload(form: ChannelFormLike): Omit<Channel, 'index
     injectDummyThoughtSignature: form.injectDummyThoughtSignature,
     stripThoughtSignature: form.stripThoughtSignature,
     passbackReasoningContent: form.passbackReasoningContent,
+    passbackThinkingBlocks: form.passbackThinkingBlocks,
     description: form.description.trim(),
     apiKeys: processedApiKeys,
     modelMapping: form.modelMapping,

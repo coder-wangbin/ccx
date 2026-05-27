@@ -48,11 +48,13 @@ func TestBuildHealthCheckURLs_UseExistingVersionSuffix(t *testing.T) {
 
 func TestGetUpstreams_IncludesUnifiedStateFields(t *testing.T) {
 	cm := setupResponsesConfigManager(t, []config.UpstreamConfig{{
-		Name:        "resp-ch",
-		ServiceType: "responses",
-		BaseURL:     "https://api.example.com",
-		APIKeys:     []string{"sk-1"},
-		Status:      "suspended",
+		Name:                     "resp-ch",
+		ServiceType:              "claude",
+		BaseURL:                  "https://api.example.com",
+		APIKeys:                  []string{"sk-1"},
+		Status:                   "suspended",
+		PassbackReasoningContent: true,
+		PassbackThinkingBlocks:   true,
 		DisabledAPIKeys: []config.DisabledKeyInfo{{
 			Key:        "sk-disabled",
 			Reason:     "insufficient_balance",
@@ -93,6 +95,12 @@ func TestGetUpstreams_IncludesUnifiedStateFields(t *testing.T) {
 	}
 	if got := resp.Channels[0]["runtimeState"]; got != "disabled_keys_present" {
 		t.Fatalf("runtimeState = %v, want disabled_keys_present", got)
+	}
+	if got := resp.Channels[0]["passbackReasoningContent"]; got != true {
+		t.Fatalf("passbackReasoningContent = %v, want true", got)
+	}
+	if got := resp.Channels[0]["passbackThinkingBlocks"]; got != true {
+		t.Fatalf("passbackThinkingBlocks = %v, want true", got)
 	}
 	disabledKeys, ok := resp.Channels[0]["disabledApiKeys"].([]interface{})
 	if !ok || len(disabledKeys) != 1 {

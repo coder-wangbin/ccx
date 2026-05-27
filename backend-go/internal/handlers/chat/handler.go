@@ -414,7 +414,7 @@ func buildProviderRequest(
 		if err != nil {
 			return nil, err
 		}
-		if !upstream.PassbackReasoningContent {
+		if !upstream.PassbackReasoningContent && !upstream.PassbackThinkingBlocks {
 			requestBody = stripThinkingBlocksFromBody(requestBody)
 		}
 		if skipVersionPrefix {

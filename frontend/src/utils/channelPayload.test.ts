@@ -14,6 +14,7 @@ describe('buildChannelPayload', () => {
       injectDummyThoughtSignature: false,
       stripThoughtSignature: false,
       passbackReasoningContent: false,
+      passbackThinkingBlocks: false,
       description: '  desc  ',
       apiKeys: ['sk-1', '  ', 'sk-2'],
       modelMapping: { 'gpt-5': 'gpt-5.2' },
@@ -60,6 +61,7 @@ describe('buildChannelPayload', () => {
       injectDummyThoughtSignature: false,
       stripThoughtSignature: false,
       passbackReasoningContent: false,
+      passbackThinkingBlocks: false,
       description: '',
       apiKeys: ['sk-1'],
       modelMapping: {},
@@ -101,6 +103,7 @@ describe('buildChannelPayload', () => {
       injectDummyThoughtSignature: false,
       stripThoughtSignature: false,
       passbackReasoningContent: false,
+      passbackThinkingBlocks: false,
       description: '',
       apiKeys: ['sk-1'],
       modelMapping: {},
@@ -138,6 +141,7 @@ describe('buildChannelPayload', () => {
       injectDummyThoughtSignature: false,
       stripThoughtSignature: false,
       passbackReasoningContent: false,
+      passbackThinkingBlocks: false,
       description: '',
       apiKeys: ['sk-1'],
       modelMapping: {},
@@ -175,6 +179,7 @@ describe('buildChannelPayload', () => {
       injectDummyThoughtSignature: false,
       stripThoughtSignature: false,
       passbackReasoningContent: false,
+      passbackThinkingBlocks: false,
       description: '',
       apiKeys: ['sk-ant'],
       modelMapping: { opus: 'claude-3-7-sonnet' },
@@ -215,6 +220,7 @@ describe('buildChannelPayload', () => {
       injectDummyThoughtSignature: false,
       stripThoughtSignature: false,
       passbackReasoningContent: false,
+      passbackThinkingBlocks: false,
       description: '',
       apiKeys: ['sk-1'],
       modelMapping: {},
@@ -251,6 +257,7 @@ describe('buildChannelPayload', () => {
       injectDummyThoughtSignature: false,
       stripThoughtSignature: false,
       passbackReasoningContent: false,
+      passbackThinkingBlocks: false,
       description: '',
       apiKeys: ['sk-1'],
       modelMapping: {},
@@ -287,6 +294,7 @@ describe('buildChannelPayload', () => {
       injectDummyThoughtSignature: false,
       stripThoughtSignature: false,
       passbackReasoningContent: false,
+      passbackThinkingBlocks: false,
       description: '',
       apiKeys: ['sk-1'],
       modelMapping: {},
@@ -311,6 +319,43 @@ describe('buildChannelPayload', () => {
     expect(result.stripEmptyTextBlocks).toBe(true)
   })
 
+  it('应携带 passbackThinkingBlocks 开关', () => {
+    const result = buildChannelPayload({
+      name: 'claude-thinking-passback',
+      serviceType: 'claude',
+      baseUrl: 'https://api.example.com/v1',
+      baseUrls: [],
+      website: '',
+      insecureSkipVerify: false,
+      lowQuality: false,
+      injectDummyThoughtSignature: false,
+      stripThoughtSignature: false,
+      passbackReasoningContent: false,
+      passbackThinkingBlocks: true,
+      description: '',
+      apiKeys: ['sk-1'],
+      modelMapping: {},
+      reasoningMapping: {},
+      reasoningParamStyle: 'reasoning',
+      textVerbosity: '',
+      fastMode: false,
+      customHeaders: {},
+      proxyUrl: '',
+      routePrefix: '',
+      supportedModels: [],
+      autoBlacklistBalance: true,
+      normalizeMetadataUserId: true,
+      stripEmptyTextBlocks: false,
+      codexNativeToolPassthrough: false,
+      codexToolCompat: true,
+      noVision: false,
+      noVisionModels: [],
+      visionFallbackModel: ''
+    })
+
+    expect(result.passbackThinkingBlocks).toBe(true)
+  })
+
   it('应携带 normalizeNonstandardChatRoles 开关', () => {
     const result = buildChannelPayload({
       name: 'chat-role-guard',
@@ -323,6 +368,7 @@ describe('buildChannelPayload', () => {
       injectDummyThoughtSignature: false,
       stripThoughtSignature: false,
       passbackReasoningContent: false,
+      passbackThinkingBlocks: false,
       description: '',
       apiKeys: ['sk-1'],
       modelMapping: {},

@@ -56,6 +56,7 @@ type UpstreamConfig struct {
 	StripThoughtSignature       bool `json:"stripThoughtSignature,omitempty"`       // 移除 thought_signature 字段（兼容旧版 Gemini API）
 	// Claude 协议 thinking 回传配置
 	PassbackReasoningContent bool `json:"passbackReasoningContent,omitempty"` // 将 thinking 块转为 reasoning_content 回传（兼容 mimo 等要求 OpenAI 风格 reasoning_content 的 Claude 协议上游）
+	PassbackThinkingBlocks   bool `json:"passbackThinkingBlocks,omitempty"`   // 将真实 reasoning_content 回传为 content[].thinking（兼容 DeepSeek/GLM 等严格 Claude thinking 上游）
 	// 自定义请求头
 	CustomHeaders map[string]string `json:"customHeaders,omitempty"` // 自定义请求头（覆盖或添加到上游请求）
 	// 渠道级代理
@@ -146,6 +147,7 @@ type UpstreamUpdate struct {
 	InjectDummyThoughtSignature *bool `json:"injectDummyThoughtSignature"`
 	StripThoughtSignature       *bool `json:"stripThoughtSignature"`
 	PassbackReasoningContent    *bool `json:"passbackReasoningContent"`
+	PassbackThinkingBlocks      *bool `json:"passbackThinkingBlocks"`
 	// 自定义请求头
 	CustomHeaders map[string]string `json:"customHeaders"`
 	// 渠道级代理

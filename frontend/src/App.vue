@@ -1418,6 +1418,7 @@ const handleCopyToTab = async (targetProtocol: string, serviceProtocol = targetP
     injectDummyThoughtSignature: sourceChannel.injectDummyThoughtSignature,
     stripThoughtSignature: sourceChannel.stripThoughtSignature,
     passbackReasoningContent: sourceChannel.passbackReasoningContent,
+    passbackThinkingBlocks: sourceChannel.passbackThinkingBlocks,
     supportedModels: sourceChannel.supportedModels,
     stripEmptyTextBlocks: sourceChannel.stripEmptyTextBlocks,
     normalizeNonstandardChatRoles: sourceChannel.normalizeNonstandardChatRoles,

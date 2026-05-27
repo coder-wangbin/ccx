@@ -719,3 +719,142 @@ func TestConvertThinkingToReasoningContent_ChannelSwitch(t *testing.T) {
 		}
 	}
 }
+
+func TestConvertReasoningContentToThinkingBlocks(t *testing.T) {
+	tests := []struct {
+		name                  string
+		keepTopLevelReasoning bool
+		input                 string
+		wantJSON              map[string]interface{}
+	}{
+		{
+			name:                  "严格 thinking 回传清理占位并保留真实 thinking",
+			keepTopLevelReasoning: true,
+			input: `{
+				"model": "deepseek-v4-pro",
+				"messages": [
+					{"role": "user", "content": [{"type": "text", "text": "hello"}]},
+					{"role": "assistant", "reasoning_content": "(no prior reasoning recorded)", "content": [
+						{"type": "text", "text": "old answer"},
+						{"type": "tool_use", "id": "call_1", "name": "Read", "input": {"file_path": "a.go"}}
+					]},
+					{"role": "user", "content": [{"type": "tool_result", "tool_use_id": "call_1", "content": "ok"}]},
+					{"role": "assistant", "reasoning_content": "real reasoning", "content": [
+						{"type": "thinking", "thinking": "real reasoning"},
+						{"type": "text", "text": "new answer"}
+					]}
+				]
+			}`,
+			wantJSON: map[string]interface{}{
+				"model": "deepseek-v4-pro",
+				"messages": []interface{}{
+					map[string]interface{}{"role": "user", "content": []interface{}{map[string]interface{}{"type": "text", "text": "hello"}}},
+					map[string]interface{}{
+						"role": "assistant",
+						"content": []interface{}{
+							map[string]interface{}{"type": "text", "text": "old answer"},
+							map[string]interface{}{"type": "tool_use", "id": "call_1", "name": "Read", "input": map[string]interface{}{"file_path": "a.go"}},
+						},
+					},
+					map[string]interface{}{"role": "user", "content": []interface{}{map[string]interface{}{"type": "tool_result", "tool_use_id": "call_1", "content": "ok"}}},
+					map[string]interface{}{
+						"role":              "assistant",
+						"reasoning_content": "real reasoning",
+						"content": []interface{}{
+							map[string]interface{}{"type": "thinking", "thinking": "real reasoning"},
+							map[string]interface{}{"type": "text", "text": "new answer"},
+						},
+					},
+				},
+			},
+		},
+		{
+			name:                  "真实顶层 reasoning_content 注入 thinking block",
+			keepTopLevelReasoning: false,
+			input: `{
+				"model": "deepseek-v4-pro",
+				"messages": [
+					{"role": "assistant", "reasoning_content": "top reasoning", "content": [
+						{"type": "text", "text": "answer"}
+					]}
+				]
+			}`,
+			wantJSON: map[string]interface{}{
+				"model": "deepseek-v4-pro",
+				"messages": []interface{}{
+					map[string]interface{}{
+						"role": "assistant",
+						"content": []interface{}{
+							map[string]interface{}{"type": "thinking", "thinking": "top reasoning"},
+							map[string]interface{}{"type": "text", "text": "answer"},
+						},
+					},
+				},
+			},
+		},
+		{
+			name:                  "content block 内 reasoning_content 注入 thinking block",
+			keepTopLevelReasoning: false,
+			input: `{
+				"model": "deepseek-v4-pro",
+				"messages": [
+					{"role": "assistant", "content": [
+						{"type": "text", "reasoning_content": "block reasoning", "text": "answer"}
+					]}
+				]
+			}`,
+			wantJSON: map[string]interface{}{
+				"model": "deepseek-v4-pro",
+				"messages": []interface{}{
+					map[string]interface{}{
+						"role": "assistant",
+						"content": []interface{}{
+							map[string]interface{}{"type": "thinking", "thinking": "block reasoning"},
+							map[string]interface{}{"type": "text", "text": "answer"},
+						},
+					},
+				},
+			},
+		},
+		{
+			name:                  "string content 有真实 reasoning 时转为 Claude content 数组",
+			keepTopLevelReasoning: false,
+			input: `{
+				"model": "deepseek-v4-pro",
+				"messages": [
+					{"role": "assistant", "reasoning_content": "plain reasoning", "content": "plain answer"}
+				]
+			}`,
+			wantJSON: map[string]interface{}{
+				"model": "deepseek-v4-pro",
+				"messages": []interface{}{
+					map[string]interface{}{
+						"role": "assistant",
+						"content": []interface{}{
+							map[string]interface{}{"type": "thinking", "thinking": "plain reasoning"},
+							map[string]interface{}{"type": "text", "text": "plain answer"},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := convertReasoningContentToThinkingBlocks([]byte(tt.input), tt.keepTopLevelReasoning)
+
+			var got map[string]interface{}
+			if err := json.Unmarshal(result, &got); err != nil {
+				t.Fatalf("unmarshal result: %v", err)
+			}
+
+			gotJSON, _ := json.Marshal(got)
+			wantJSON, _ := json.Marshal(tt.wantJSON)
+
+			if string(gotJSON) != string(wantJSON) {
+				t.Errorf("convertReasoningContentToThinkingBlocks() mismatch:\ngot:  %s\nwant: %s", string(gotJSON), string(wantJSON))
+			}
+		})
+	}
+}

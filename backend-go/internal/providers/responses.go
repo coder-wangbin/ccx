@@ -217,6 +217,15 @@ func (p *ResponsesProvider) buildProviderRequestBody(c *gin.Context, requestPath
 					}
 				}
 			}
+			if upstream.PassbackThinkingBlocks {
+				if marshaledReq, err := utils.MarshalJSONNoEscape(reqMap); err == nil {
+					var normalized map[string]interface{}
+					if normalizedBytes := convertReasoningContentToThinkingBlocks(marshaledReq, upstream.PassbackReasoningContent); json.Unmarshal(normalizedBytes, &normalized) == nil {
+						reqMap = normalized
+						convertedReq = reqMap
+					}
+				}
+			}
 		}
 
 		providerReq = convertedReq

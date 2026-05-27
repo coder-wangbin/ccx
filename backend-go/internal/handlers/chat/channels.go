@@ -29,6 +29,7 @@ func GetUpstreams(cfgManager *config.ConfigManager) gin.HandlerFunc {
 		for i, up := range cfg.ChatUpstream {
 			upstreams[i] = common.BuildChannelView(up, i)
 			upstreams[i]["passbackReasoningContent"] = up.PassbackReasoningContent
+			upstreams[i]["passbackThinkingBlocks"] = up.PassbackThinkingBlocks
 			upstreams[i]["injectDummyThoughtSignature"] = up.InjectDummyThoughtSignature
 			upstreams[i]["stripThoughtSignature"] = up.StripThoughtSignature
 		}

@@ -653,3 +653,58 @@ func TestResponsesProvider_BuildProviderRequestBody_PassbackReasoningContentForC
 		t.Fatalf("assistant.reasoning_content = %q, want non-empty placeholder", rc)
 	}
 }
+
+func TestResponsesProvider_BuildProviderRequestBody_PassbackThinkingBlocksForClaudeUpstream(t *testing.T) {
+	provider := &ResponsesProvider{}
+	upstream := &config.UpstreamConfig{
+		ServiceType:            "claude",
+		PassbackThinkingBlocks: true,
+	}
+
+	body := []byte(`{
+		"model":"gpt-5",
+		"input":[
+			{"type":"message","role":"user","content":[{"type":"input_text","text":"hello"}]},
+			{"type":"reasoning","summary":[{"type":"summary_text","text":"real reasoning"}]},
+			{"type":"message","role":"assistant","content":[{"type":"output_text","text":"gpt answer"}]}
+		]
+	}`)
+
+	reqBody, _, err := provider.buildProviderRequestBody(nil, "/v1/responses", body, upstream)
+	if err != nil {
+		t.Fatalf("buildProviderRequestBody() err = %v", err)
+	}
+
+	reqMap, ok := reqBody.(map[string]interface{})
+	if !ok {
+		t.Fatalf("provider request type = %T, want map[string]interface{}", reqBody)
+	}
+
+	messages, ok := reqMap["messages"].([]interface{})
+	if !ok || len(messages) != 2 {
+		t.Fatalf("reqMap[messages] = %#v, want 2 messages", reqMap["messages"])
+	}
+
+	assistant, ok := messages[1].(map[string]interface{})
+	if !ok {
+		t.Fatalf("assistant message type = %T, want map[string]interface{}", messages[1])
+	}
+
+	content, ok := assistant["content"].([]interface{})
+	if !ok || len(content) < 1 {
+		t.Fatalf("assistant.content = %#v, want non-empty array", assistant["content"])
+	}
+	first, ok := content[0].(map[string]interface{})
+	if !ok {
+		t.Fatalf("assistant.content[0] type = %T, want map[string]interface{}", content[0])
+	}
+	if first["type"] != "thinking" {
+		t.Fatalf("assistant.content[0].type = %v, want thinking", first["type"])
+	}
+	if first["thinking"] != "real reasoning" {
+		t.Fatalf("assistant.content[0].thinking = %v, want real reasoning", first["thinking"])
+	}
+	if _, exists := assistant["reasoning_content"]; exists {
+		t.Fatalf("assistant.reasoning_content should be removed when passbackReasoningContent is false: %#v", assistant)
+	}
+}

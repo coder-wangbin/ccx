@@ -228,6 +228,9 @@ func (cm *ConfigManager) UpdateUpstream(index int, updates UpstreamUpdate) (shou
 	if updates.PassbackReasoningContent != nil {
 		upstream.PassbackReasoningContent = *updates.PassbackReasoningContent
 	}
+	if updates.PassbackThinkingBlocks != nil {
+		upstream.PassbackThinkingBlocks = *updates.PassbackThinkingBlocks
+	}
 	if updates.CustomHeaders != nil {
 		upstream.CustomHeaders = updates.CustomHeaders
 	}

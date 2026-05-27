@@ -246,6 +246,8 @@ export type MessageKey =
   | 'addChannel.visionFallbackHint'
   | 'addChannel.passbackReasoningContentLabel'
   | 'addChannel.passbackReasoningContentHint'
+  | 'addChannel.passbackThinkingBlocksLabel'
+  | 'addChannel.passbackThinkingBlocksHint'
   | 'addChannel.customHeadersLabel'
   | 'addChannel.customHeadersHint'
   | 'addChannel.headerNameLabel'
@@ -670,6 +672,8 @@ export const messages: Record<SupportedLocale, Record<MessageKey, string>> = {
     'addChannel.visionFallbackHint': 'When a request contains images and the target model does not support vision, this model will be used instead. Leave empty to failover to the next channel.',
     'addChannel.passbackReasoningContentLabel': 'Passback reasoning content',
     'addChannel.passbackReasoningContentHint': 'Convert thinking blocks to reasoning_content when forwarding to Claude-protocol upstreams that require OpenAI-style reasoning_content (e.g. mimo).',
+    'addChannel.passbackThinkingBlocksLabel': 'Passback thinking blocks',
+    'addChannel.passbackThinkingBlocksHint': 'Project real reasoning_content into Claude content[].thinking when forwarding to strict Claude thinking-mode upstreams (e.g. DeepSeek/GLM).',
     'addChannel.customHeadersLabel': 'Custom headers (optional)',
     'addChannel.customHeadersHint': 'Add or override HTTP headers sent to the upstream service.',
     'addChannel.headerNameLabel': 'Header name',
@@ -1093,6 +1097,8 @@ export const messages: Record<SupportedLocale, Record<MessageKey, string>> = {
     'addChannel.visionFallbackHint': 'Saat permintaan mengandung gambar dan model target tidak mendukung vision, model ini akan digunakan. Kosongkan untuk failover ke channel berikutnya.',
     'addChannel.passbackReasoningContentLabel': 'Teruskan reasoning content',
     'addChannel.passbackReasoningContentHint': 'Ubah thinking block menjadi reasoning_content saat diteruskan ke upstream protokol Claude yang mewajibkan reasoning_content ala OpenAI (misalnya mimo).',
+    'addChannel.passbackThinkingBlocksLabel': 'Teruskan thinking block',
+    'addChannel.passbackThinkingBlocksHint': 'Proyeksikan reasoning_content yang valid ke content[].thinking Claude saat diteruskan ke upstream Claude mode thinking yang ketat (misalnya DeepSeek/GLM).',
     'addChannel.customHeadersLabel': 'Custom header (opsional)',
     'addChannel.customHeadersHint': 'Tambahkan atau timpa HTTP header yang dikirim ke upstream.',
     'addChannel.headerNameLabel': 'Nama header',
@@ -1516,6 +1522,8 @@ export const messages: Record<SupportedLocale, Record<MessageKey, string>> = {
     'addChannel.visionFallbackHint': '当请求包含图片且目标模型不支持 vision 时，使用此模型替代。留空则 failover 到下一个渠道。',
     'addChannel.passbackReasoningContentLabel': '回传 Reasoning Content',
     'addChannel.passbackReasoningContentHint': '将 thinking 块转为 reasoning_content 回传，兼容 mimo 等要求 OpenAI 风格 reasoning_content 的 Claude 协议上游',
+    'addChannel.passbackThinkingBlocksLabel': '回传 Thinking Blocks',
+    'addChannel.passbackThinkingBlocksHint': '将真实 reasoning_content 投影为 Claude 的 content[].thinking，兼容 DeepSeek/GLM 等严格 thinking mode 上游',
     'addChannel.customHeadersLabel': '自定义请求头 (可选)',
     'addChannel.customHeadersHint': '添加或覆盖发送到上游的 HTTP 请求头',
     'addChannel.headerNameLabel': 'Header 名称',

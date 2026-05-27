@@ -227,6 +227,12 @@ func (cm *ConfigManager) UpdateResponsesUpstream(index int, updates UpstreamUpda
 	if updates.StripThoughtSignature != nil {
 		upstream.StripThoughtSignature = *updates.StripThoughtSignature
 	}
+	if updates.PassbackReasoningContent != nil {
+		upstream.PassbackReasoningContent = *updates.PassbackReasoningContent
+	}
+	if updates.PassbackThinkingBlocks != nil {
+		upstream.PassbackThinkingBlocks = *updates.PassbackThinkingBlocks
+	}
 	if updates.CustomHeaders != nil {
 		upstream.CustomHeaders = updates.CustomHeaders
 	}

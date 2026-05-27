@@ -242,6 +242,12 @@ func (cm *ConfigManager) UpdateImagesUpstream(index int, updates UpstreamUpdate)
 		v := *updates.CodexToolCompat
 		upstream.CodexToolCompat = &v
 	}
+	if updates.PassbackReasoningContent != nil {
+		upstream.PassbackReasoningContent = *updates.PassbackReasoningContent
+	}
+	if updates.PassbackThinkingBlocks != nil {
+		upstream.PassbackThinkingBlocks = *updates.PassbackThinkingBlocks
+	}
 	if updates.CustomHeaders != nil {
 		upstream.CustomHeaders = updates.CustomHeaders
 	}

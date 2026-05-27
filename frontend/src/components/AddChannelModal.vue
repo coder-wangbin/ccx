@@ -871,8 +871,8 @@
               </div>
             </v-col>
 
-            <!-- 回传 Reasoning Content（仅 Messages/Chat 渠道 + claude 服务类型显示） -->
-            <v-col v-if="(props.channelType === 'messages' || props.channelType === 'chat') && form.serviceType === 'claude'" cols="12">
+            <!-- 回传 Reasoning Content（Messages/Chat/Responses 渠道 + claude 服务类型显示） -->
+            <v-col v-if="(props.channelType === 'messages' || props.channelType === 'chat' || props.channelType === 'responses') && form.serviceType === 'claude'" cols="12">
               <div class="d-flex align-center justify-space-between ga-5">
                 <div class="d-flex align-center ga-2" style="min-width: 0; flex: 1 1 auto;">
                   <v-icon color="secondary">mdi-brain</v-icon>
@@ -882,6 +882,20 @@
                   </div>
                 </div>
                 <v-switch v-model="form.passbackReasoningContent" inset color="secondary" hide-details style="flex-shrink: 0;" />
+              </div>
+            </v-col>
+
+            <!-- 回传 Thinking Blocks（Messages/Chat/Responses 渠道 + claude 服务类型显示） -->
+            <v-col v-if="(props.channelType === 'messages' || props.channelType === 'chat' || props.channelType === 'responses') && form.serviceType === 'claude'" cols="12">
+              <div class="d-flex align-center justify-space-between ga-5">
+                <div class="d-flex align-center ga-2" style="min-width: 0; flex: 1 1 auto;">
+                  <v-icon color="secondary">mdi-head-snowflake</v-icon>
+                  <div style="min-width: 0;">
+                    <div class="section-title section-title--soft">{{ t('addChannel.passbackThinkingBlocksLabel') }}</div>
+                    <div class="text-caption text-medium-emphasis" style="word-break: break-word;">{{ t('addChannel.passbackThinkingBlocksHint') }}</div>
+                  </div>
+                </div>
+                <v-switch v-model="form.passbackThinkingBlocks" inset color="secondary" hide-details style="flex-shrink: 0;" />
               </div>
             </v-col>
 
@@ -1716,6 +1730,7 @@ const form = reactive({
   injectDummyThoughtSignature: false,
   stripThoughtSignature: false,
   passbackReasoningContent: false,
+  passbackThinkingBlocks: false,
   stripEmptyTextBlocks: false,
   description: '',
   apiKeys: [] as string[],
@@ -2035,6 +2050,7 @@ const hasEditableDraftChanges = computed(() => {
     injectDummyThoughtSignature: !!props.channel.injectDummyThoughtSignature,
     stripThoughtSignature: !!props.channel.stripThoughtSignature,
     passbackReasoningContent: !!props.channel.passbackReasoningContent,
+    passbackThinkingBlocks: !!props.channel.passbackThinkingBlocks,
     stripEmptyTextBlocks: !!props.channel.stripEmptyTextBlocks,
     description: (props.channel.description || '').trim(),
     apiKeys: normalizeStringArray(props.channel.apiKeys || []),
@@ -2111,6 +2127,7 @@ const resetForm = () => {
   form.injectDummyThoughtSignature = false
   form.stripThoughtSignature = false
   form.passbackReasoningContent = false
+  form.passbackThinkingBlocks = false
   form.stripEmptyTextBlocks = false
   form.description = ''
   form.apiKeys = []
@@ -2169,6 +2186,7 @@ const loadChannelData = (channel: Channel) => {
   form.injectDummyThoughtSignature = !!channel.injectDummyThoughtSignature
   form.stripThoughtSignature = !!channel.stripThoughtSignature
   form.passbackReasoningContent = !!channel.passbackReasoningContent
+  form.passbackThinkingBlocks = !!channel.passbackThinkingBlocks
   form.stripEmptyTextBlocks = !!channel.stripEmptyTextBlocks
   form.description = channel.description || ''
 
@@ -2590,7 +2608,7 @@ const PAYLOAD_KEYS = [
   'lowQuality', 'injectDummyThoughtSignature', 'stripThoughtSignature', 'description',
   'apiKeys', 'modelMapping', 'reasoningMapping', 'reasoningParamStyle', 'textVerbosity',
   'fastMode', 'customHeaders', 'proxyUrl', 'routePrefix', 'supportedModels',
-  'autoBlacklistBalance', 'normalizeMetadataUserId', 'stripEmptyTextBlocks', 'codexNativeToolPassthrough',
+  'autoBlacklistBalance', 'normalizeMetadataUserId', 'passbackThinkingBlocks', 'stripEmptyTextBlocks', 'codexNativeToolPassthrough',
   'codexToolCompat', 'normalizeNonstandardChatRoles', 'stripCodexClientTools'
 ] as const
 

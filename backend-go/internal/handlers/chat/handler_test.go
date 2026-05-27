@@ -351,6 +351,60 @@ func TestBuildProviderRequest_PreservesMultimodalContentArray(t *testing.T) {
 	}
 }
 
+func TestBuildProviderRequest_ClaudePassbackThinkingBlocksKeepsThinking(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil).WithContext(context.Background())
+
+	bodyBytes := []byte(`{
+		"model":"deepseek-v4-pro",
+		"messages":[
+			{"role":"user","content":"hello"},
+			{"role":"assistant","reasoning_content":"previous reasoning","content":"previous text"}
+		]
+	}`)
+
+	upstream := &config.UpstreamConfig{
+		ServiceType:            "claude",
+		PassbackThinkingBlocks: true,
+	}
+
+	req, err := buildProviderRequest(c, upstream, "https://api.example.com/anthropic", "sk-test", bodyBytes, "deepseek-v4-pro", false)
+	if err != nil {
+		t.Fatalf("buildProviderRequest() err = %v", err)
+	}
+
+	var got map[string]interface{}
+	if err := json.NewDecoder(req.Body).Decode(&got); err != nil {
+		t.Fatalf("decode request body: %v", err)
+	}
+
+	messages, ok := got["messages"].([]interface{})
+	if !ok || len(messages) != 2 {
+		t.Fatalf("messages = %#v, want 2", got["messages"])
+	}
+
+	assistant, ok := messages[1].(map[string]interface{})
+	if !ok {
+		t.Fatalf("assistant type = %T, want map[string]interface{}", messages[1])
+	}
+	content, ok := assistant["content"].([]interface{})
+	if !ok || len(content) < 1 {
+		t.Fatalf("assistant.content = %#v, want non-empty array", assistant["content"])
+	}
+	first, ok := content[0].(map[string]interface{})
+	if !ok {
+		t.Fatalf("assistant.content[0] type = %T, want map[string]interface{}", content[0])
+	}
+	if first["type"] != "thinking" {
+		t.Fatalf("assistant.content[0].type = %v, want thinking", first["type"])
+	}
+	if first["thinking"] != "previous reasoning" {
+		t.Fatalf("assistant.content[0].thinking = %v, want previous reasoning", first["thinking"])
+	}
+}
+
 func TestInjectGeminiThoughtSignatures(t *testing.T) {
 	tests := []struct {
 		name     string

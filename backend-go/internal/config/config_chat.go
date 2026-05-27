@@ -212,6 +212,9 @@ func (cm *ConfigManager) UpdateChatUpstream(index int, updates UpstreamUpdate) (
 	if updates.PassbackReasoningContent != nil {
 		upstream.PassbackReasoningContent = *updates.PassbackReasoningContent
 	}
+	if updates.PassbackThinkingBlocks != nil {
+		upstream.PassbackThinkingBlocks = *updates.PassbackThinkingBlocks
+	}
 	if updates.InjectDummyThoughtSignature != nil {
 		upstream.InjectDummyThoughtSignature = *updates.InjectDummyThoughtSignature
 	}

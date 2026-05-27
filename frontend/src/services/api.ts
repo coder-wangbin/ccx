@@ -137,6 +137,7 @@ export interface Channel {
   injectDummyThoughtSignature?: boolean  // Gemini 特定：为 functionCall 注入 dummy thought_signature（兼容第三方 API）
   stripThoughtSignature?: boolean        // Gemini 特定：移除 thought_signature 字段（兼容旧版 Gemini API）
   passbackReasoningContent?: boolean     // Claude 协议特定：将 thinking 块转为 reasoning_content 回传（兼容 mimo 等上游）
+  passbackThinkingBlocks?: boolean       // Claude 协议特定：将真实 reasoning_content 投影为 content[].thinking（兼容 DeepSeek/GLM 等严格 thinking 上游）
   supportedModels?: string[]  // 支持的模型白名单（空=全部），支持通配符如 gpt-4*
   noVision?: boolean                       // 整个渠道不支持图片输入
   noVisionModels?: string[]                // 不支持图片输入的模型列表（匹配 modelMapping 后的实际模型名）
