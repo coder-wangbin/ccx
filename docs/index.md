@@ -2,8 +2,8 @@
 layout: home
 hero:
   name: CCX
-  text: AI API 代理网关
-  tagline: 支持 Claude、OpenAI、Gemini、DeepSeek、GLM、Kimi 等多上游的统一代理与协议转换
+  text: '- AI API 代理网关'
+  tagline: 支持 Claude、OpenAI、Gemini、DeepSeek、Kimi、GLM、MiniMax、通义千问 等多上游的统一代理与协议转换
   actions:
     - theme: brand
       text: 快速开始

@@ -29,4 +29,10 @@ export default defineConfig({
       provider: 'local',
     },
   },
+  markdown: {
+    languageAlias: {
+      env: 'ini',
+      dotenv: 'ini',
+    },
+  },
 })

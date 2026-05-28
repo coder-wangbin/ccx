@@ -1,0 +1,30 @@
+/* Home Hero: 让 CCX 与「AI API 代理网关」同一行，并放宽 tagline 换行宽度 */
+/* 不改变字号、字色、字距等基础样式，只调整布局方向与最大宽度 */
+.VPHero .heading {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 0.4em;
+  row-gap: 0;
+}
+
+.VPHero .heading .name,
+.VPHero .heading .text {
+  max-width: none;
+}
+
+.VPHero .tagline {
+  max-width: 720px;
+}
+
+@media (min-width: 640px) {
+  .VPHero .tagline {
+    max-width: 880px;
+  }
+}
+
+@media (min-width: 960px) {
+  .VPHero .tagline {
+    max-width: 1040px;
+  }
+}

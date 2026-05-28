@@ -2,8 +2,8 @@
 layout: home
 hero:
   name: CCX
-  text: AI API Proxy Gateway
-  tagline: Unified proxy and protocol translation for Claude, OpenAI, Gemini, DeepSeek, GLM, Kimi and more
+  text: '- AI API Proxy Gateway'
+  tagline: Unified proxy and protocol translation for Claude, OpenAI, Gemini, DeepSeek, Kimi, GLM, MiniMax, Qwen and more
   actions:
     - theme: brand
       text: Quick Start

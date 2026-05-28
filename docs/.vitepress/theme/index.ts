@@ -2,6 +2,7 @@ import DefaultTheme from 'vitepress/theme'
 import { defineComponent, h } from 'vue'
 import { useData } from 'vitepress'
 import RecommendedDownload from './components/RecommendedDownload.vue'
+import './custom.css'
 
 import type { Theme } from 'vitepress'
 
