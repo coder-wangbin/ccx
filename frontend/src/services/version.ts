@@ -4,8 +4,8 @@
  */
 
 const CACHE_KEY = 'ccx-version-info'
-const CACHE_DURATION = 30 * 60 * 1000 // 30分钟缓存
-const ERROR_CACHE_DURATION = 5 * 60 * 1000 // 错误状态缓存5分钟，避免频繁请求
+const CACHE_DURATION = 4 * 60 * 60 * 1000 // 4 小时缓存
+const ERROR_CACHE_DURATION = 30 * 60 * 1000 // 错误状态缓存 30 分钟，避免频繁请求
 const GITHUB_API_TIMEOUT = 10000 // 10秒超时
 
 export interface GitHubRelease {
@@ -215,17 +215,17 @@ class VersionService {
         versionInfo.hasUpdate = comparison < 0
         versionInfo.status = comparison < 0 ? 'update-available' : 'latest'
 
-        // 成功时缓存结果（30分钟）
+        // 成功时缓存结果（4 小时）
         this.setCachedVersionInfo(versionInfo)
       } else {
         versionInfo.status = 'error'
-        // 错误时也缓存（5分钟），避免频繁请求 GitHub API
+        // 错误时也缓存（30 分钟），避免频繁请求 GitHub API
         this.setCachedVersionInfo(versionInfo)
       }
     } catch (error) {
       console.warn('Version check failed:', error)
       versionInfo.status = 'error'
-      // 错误时也缓存（5分钟），避免频繁请求 GitHub API
+      // 错误时也缓存（30 分钟），避免频繁请求 GitHub API
       this.setCachedVersionInfo(versionInfo)
     }
 

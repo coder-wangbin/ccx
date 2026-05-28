@@ -455,7 +455,11 @@ func run() error {
 		}
 	})
 
-	// 初始化 Wails v3 内置 Updater（非 Store 分发时）
+	// 初始化 Wails v3 内置 Updater（非 Store 分发时）。
+	// 不开启 CheckInterval：自动轮询会在每个间隔自动 CheckAndInstall 弹出更新窗口，
+	// 即便「up-to-date」或失败也会保留窗口，干扰严重。改为静默调用 GitHub Releases
+	// API（见 desktopservice.CheckLatestRelease）+ 侧栏胶囊提示，用户主动点击托盘
+	// 菜单或胶囊后再走 wails updater 的下载安装流程。
 	if !desktopService.isStoreDistribution() {
 		gh, err := updaterGithub.New(updaterGithub.Config{
 			Repository:    "BenedictKing/ccx",
@@ -467,7 +471,6 @@ func run() error {
 			if err := app.Updater.Init(updater.Config{
 				CurrentVersion: Version,
 				Providers:      []updater.Provider{gh},
-				CheckInterval:  30 * time.Minute,
 			}); err != nil {
 				log.Printf("[Desktop-Updater] Updater 初始化失败: %v", err)
 			} else {

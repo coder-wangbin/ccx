@@ -66,6 +66,50 @@ export class LanguagePreference {
     }
 }
 
+/**
+ * ReleaseCheckResult 前端直接消费的版本检查结果。
+ */
+export class ReleaseCheckResult {
+    "currentVersion": string;
+    "latestVersion": string;
+    "hasUpdate": boolean;
+    "releaseUrl": string;
+
+    /**
+     * "latest" | "update-available" | "error"
+     */
+    "status": string;
+
+    /** Creates a new ReleaseCheckResult instance. */
+    constructor($$source: Partial<ReleaseCheckResult> = {}) {
+        if (!("currentVersion" in $$source)) {
+            this["currentVersion"] = "";
+        }
+        if (!("latestVersion" in $$source)) {
+            this["latestVersion"] = "";
+        }
+        if (!("hasUpdate" in $$source)) {
+            this["hasUpdate"] = false;
+        }
+        if (!("releaseUrl" in $$source)) {
+            this["releaseUrl"] = "";
+        }
+        if (!("status" in $$source)) {
+            this["status"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new ReleaseCheckResult instance from a string or object.
+     */
+    static createFrom($$source: any = {}): ReleaseCheckResult {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new ReleaseCheckResult($$parsedSource as Partial<ReleaseCheckResult>);
+    }
+}
+
 export class VersionInfo {
     "version": string;
     "buildTime": string;

@@ -9,5 +9,6 @@ export {
 export {
     EnvFileState,
     LanguagePreference,
+    ReleaseCheckResult,
     VersionInfo
 } from "./models.js";

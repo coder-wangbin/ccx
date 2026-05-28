@@ -2,6 +2,8 @@
 import { ref, computed, onMounted } from 'vue'
 import { useStatus } from '@/composables/useStatus'
 import { useLanguage } from '@/composables/useLanguage'
+import { useReleaseCheck } from '@/composables/useReleaseCheck'
+import { openExternalLink } from '@/lib/external-link'
 import { GetVersion } from '@bindings/github.com/BenedictKing/ccx/desktop/desktopservice'
 import type { VersionInfo } from '@bindings/github.com/BenedictKing/ccx/desktop/models'
 import Logo from '@/components/layout/Logo.vue'
@@ -13,7 +15,8 @@ import {
   Play,
   Square,
   Power,
-  Network
+  Network,
+  Sparkles
 } from 'lucide-vue-next'
 import type { TabValue } from '@/types'
 
@@ -21,9 +24,21 @@ const modelValue = defineModel<TabValue>({ required: true })
 
 const { status, loading, autostartEnabled, startService, stopService, setAutostart } = useStatus()
 const { locale, languageOptions, setLanguage, t } = useLanguage()
+const { releaseInfo } = useReleaseCheck()
 
 const versionInfo = ref<VersionInfo | null>(null)
 const isStoreDistribution = computed(() => versionInfo.value?.distribution === 'store')
+
+// Store 分发由 Store 接管更新通道，桌面端不应再展示 GitHub release 胶囊
+const showUpdateBadge = computed(
+  () => !isStoreDistribution.value && releaseInfo.value?.status === 'update-available' && !!releaseInfo.value?.releaseUrl
+)
+
+const handleOpenRelease = () => {
+  const url = releaseInfo.value?.releaseUrl
+  if (!url) return
+  openExternalLink(url)
+}
 
 onMounted(async () => {
   try {
@@ -185,17 +200,29 @@ const handleDaemonAction = async () => {
           </div>
           <div class="flex justify-between items-center">
             <span>{{ t('common.version') }}</span>
-            <span
-              :class="[
-                'flex items-center gap-1 px-1.5 py-0.5 rounded border',
-                isStoreDistribution
-                  ? 'bg-slate-900/80 text-slate-500 border-white/[0.02]'
-                  : 'bg-slate-900/80 text-slate-300 border-white/[0.02]'
-              ]"
-              :title="isStoreDistribution ? t('sidebar.versionHintStore') : t('sidebar.versionHintTray')"
-            >
-              <span>{{ versionInfo?.version || '—' }}</span>
-            </span>
+            <div class="flex items-center gap-1">
+              <button
+                v-if="showUpdateBadge"
+                type="button"
+                @click="handleOpenRelease"
+                class="flex items-center gap-1 px-1.5 py-0.5 rounded border border-emerald-500/30 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20 hover:text-emerald-200 transition-all duration-200 cursor-pointer animate-pulse"
+                :title="t('sidebar.updateAvailableHint')"
+              >
+                <Sparkles class="w-2.5 h-2.5" />
+                <span>{{ t('sidebar.updateAvailable', { version: releaseInfo?.latestVersion || '' }) }}</span>
+              </button>
+              <span
+                :class="[
+                  'flex items-center gap-1 px-1.5 py-0.5 rounded border',
+                  isStoreDistribution
+                    ? 'bg-slate-900/80 text-slate-500 border-white/[0.02]'
+                    : 'bg-slate-900/80 text-slate-300 border-white/[0.02]'
+                ]"
+                :title="isStoreDistribution ? t('sidebar.versionHintStore') : t('sidebar.versionHintTray')"
+              >
+                <span>{{ versionInfo?.version || '—' }}</span>
+              </span>
+            </div>
           </div>
         </div>
       </div>
