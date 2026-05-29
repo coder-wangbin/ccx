@@ -353,6 +353,18 @@ func (m *Manager) CurrentPort() int {
 	return m.port
 }
 
+// ReadConfiguredPort 从 .env 文件读取用户配置的端口，读不到时返回运行时缓存端口。
+func (m *Manager) ReadConfiguredPort() int {
+	m.mu.Lock()
+	dataDir := m.dataDir
+	port := m.port
+	m.mu.Unlock()
+	if p, err := readPortFromEnvFile(filepath.Join(dataDir, ".env")); err == nil && p > 0 {
+		return p
+	}
+	return port
+}
+
 func (m *Manager) EnsureProxyAccessKey() (string, error) {
 	m.mu.Lock()
 	dataDir := m.dataDir

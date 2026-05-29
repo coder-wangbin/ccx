@@ -480,3 +480,30 @@ func TestCurrentPort(t *testing.T) {
 		t.Errorf("CurrentPort = %d, want 5555", m.CurrentPort())
 	}
 }
+
+func TestReadConfiguredPort(t *testing.T) {
+	t.Run("env file has PORT", func(t *testing.T) {
+		dir := t.TempDir()
+		os.WriteFile(filepath.Join(dir, ".env"), []byte("PORT=4000\n"), 0o644)
+		m := NewManager(Options{RootDir: t.TempDir(), DataDir: dir, DefaultPort: 3000})
+		if got := m.ReadConfiguredPort(); got != 4000 {
+			t.Errorf("ReadConfiguredPort = %d, want 4000", got)
+		}
+	})
+
+	t.Run("env file missing PORT falls back to cached", func(t *testing.T) {
+		dir := t.TempDir()
+		os.WriteFile(filepath.Join(dir, ".env"), []byte("ENV=production\n"), 0o644)
+		m := NewManager(Options{RootDir: t.TempDir(), DataDir: dir, DefaultPort: 5555})
+		if got := m.ReadConfiguredPort(); got != 5555 {
+			t.Errorf("ReadConfiguredPort = %d, want 5555", got)
+		}
+	})
+
+	t.Run("env file missing falls back to cached", func(t *testing.T) {
+		m := NewManager(Options{RootDir: t.TempDir(), DataDir: t.TempDir(), DefaultPort: 7777})
+		if got := m.ReadConfiguredPort(); got != 7777 {
+			t.Errorf("ReadConfiguredPort = %d, want 7777", got)
+		}
+	})
+}

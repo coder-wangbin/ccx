@@ -237,10 +237,7 @@ func (s *DesktopService) GetAgentConfigStatus(platform string) (configservice.Ag
 	if s.configService == nil {
 		return configservice.AgentConfigStatus{}, fmt.Errorf("配置服务未初始化")
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 1200*time.Millisecond)
-	defer cancel()
-	status := s.manager.Status(ctx)
-	return s.configService.GetStatus(platform, status.Port)
+	return s.configService.GetStatus(platform, s.manager.ReadConfiguredPort())
 }
 
 func (s *DesktopService) ApplyAgentConfig(req configservice.ApplyAgentConfigRequest) error {
@@ -265,7 +262,7 @@ func (s *DesktopService) ApplyAgentConfig(req configservice.ApplyAgentConfigRequ
 			return err
 		}
 	}
-	return s.configService.Apply(req, status.Port, key)
+	return s.configService.Apply(req, s.manager.ReadConfiguredPort(), key)
 }
 
 func (s *DesktopService) PreviewAgentConfigDiff(req configservice.ApplyAgentConfigRequest) (configservice.ConfigDiffResult, error) {
@@ -283,7 +280,7 @@ func (s *DesktopService) PreviewAgentConfigDiff(req configservice.ApplyAgentConf
 	if platform == configservice.PlatformCodex || platform == configservice.PlatformOpenCode || (platform == configservice.PlatformClaude && (req.Provider == "" || req.Provider == configservice.ProviderCCX)) {
 		key, _ = s.manager.ReadProxyAccessKey()
 	}
-	return s.configService.PreviewApply(req, status.Port, key)
+	return s.configService.PreviewApply(req, s.manager.ReadConfiguredPort(), key)
 }
 
 func (s *DesktopService) PreviewRestoreConfigDiff(platform string) (configservice.ConfigDiffResult, error) {
