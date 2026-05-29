@@ -85,47 +85,47 @@ const sizeStyle = computed(() => {
 
 <style scoped>
 .ccx-desktop-logo {
-  /* 亮色主题：浅底 + 深蓝/青绿，高对比但不压重 Sidebar */
-  --logo-bg-start: #ccfbf1;
-  --logo-bg-mid: #dbeafe;
-  --logo-bg-end: #f8fafc;
-  --logo-border: #2563eb;
-  --logo-panel-start: #ffffff;
-  --logo-panel-mid: #eff6ff;
-  --logo-panel-end: #ecfdf5;
-  --logo-panel-border: #0284c7;
-  --logo-divider: #0f766e;
-  --logo-flow-start: #0369a1;
-  --logo-flow-mid: #2563eb;
-  --logo-flow-end: #059669;
-  --logo-dot-green: #059669;
-  --logo-dot-blue: #0284c7;
-  --logo-dot-indigo: #4f46e5;
-  --logo-status-green: #047857;
-  --logo-status-blue: #0369a1;
-  --logo-online: #0d9488;
+  /* 亮色主题为默认值；暗色主题通过继承自 .dark 的全局变量覆盖 */
+  --logo-bg-start: var(--desktop-logo-bg-start, #ccfbf1);
+  --logo-bg-mid: var(--desktop-logo-bg-mid, #dbeafe);
+  --logo-bg-end: var(--desktop-logo-bg-end, #f8fafc);
+  --logo-border: var(--desktop-logo-border, #2563eb);
+  --logo-panel-start: var(--desktop-logo-panel-start, #ffffff);
+  --logo-panel-mid: var(--desktop-logo-panel-mid, #eff6ff);
+  --logo-panel-end: var(--desktop-logo-panel-end, #ecfdf5);
+  --logo-panel-border: var(--desktop-logo-panel-border, #0284c7);
+  --logo-divider: var(--desktop-logo-divider, #0f766e);
+  --logo-flow-start: var(--desktop-logo-flow-start, #0369a1);
+  --logo-flow-mid: var(--desktop-logo-flow-mid, #2563eb);
+  --logo-flow-end: var(--desktop-logo-flow-end, #059669);
+  --logo-dot-green: var(--desktop-logo-dot-green, #059669);
+  --logo-dot-blue: var(--desktop-logo-dot-blue, #0284c7);
+  --logo-dot-indigo: var(--desktop-logo-dot-indigo, #4f46e5);
+  --logo-status-green: var(--desktop-logo-status-green, #047857);
+  --logo-status-blue: var(--desktop-logo-status-blue, #0369a1);
+  --logo-online: var(--desktop-logo-online, #0d9488);
 }
 
-:global(.dark) .ccx-desktop-logo {
+:global(.dark) {
   /* 暗色主题：深底 + 蓝靛绿霓虹，呼应 App 图标 */
-  --logo-bg-start: #064e3b;
-  --logo-bg-mid: #082f49;
-  --logo-bg-end: #020617;
-  --logo-border: #93c5fd;
-  --logo-panel-start: #102a56;
-  --logo-panel-mid: #06142a;
-  --logo-panel-end: #042f2e;
-  --logo-panel-border: #93c5fd;
-  --logo-divider: #bae6fd;
-  --logo-flow-start: #38bdf8;
-  --logo-flow-mid: #6366f1;
-  --logo-flow-end: #10b981;
-  --logo-dot-green: #10b981;
-  --logo-dot-blue: #38bdf8;
-  --logo-dot-indigo: #6366f1;
-  --logo-status-green: #10b981;
-  --logo-status-blue: #38bdf8;
-  --logo-online: #5eead4;
+  --desktop-logo-bg-start: #064e3b;
+  --desktop-logo-bg-mid: #082f49;
+  --desktop-logo-bg-end: #020617;
+  --desktop-logo-border: #93c5fd;
+  --desktop-logo-panel-start: #102a56;
+  --desktop-logo-panel-mid: #06142a;
+  --desktop-logo-panel-end: #042f2e;
+  --desktop-logo-panel-border: #93c5fd;
+  --desktop-logo-divider: #bae6fd;
+  --desktop-logo-flow-start: #38bdf8;
+  --desktop-logo-flow-mid: #6366f1;
+  --desktop-logo-flow-end: #10b981;
+  --desktop-logo-dot-green: #10b981;
+  --desktop-logo-dot-blue: #38bdf8;
+  --desktop-logo-dot-indigo: #6366f1;
+  --desktop-logo-status-green: #10b981;
+  --desktop-logo-status-blue: #38bdf8;
+  --desktop-logo-online: #5eead4;
 }
 
 /* 在线网关节点呼吸脉冲 */
