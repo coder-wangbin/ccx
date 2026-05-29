@@ -524,7 +524,7 @@ func extractClaudeSystemText(content interface{}) string {
 	}
 }
 
-func normalizeSystemRoleToTopLevel(bodyBytes []byte) []byte {
+func NormalizeSystemRoleToTopLevel(bodyBytes []byte) []byte {
 	decoder := json.NewDecoder(bytes.NewReader(bodyBytes))
 	decoder.UseNumber()
 
@@ -676,7 +676,7 @@ func (p *ClaudeProvider) ConvertToProviderRequest(c *gin.Context, upstream *conf
 	}
 
 	if upstream.NormalizeSystemRoleToTopLevel {
-		bodyBytes = normalizeSystemRoleToTopLevel(bodyBytes)
+		bodyBytes = NormalizeSystemRoleToTopLevel(bodyBytes)
 	}
 	// 构建目标URL
 	// 智能拼接逻辑：

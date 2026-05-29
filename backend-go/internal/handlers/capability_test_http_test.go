@@ -868,3 +868,74 @@ func TestBuildTestRequestWithModel_FallbackToDisabledKey(t *testing.T) {
 		t.Fatalf("auth header=%q, want contains 'disabled-key-1'", authHeader)
 	}
 }
+
+func TestBuildTestRequestWithModel_ClaudeOpus48KeepsSystemMessageByDefault(t *testing.T) {
+	channel := &config.UpstreamConfig{
+		BaseURL: "https://example.com",
+		APIKeys: []string{"test-key"},
+	}
+
+	req, err := buildTestRequestWithModel("messages", channel, capabilityProbeModelClaudeOpus48)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	defer req.Body.Close()
+
+	var body map[string]interface{}
+	if err := json.NewDecoder(req.Body).Decode(&body); err != nil {
+		t.Fatalf("decode request body failed: %v", err)
+	}
+	messages, ok := body["messages"].([]interface{})
+	if !ok {
+		t.Fatalf("messages=%T, want []interface{}", body["messages"])
+	}
+	if len(messages) != 4 {
+		t.Fatalf("messages len=%d, want 4", len(messages))
+	}
+	middle, ok := messages[2].(map[string]interface{})
+	if !ok {
+		t.Fatalf("middle message=%T, want map[string]interface{}", messages[2])
+	}
+	if middle["role"] != "system" {
+		t.Fatalf("middle role=%v, want system", middle["role"])
+	}
+}
+
+func TestBuildTestRequestWithModel_ClaudeOpus48NormalizesSystemMessageWhenEnabled(t *testing.T) {
+	channel := &config.UpstreamConfig{
+		BaseURL:                       "https://example.com",
+		APIKeys:                       []string{"test-key"},
+		NormalizeSystemRoleToTopLevel: true,
+	}
+
+	req, err := buildTestRequestWithModel("messages", channel, capabilityProbeModelClaudeOpus48)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	defer req.Body.Close()
+
+	var body map[string]interface{}
+	if err := json.NewDecoder(req.Body).Decode(&body); err != nil {
+		t.Fatalf("decode request body failed: %v", err)
+	}
+	messages, ok := body["messages"].([]interface{})
+	if !ok {
+		t.Fatalf("messages=%T, want []interface{}", body["messages"])
+	}
+	for _, raw := range messages {
+		msg, ok := raw.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		if msg["role"] == "system" {
+			t.Fatalf("normalized probe should not include system message: %#v", messages)
+		}
+	}
+	systemText, ok := body["system"].(string)
+	if !ok {
+		t.Fatalf("system=%T, want string", body["system"])
+	}
+	if !strings.Contains(systemText, "cc_entrypoint=cli") || !strings.Contains(systemText, "Claude agent") {
+		t.Fatalf("system=%q, want billing header and Claude agent text", systemText)
+	}
+}

@@ -49,19 +49,12 @@ func providerServiceTypeForProtocol(protocol CapabilityBaseProtocol) string {
 
 // buildMessagesProbeBody 构造 messages 协议最小探测请求体。
 func buildMessagesProbeBody(probeModel string) []byte {
-	body, _ := json.Marshal(map[string]interface{}{
+	body := map[string]interface{}{
 		"model": probeModel,
 		"system": []map[string]interface{}{
 			{
 				"type": "text",
 				"text": "x-anthropic-billing-header: cc_version=2.1.71.2f9; cc_entrypoint=cli;",
-			},
-			{
-				"type": "text",
-				"text": "You are a Claude agent, built on Anthropic's Claude Agent SDK.",
-				"cache_control": map[string]string{
-					"type": "ephemeral",
-				},
 			},
 		},
 		"messages":   []map[string]string{{"role": "user", "content": "What are you best at: code generation, creative writing, or math problem solving?"}},
@@ -70,8 +63,27 @@ func buildMessagesProbeBody(probeModel string) []byte {
 		"thinking": map[string]interface{}{
 			"type": "disabled",
 		},
-	})
-	return body
+	}
+
+	if probeModel == capabilityProbeModelClaudeOpus48 {
+		body["messages"] = []map[string]string{
+			{"role": "user", "content": "Confirm you are ready."},
+			{"role": "assistant", "content": "Ready."},
+			{"role": "system", "content": "You are a Claude agent, built on Anthropic's Claude Agent SDK."},
+			{"role": "user", "content": "What are you best at: code generation, creative writing, or math problem solving?"},
+		}
+	} else {
+		body["system"] = append(body["system"].([]map[string]interface{}), map[string]interface{}{
+			"type": "text",
+			"text": "You are a Claude agent, built on Anthropic's Claude Agent SDK.",
+			"cache_control": map[string]string{
+				"type": "ephemeral",
+			},
+		})
+	}
+
+	bodyBytes, _ := json.Marshal(body)
+	return bodyBytes
 }
 
 // buildChatProbeBody 构造 chat 协议最小探测请求体。

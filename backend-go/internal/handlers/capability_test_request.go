@@ -204,28 +204,10 @@ func buildTestRequestWithModel(protocol string, channel *config.UpstreamConfig, 
 	switch protocol {
 	case "messages":
 		requestURL = buildCapabilityTestURL(baseURL, "/v1", "/messages")
-		body, err = json.Marshal(map[string]interface{}{
-			"model": model,
-			"system": []map[string]interface{}{
-				{
-					"type": "text",
-					"text": "x-anthropic-billing-header: cc_version=2.1.71.2f9; cc_entrypoint=cli;",
-				},
-				{
-					"type": "text",
-					"text": "You are a Claude agent, built on Anthropic's Claude Agent SDK.",
-					"cache_control": map[string]string{
-						"type": "ephemeral",
-					},
-				},
-			},
-			"messages":   []map[string]string{{"role": "user", "content": "What are you best at: code generation, creative writing, or math problem solving?"}},
-			"max_tokens": 100,
-			"stream":     true,
-			"thinking": map[string]interface{}{
-				"type": "disabled",
-			},
-		})
+		body = buildMessagesProbeBody(model)
+		if channel.NormalizeSystemRoleToTopLevel {
+			body = providers.NormalizeSystemRoleToTopLevel(body)
+		}
 
 	case "chat":
 		requestURL = buildCapabilityTestURL(baseURL, "/v1", "/chat/completions")
