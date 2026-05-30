@@ -160,7 +160,7 @@ func Presets() []ProviderPreset {
 				{ID: "token-ams-anthropic", Label: "Token Plan - 欧洲 (Anthropic)", BaseURL: "https://token-plan-ams.xiaomimimo.com/anthropic", Description: "欧洲区订阅套餐 Anthropic 入口"},
 			},
 			Targets: []ChannelTarget{
-				{Type: TargetMessages, Label: "Messages 原生透传", Description: "自动开启 reasoning passback 兼容", Recommended: true},
+				{Type: TargetMessages, Label: "Messages 原生透传", Description: "Claude Code 直连或 CCX messages 渠道", Recommended: true},
 				{Type: TargetResponses, Label: "Codex Responses", Description: "OpenAI Responses 协议，供 Codex 使用"},
 				{Type: TargetChat, Label: "Chat 渠道透传", Description: "OpenAI Chat 协议，供 Chat 客户端使用"},
 			},

@@ -548,8 +548,6 @@ export const messages: Record<SupportedLocale, Messages> = {
     'channel.target.responses.description': 'OpenAI Responses protocol, designed for Codex CLI and compatible clients',
     'channel.target.chat.label': 'OpenAI Chat',
     'channel.target.chat.description': 'OpenAI Chat Completions protocol, compatible with various Chat clients and third-party tools',
-    // MiMo target override
-    'channel.preset.mimo.target.messages.description': 'Enables reasoning passback compatibility',
     'env.title': 'Environment config',
     'env.pathDetecting': 'Detecting',
     'env.refresh': 'Refresh',

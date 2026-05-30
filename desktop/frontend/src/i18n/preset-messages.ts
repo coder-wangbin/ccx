@@ -52,7 +52,6 @@ export const presetMessages: Record<SupportedLocale, Record<string, string>> = {
     'channel.preset.mimo.plan.token-ams-anthropic.label': 'Token Plan (Europe · Anthropic)',
     'channel.preset.mimo.plan.token-ams-anthropic.description':
       'Europe subscription plan (Anthropic endpoint)',
-    'channel.preset.mimo.target.messages.description': 'Auto-enables reasoning passback compatibility',
 
     // Compshare
     'channel.preset.compshare.label': 'Compshare Plans',
