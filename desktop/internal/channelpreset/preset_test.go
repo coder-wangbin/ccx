@@ -53,8 +53,9 @@ func TestBuildPayload(t *testing.T) {
 			wantNativeTool: true,
 			wantNormalize:  true,
 			wantModelMap: map[string]string{
-				"gpt":  "deepseek-v4-pro",
-				"mini": "deepseek-v4-flash",
+				"gpt":               "deepseek-v4-pro",
+				"mini":              "deepseek-v4-flash",
+				"codex-auto-review": "deepseek-v4-flash",
 			},
 		},
 		{
@@ -100,7 +101,8 @@ func TestBuildPayload(t *testing.T) {
 			wantBaseURL: "https://api.xiaomimimo.com/v1",
 			wantService: "openai",
 			wantModelMap: map[string]string{
-				"gpt-5": "mimo-v2.5-pro",
+				"gpt-5":             "mimo-v2.5-pro",
+				"codex-auto-review": "mimo-v2.5",
 			},
 			wantNoVisionModels: []string{"mimo-v2.5-pro"},
 			wantFallback:       "mimo-v2.5",
@@ -139,8 +141,9 @@ func TestBuildPayload(t *testing.T) {
 			wantNativeTool: true,
 			wantNormalize:  true,
 			wantModelMap: map[string]string{
-				"gpt":  "glm-5.1",
-				"mini": "deepseek-v4-flash",
+				"gpt":               "glm-5.1",
+				"mini":              "deepseek-v4-flash",
+				"codex-auto-review": "deepseek-v4-flash",
 			},
 			wantNoVisionModels: []string{"deepseek-v4-flash"},
 			wantFallback:       "MiniMax-M2.7",
@@ -190,7 +193,7 @@ func TestBuildPayload(t *testing.T) {
 			wantCodex:      false,
 			wantStripCodex: false,
 			wantNativeTool: true,
-			wantModelMap:   map[string]string{"gpt-5": "MiniMax-M2.7"},
+			wantModelMap:   map[string]string{"gpt-5": "MiniMax-M2.7", "codex-auto-review": "MiniMax-M2.7"},
 			wantNormalize:  true,
 		},
 		{
@@ -208,10 +211,11 @@ func TestBuildPayload(t *testing.T) {
 			wantCodex:      true,
 			wantStripCodex: true,
 			wantModelMap: map[string]string{
-				"gpt-5.5":       "glm-5.1",
-				"gpt-5.4":       "deepseek-v4-pro",
-				"gpt-5.4-mini":  "deepseek-v4-flash",
-				"gpt-5.3-codex": "deepseek-v4-flash",
+				"gpt-5.5":           "glm-5.1",
+				"gpt-5.4":           "deepseek-v4-pro",
+				"gpt-5.4-mini":      "deepseek-v4-flash",
+				"gpt-5.3-codex":     "deepseek-v4-flash",
+				"codex-auto-review": "deepseek-v4-flash",
 			},
 			wantReasoning: map[string]string{
 				"gpt-5.5":       "high",
@@ -228,10 +232,11 @@ func TestBuildPayload(t *testing.T) {
 			wantCodex:      true,
 			wantStripCodex: true,
 			wantModelMap: map[string]string{
-				"gpt-5.5":       "glm-5.1",
-				"gpt-5.4":       "deepseek-v4-pro",
-				"gpt-5.4-mini":  "deepseek-v4-flash",
-				"gpt-5.3-codex": "deepseek-v4-flash",
+				"gpt-5.5":           "glm-5.1",
+				"gpt-5.4":           "deepseek-v4-pro",
+				"gpt-5.4-mini":      "deepseek-v4-flash",
+				"gpt-5.3-codex":     "deepseek-v4-flash",
+				"codex-auto-review": "deepseek-v4-flash",
 			},
 			wantReasoning: map[string]string{
 				"gpt-5.5":       "high",
@@ -274,10 +279,11 @@ func TestBuildPayload(t *testing.T) {
 			wantCodex:      true,
 			wantStripCodex: true,
 			wantModelMap: map[string]string{
-				"gpt-5.5":       "glm-5.1",
-				"gpt-5.4":       "deepseek-v4-pro",
-				"gpt-5.4-mini":  "deepseek-v4-flash",
-				"gpt-5.3-codex": "deepseek-v4-flash",
+				"gpt-5.5":           "glm-5.1",
+				"gpt-5.4":           "deepseek-v4-pro",
+				"gpt-5.4-mini":      "deepseek-v4-flash",
+				"gpt-5.3-codex":     "deepseek-v4-flash",
+				"codex-auto-review": "deepseek-v4-flash",
 			},
 			wantReasoning: map[string]string{
 				"gpt-5.5":       "high",
@@ -307,7 +313,7 @@ func TestBuildPayload(t *testing.T) {
 			wantService:    "openai",
 			wantCodex:      true,
 			wantStripCodex: true,
-			wantModelMap:   map[string]string{"gpt-5": "glm-5.1"},
+			wantModelMap:   map[string]string{"gpt-5": "glm-5.1", "codex-auto-review": "glm-5.1"},
 		},
 		{
 			name:           "opencode go responses",
@@ -316,7 +322,25 @@ func TestBuildPayload(t *testing.T) {
 			wantService:    "openai",
 			wantCodex:      true,
 			wantStripCodex: true,
-			wantModelMap:   map[string]string{"gpt-5": "glm-5.1"},
+			wantModelMap:   map[string]string{"gpt-5": "glm-5.1", "codex-auto-review": "glm-5.1"},
+		},
+		{
+			name:           "kimi responses auto-review redirect",
+			req:            CreateChannelRequest{Provider: ProviderKimi, Target: TargetResponses, APIKey: "sk-test"},
+			wantBaseURL:    "https://api.moonshot.cn/v1",
+			wantService:    "openai",
+			wantCodex:      true,
+			wantStripCodex: true,
+			wantModelMap:   map[string]string{"gpt-5": "kimi-k2.6", "codex-auto-review": "kimi-k2.6"},
+		},
+		{
+			name:           "glm responses auto-review redirect",
+			req:            CreateChannelRequest{Provider: ProviderGLM, Target: TargetResponses, APIKey: "sk-test"},
+			wantBaseURL:    "https://open.bigmodel.cn/api/coding/paas/v4#",
+			wantService:    "openai",
+			wantCodex:      true,
+			wantStripCodex: true,
+			wantModelMap:   map[string]string{"gpt-5": "glm-5.1", "codex-auto-review": "glm-5.1"},
 		},
 	}
 	for _, tt := range tests {

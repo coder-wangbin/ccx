@@ -1523,6 +1523,7 @@ const allSourceModelOptions = computed(() => {
     // Responses API (Codex) 常用模型名称
     return [
       { title: 'codex', value: 'codex' },
+      { title: 'codex-auto-review', value: 'codex-auto-review' },
       { title: 'gpt-5', value: 'gpt-5' },
       { title: 'gpt', value: 'gpt' },
       { title: 'mini', value: 'mini' },
@@ -1785,7 +1786,8 @@ const codexResponsesChannelPresets: Record<
 > = {
   mimo: {
     modelMapping: {
-      'gpt-5': 'mimo-v2.5-pro'
+      'gpt-5': 'mimo-v2.5-pro',
+      'codex-auto-review': 'mimo-v2.5'
     },
     reasoningMapping: {},
     reasoningParamStyle: 'reasoning',
@@ -1800,7 +1802,8 @@ const codexResponsesChannelPresets: Record<
   deepseek: {
     modelMapping: {
       gpt: 'deepseek-v4-pro',
-      mini: 'deepseek-v4-flash'
+      mini: 'deepseek-v4-flash',
+      'codex-auto-review': 'deepseek-v4-flash'
     },
     reasoningMapping: {
       gpt: 'max'
