@@ -4,9 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"regexp"
 	"strings"
@@ -319,67 +317,6 @@ func isRealReasoningText(text string) bool {
 	return trimmed != "" && trimmed != legacyThinkingPlaceholder
 }
 
-func summarizeAssistantReasoningState(bodyBytes []byte) string {
-	decoder := json.NewDecoder(bytes.NewReader(bodyBytes))
-	decoder.UseNumber()
-
-	var data map[string]interface{}
-	if err := decoder.Decode(&data); err != nil {
-		return fmt.Sprintf("decode_error=%v", err)
-	}
-
-	messages, ok := data["messages"].([]interface{})
-	if !ok {
-		return "messages=<missing_or_invalid>"
-	}
-
-	parts := make([]string, 0, len(messages))
-	for idx, rawMsg := range messages {
-		msg, ok := rawMsg.(map[string]interface{})
-		if !ok {
-			continue
-		}
-		if role, _ := msg["role"].(string); role != "assistant" {
-			continue
-		}
-
-		existing, hasExisting := msg["reasoning_content"].(string)
-		rcState := "missing"
-		switch {
-		case hasExisting && strings.TrimSpace(existing) == "":
-			rcState = "empty"
-		case hasExisting:
-			rcState = fmt.Sprintf("len=%d", len(existing))
-		}
-
-		contentTypes := make([]string, 0, 4)
-		if content, ok := msg["content"].([]interface{}); ok {
-			for _, rawBlock := range content {
-				block, ok := rawBlock.(map[string]interface{})
-				if !ok {
-					contentTypes = append(contentTypes, "?")
-					continue
-				}
-				blockType, _ := block["type"].(string)
-				blockType = strings.TrimSpace(blockType)
-				if blockType == "" {
-					blockType = "?"
-				}
-				contentTypes = append(contentTypes, blockType)
-			}
-		} else {
-			contentTypes = append(contentTypes, "<non_array>")
-		}
-
-		parts = append(parts, fmt.Sprintf("assistant[%d]:rc=%s blocks=%s", idx, rcState, strings.Join(contentTypes, ",")))
-	}
-
-	if len(parts) == 0 {
-		return "assistants=<none>"
-	}
-	return strings.Join(parts, " | ")
-}
-
 func stripEmptyTextBlocksFromBody(bodyBytes []byte) []byte {
 	decoder := json.NewDecoder(bytes.NewReader(bodyBytes))
 	decoder.UseNumber()
@@ -662,11 +599,9 @@ func (p *ClaudeProvider) ConvertToProviderRequest(c *gin.Context, upstream *conf
 
 	if upstream.PassbackReasoningContent {
 		bodyBytes = convertThinkingToReasoningContent(bodyBytes)
-		log.Printf("[Claude-Reasoning-Debug] after_passback channel=%s summary=%s", upstream.Name, summarizeAssistantReasoningState(bodyBytes))
 	}
 	if upstream.PassbackThinkingBlocks {
 		bodyBytes = convertReasoningContentToThinkingBlocks(bodyBytes, upstream.PassbackReasoningContent)
-		log.Printf("[Claude-Reasoning-Debug] after_thinking_passback channel=%s summary=%s", upstream.Name, summarizeAssistantReasoningState(bodyBytes))
 	}
 	if upstream.StripEmptyTextBlocks {
 		bodyBytes = stripEmptyTextBlocksFromBody(bodyBytes)
