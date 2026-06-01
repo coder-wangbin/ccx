@@ -118,32 +118,6 @@
           </ul>
         </section>
 
-        <!-- 5. 状态图例 -->
-        <section v-show="step === 4" class="guide-section">
-          <h3 class="guide-section-title">{{ t('guide.legend.title') }}</h3>
-          <div class="guide-legend-list">
-            <div v-for="item in legendItems" :key="item.status" class="guide-legend-row">
-              <ChannelStatusBadge :status="item.status" :show-label="false" size="small" />
-              <span class="guide-legend-text">{{ t(item.key) }}</span>
-            </div>
-          </div>
-        </section>
-
-        <!-- 6. 顶部开关 -->
-        <section v-show="step === 5" class="guide-section">
-          <h3 class="guide-section-title">{{ t('guide.switches.title') }}</h3>
-          <ul class="guide-switch-list">
-            <li><span class="switch-badge">CB</span>{{ t('guide.switches.cb') }}</li>
-            <li><span class="switch-badge">Fuzzy</span>{{ t('guide.switches.fuzzy') }}</li>
-            <li><span class="switch-badge">CCH</span>{{ t('guide.switches.cch') }}</li>
-          </ul>
-        </section>
-
-        <!-- 7. 接入客户端 -->
-        <section v-show="step === 6" class="guide-section">
-          <h3 class="guide-section-title">{{ t('guide.connect.title') }}</h3>
-          <p class="guide-section-body">{{ t('guide.connect.body') }}</p>
-        </section>
       </v-card-text>
 
       <v-divider />
@@ -170,7 +144,6 @@ import { computed, ref, watch } from 'vue'
 
 import ChannelStatusBadge from './ChannelStatusBadge.vue'
 import { useI18n } from '../i18n'
-import type { MessageKey } from '../i18n/messages'
 import type { ChannelStatus } from '../services/api'
 
 const props = defineProps<{
@@ -183,7 +156,7 @@ const emit = defineEmits<{
 
 const { t } = useI18n()
 
-const STEP_COUNT = 7
+const STEP_COUNT = 4
 const step = ref(0)
 
 // 每次打开指引时回到第一步
@@ -199,15 +172,6 @@ const demoRows = computed<Array<{ priority: number; status: ChannelStatus; name:
   { priority: 1, status: 'active', name: t('guide.channelList.demoNormalName'), keys: 3 },
   { priority: 2, status: 'suspended', name: t('guide.channelList.demoTrippedName'), keys: 2 },
 ])
-
-// 状态图例（status 取值与真实渠道一致，复用 ChannelStatusBadge 的颜色映射）
-const legendItems: Array<{ status: ChannelStatus | 'error' | 'unknown'; key: MessageKey }> = [
-  { status: 'active', key: 'guide.legend.normal' },
-  { status: 'suspended', key: 'guide.legend.tripped' },
-  { status: 'disabled', key: 'guide.legend.disabled' },
-  { status: 'error', key: 'guide.legend.error' },
-  { status: 'unknown', key: 'guide.legend.unknown' },
-]
 
 function prev() {
   if (step.value > 0) step.value -= 1
@@ -383,8 +347,7 @@ function close() {
 }
 
 /* 点击点说明列表 */
-.guide-click-list,
-.guide-switch-list {
+.guide-click-list {
   list-style: none;
   padding: 0;
   margin: 0;
@@ -406,48 +369,6 @@ function close() {
 .guide-click-list li :deep(.v-icon) {
   margin-top: 2px;
   flex-shrink: 0;
-}
-
-/* 状态图例 */
-.guide-legend-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.guide-legend-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.guide-legend-text {
-  font-size: 0.9rem;
-  color: rgba(var(--v-theme-on-surface), 0.78);
-}
-
-/* 开关说明 */
-.guide-switch-list li {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  font-size: 0.9rem;
-  line-height: 1.6;
-  padding: 8px 0;
-}
-
-.switch-badge {
-  flex-shrink: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 48px;
-  padding: 2px 8px;
-  font-size: 0.75rem;
-  font-weight: 700;
-  background: rgba(var(--v-theme-primary), 0.12);
-  color: rgb(var(--v-theme-primary));
-  border-radius: 4px;
 }
 
 @media (max-width: 600px) {

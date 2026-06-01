@@ -462,18 +462,6 @@ export type MessageKey =
   | 'guide.channelList.clickLogs'
   | 'guide.channelList.clickResume'
   | 'guide.channelList.drag'
-  | 'guide.legend.title'
-  | 'guide.legend.normal'
-  | 'guide.legend.tripped'
-  | 'guide.legend.disabled'
-  | 'guide.legend.error'
-  | 'guide.legend.unknown'
-  | 'guide.switches.title'
-  | 'guide.switches.cb'
-  | 'guide.switches.fuzzy'
-  | 'guide.switches.cch'
-  | 'guide.connect.title'
-  | 'guide.connect.body'
 
 export const messages: Record<SupportedLocale, Record<MessageKey, string>> = {
   en: {
@@ -938,18 +926,6 @@ export const messages: Record<SupportedLocale, Record<MessageKey, string>> = {
     'guide.channelList.clickLogs': 'Click the log button on the right to view that channel’s logs.',
     'guide.channelList.clickResume': 'Click the resume button (shown only on tripped channels) to restore a circuit-broken channel right away.',
     'guide.channelList.drag': 'Drag the handle on the left to reorder priority and the failover sequence.',
-    'guide.legend.title': 'Channel status legend',
-    'guide.legend.normal': 'Normal: serving traffic',
-    'guide.legend.tripped': 'Tripped: circuit broken by failures, temporarily skipped',
-    'guide.legend.disabled': 'Disabled: manually moved to the standby pool',
-    'guide.legend.error': 'Error: last health check failed',
-    'guide.legend.unknown': 'Unknown: not probed yet',
-    'guide.switches.title': 'Top toolbar switches',
-    'guide.switches.cb': 'CB — circuit breaker thresholds (window size, failure rate, consecutive failures); changes apply instantly.',
-    'guide.switches.fuzzy': 'Fuzzy — loose error handling that retries across all channels.',
-    'guide.switches.cch': 'CCH — strips the cch= billing header (Claude channels only).',
-    'guide.connect.title': 'Connect your client',
-    'guide.connect.body': 'Once a channel works, point your client (Claude Code, Codex, etc.) at this gateway: use the gateway URL as the base URL and PROXY_ACCESS_KEY as the API key. The same key you used to sign in here is the proxy access key.',
   },
   id: {
     'app.auth.verifyingTitle': 'Memverifikasi akses',
@@ -1413,18 +1389,6 @@ export const messages: Record<SupportedLocale, Record<MessageKey, string>> = {
     'guide.channelList.clickLogs': 'Klik tombol log di sebelah kanan untuk melihat log channel tersebut.',
     'guide.channelList.clickResume': 'Klik tombol lanjutkan (hanya muncul pada channel yang terputus) untuk segera memulihkan channel yang terkena circuit breaker.',
     'guide.channelList.drag': 'Seret handle di sebelah kiri untuk mengatur ulang prioritas dan urutan failover.',
-    'guide.legend.title': 'Legenda status channel',
-    'guide.legend.normal': 'Normal: melayani trafik',
-    'guide.legend.tripped': 'Terputus: circuit breaker aktif karena kegagalan, dilewati sementara',
-    'guide.legend.disabled': 'Nonaktif: dipindah manual ke pool standby',
-    'guide.legend.error': 'Error: health check terakhir gagal',
-    'guide.legend.unknown': 'Tidak diketahui: belum diuji',
-    'guide.switches.title': 'Tombol di toolbar atas',
-    'guide.switches.cb': 'CB — ambang circuit breaker (ukuran window, rasio gagal, kegagalan beruntun); perubahan langsung berlaku.',
-    'guide.switches.fuzzy': 'Fuzzy — penanganan error longgar yang mencoba ulang ke semua channel.',
-    'guide.switches.cch': 'CCH — menghapus header billing cch= (khusus channel Claude).',
-    'guide.connect.title': 'Hubungkan klien Anda',
-    'guide.connect.body': 'Setelah sebuah channel berfungsi, arahkan klien Anda (Claude Code, Codex, dll.) ke gateway ini: gunakan URL gateway sebagai base URL dan PROXY_ACCESS_KEY sebagai API key. Key yang Anda pakai untuk masuk di sini adalah proxy access key tersebut.',
   },
   'zh-CN': {
     'app.auth.verifyingTitle': '正在验证访问权限',
@@ -1888,17 +1852,5 @@ export const messages: Record<SupportedLocale, Record<MessageKey, string>> = {
     'guide.channelList.clickLogs': '点击右侧的日志按钮，可查看该渠道的日志。',
     'guide.channelList.clickResume': '点击恢复按钮（仅熔断渠道显示），可立即恢复被熔断的渠道。',
     'guide.channelList.drag': '拖动左侧手柄，可调整渠道优先级与故障转移顺序。',
-    'guide.legend.title': '渠道状态图例',
-    'guide.legend.normal': '正常：正在承载流量',
-    'guide.legend.tripped': '熔断：因连续失败被熔断，暂时跳过',
-    'guide.legend.disabled': '禁用：已手动移入待命池',
-    'guide.legend.error': '错误：最近一次健康检查失败',
-    'guide.legend.unknown': '未知：尚未探测',
-    'guide.switches.title': '顶部开关速览',
-    'guide.switches.cb': 'CB —— 熔断阈值（滑动窗口、失败率、连续失败次数），修改立即生效。',
-    'guide.switches.fuzzy': 'Fuzzy —— 模糊处理错误，自动重试所有渠道。',
-    'guide.switches.cch': 'CCH —— 移除 cch= 计费头（仅 Claude 渠道）。',
-    'guide.connect.title': '接入客户端',
-    'guide.connect.body': '当渠道可用后，把客户端（Claude Code、Codex 等）指向本网关：用网关地址作为 Base URL，用 PROXY_ACCESS_KEY 作为 API 密钥。你在这里登录所用的密钥就是该代理访问密钥。',
   },
 }
