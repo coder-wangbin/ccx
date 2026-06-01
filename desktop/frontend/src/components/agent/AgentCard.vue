@@ -253,7 +253,7 @@ const openFileInEditor = async (editorPath: string, filePath: string) => {
             {{ t('agent.openConsole') }}
             <ExternalLink class="h-3 w-3" />
           </button>
-          <span class="text-muted-foreground">|</span>
+          <span v-if="selectedCodexProvider === 'openai'" class="text-muted-foreground">|</span>
           <label
             v-if="selectedCodexProvider === 'openai'"
             class="inline-flex items-center gap-1 text-xs text-muted-foreground select-none cursor-pointer"
