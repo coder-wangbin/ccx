@@ -455,7 +455,6 @@ export type MessageKey =
   | 'guide.protocol.body3'
   | 'guide.addChannel.title'
   | 'guide.addChannel.body'
-  | 'guide.addChannel.quickHint'
   | 'guide.addChannel.fieldName'
   | 'guide.addChannel.fieldBaseUrl'
   | 'guide.addChannel.fieldApiKey'
@@ -924,8 +923,7 @@ export const messages: Record<SupportedLocale, Record<MessageKey, string>> = {
     'guide.protocol.body2': 'Switching a tab changes both the channel list below and what the Add channel button creates.',
     'guide.protocol.body3': 'Pick the protocol your client speaks first.',
     'guide.addChannel.title': 'Add a channel',
-    'guide.addChannel.body': 'Click the Add channel button at the top left to add an upstream for the current protocol. Quick mode needs only a name, base URL and API key; detailed mode exposes model mapping, capability options and more.',
-    'guide.addChannel.quickHint': 'Quick mode — just paste your Base URL and API key:',
+    'guide.addChannel.body': 'Click the Add channel button at the top left to add an upstream for the current protocol. Just paste a Base URL and API key — CCX detects the rest automatically.',
     'guide.addChannel.fieldName': 'Name',
     'guide.addChannel.fieldBaseUrl': 'Base URL',
     'guide.addChannel.fieldApiKey': 'API Key',
@@ -1393,8 +1391,7 @@ export const messages: Record<SupportedLocale, Record<MessageKey, string>> = {
     'guide.protocol.body2': 'Mengganti tab mengubah daftar channel di bawah sekaligus apa yang dibuat tombol Tambah channel.',
     'guide.protocol.body3': 'Pilih dulu protokol yang dipakai klien Anda.',
     'guide.addChannel.title': 'Tambah channel',
-    'guide.addChannel.body': 'Klik tombol Tambah channel di kiri atas untuk menambah upstream bagi protokol saat ini. Mode cepat hanya butuh nama, base URL, dan API key; mode detail menampilkan pemetaan model, opsi kapabilitas, dan lainnya.',
-    'guide.addChannel.quickHint': 'Mode cepat — cukup tempel Base URL dan API key Anda:',
+    'guide.addChannel.body': 'Klik tombol Tambah channel di kiri atas untuk menambah upstream bagi protokol saat ini. Cukup tempel Base URL dan API key — CCX akan mendeteksi sisanya secara otomatis.',
     'guide.addChannel.fieldName': 'Nama',
     'guide.addChannel.fieldBaseUrl': 'Base URL',
     'guide.addChannel.fieldApiKey': 'API Key',
@@ -1862,8 +1859,7 @@ export const messages: Record<SupportedLocale, Record<MessageKey, string>> = {
     'guide.protocol.body2': '切换标签会同时改变下方的渠道列表以及”添加渠道”按钮创建的渠道类型。',
     'guide.protocol.body3': '请先选择你的客户端所用的协议。',
     'guide.addChannel.title': '添加渠道',
-    'guide.addChannel.body': '点击左上角的”添加渠道”按钮，为当前协议添加上游。快速模式只需名称、Base URL 和 API 密钥；详细模式则可配置模型映射、能力选项等。',
-    'guide.addChannel.quickHint': '快速模式 — 只需粘贴 Base URL 和 API 密钥：',
+    'guide.addChannel.body': '点击左上角的”添加渠道”按钮，为当前协议添加上游。只需粘贴 Base URL 和 API 密钥，CCX 会自动识别。',
     'guide.addChannel.fieldName': '名称',
     'guide.addChannel.fieldBaseUrl': 'Base URL',
     'guide.addChannel.fieldApiKey': 'API 密钥',

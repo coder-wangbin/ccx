@@ -78,7 +78,6 @@
             </v-btn>
           </div>
           <p class="guide-section-body mb-3">{{ t('guide.addChannel.body') }}</p>
-          <p class="guide-section-body mb-2" style="font-weight: 600;">{{ t('guide.addChannel.quickHint') }}</p>
           <div class="guide-form-demo">
             <div class="guide-form-field">
               <span class="guide-form-label">{{ t('guide.addChannel.fieldName') }}</span>
