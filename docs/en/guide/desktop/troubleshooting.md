@@ -4,6 +4,26 @@ This page collects common CCX Desktop issues and resolution steps.
 
 For first-run setup or the full user flow, see [CCX Desktop](./index).
 
+## First things to check
+
+### Disable global proxy and TUN mode
+
+**This is the most common first troubleshooting step.**
+
+Global proxies and TUN mode (e.g. Clash TUN, Surge enhanced mode, v2rayN TUN) hijack all local network traffic, causing requests between CCX and upstream providers to be misrouted or intercepted.
+
+**Symptoms**:
+
+- Requests time out or connections are reset
+- Unexpected error pages or HTML content is returned
+- Upstream channels show unhealthy, but direct curl to upstream works fine
+
+**Resolution**:
+
+1. Disable the system proxy or switch to rule-based mode (PAC / Rule) to avoid global hijacking.
+2. Disable TUN mode, or add CCX-related addresses to the bypass list.
+3. Retry the request.
+
 ## Startup failures
 
 ### Binary not found
