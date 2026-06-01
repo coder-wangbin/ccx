@@ -719,8 +719,8 @@ func TestApplyAndRestoreCodex_ThirdPartyCleanup(t *testing.T) {
 	if authData["OPENAI_API_KEY"] != "sk-ds-key" {
 		t.Errorf("OPENAI_API_KEY = %v, want sk-ds-key", authData["OPENAI_API_KEY"])
 	}
-	if authData["auth_mode"] != "chatgpt" {
-		t.Errorf("auth_mode = %v, want chatgpt", authData["auth_mode"])
+	if authData["auth_mode"] != "apikey" {
+		t.Errorf("auth_mode = %v, want apikey", authData["auth_mode"])
 	}
 
 	// Restore
@@ -924,21 +924,21 @@ func TestApplyCodexOpenAI_WithApiKey(t *testing.T) {
 	os.WriteFile(configPath, []byte(tomlContent), 0o644)
 	writeJSON(authPath, map[string]any{"OPENAI_API_KEY": nil, "auth_mode": "chatgpt"})
 
-	// 应用 OpenAI direct，提供了 apiKey → 应写入 key 并设置 auth_mode = "api"
+	// 应用 OpenAI direct，提供了 apiKey → 应写入 key 并设置 auth_mode = "apikey"
 	err := svc.Apply(ApplyAgentConfigRequest{Platform: PlatformCodex, Provider: ProviderOpenAI, APIKey: "sk-my-openai-key"}, 0, "")
 	if err != nil {
 		t.Fatalf("Apply failed: %v", err)
 	}
 
-	// 验证 auth.json：OPENAI_API_KEY 写入，auth_mode = "api"
+	// 验证 auth.json：OPENAI_API_KEY 写入，auth_mode = "apikey"
 	authContent, _ := os.ReadFile(authPath)
 	var authData map[string]any
 	json.Unmarshal(authContent, &authData)
 	if authData["OPENAI_API_KEY"] != "sk-my-openai-key" {
 		t.Errorf("auth.json should have OPENAI_API_KEY = sk-my-openai-key, got %v", authData["OPENAI_API_KEY"])
 	}
-	if authData["auth_mode"] != "api" {
-		t.Errorf("auth.json should have auth_mode = api, got %v", authData["auth_mode"])
+	if authData["auth_mode"] != "apikey" {
+		t.Errorf("auth.json should have auth_mode = apikey, got %v", authData["auth_mode"])
 	}
 }
 
@@ -1075,8 +1075,8 @@ func TestApplyCodex_PluginMode(t *testing.T) {
 	}
 
 	authData, _, _ := readJSONMap(authPath)
-	if authData["auth_mode"] != "chatgpt" {
-		t.Errorf("auth_mode = %v, want chatgpt", authData["auth_mode"])
+	if authData["auth_mode"] != "apikey" {
+		t.Errorf("auth_mode = %v, want apikey", authData["auth_mode"])
 	}
 	if authData["OPENAI_API_KEY"] != "test-key" {
 		t.Errorf("OPENAI_API_KEY = %v, want test-key", authData["OPENAI_API_KEY"])
@@ -1125,8 +1125,8 @@ experimental_bearer_token = "old-key"
 	if authData["OPENAI_API_KEY"] != "new-key" {
 		t.Errorf("OPENAI_API_KEY = %v, want new-key", authData["OPENAI_API_KEY"])
 	}
-	if authData["auth_mode"] != "chatgpt" {
-		t.Errorf("auth_mode = %v, want chatgpt", authData["auth_mode"])
+	if authData["auth_mode"] != "apikey" {
+		t.Errorf("auth_mode = %v, want apikey", authData["auth_mode"])
 	}
 }
 
