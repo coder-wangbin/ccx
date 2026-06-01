@@ -339,6 +339,45 @@ func TestComputeJSONDiffWithMask_SensitiveValueChanged(t *testing.T) {
 	}
 }
 
+func TestComputeJSONDiffWithMask_ShortValueNoSubstringLeak(t *testing.T) {
+	// PROXY_ACCESS_KEY 可能是极短字符串（如 "key"），文本级 ReplaceAll 会误伤
+	// 同一文件里的其它字段值（如 auth_mode="apikey" 中的 "key" 子串）。
+	old := map[string]any{
+		"OPENAI_API_KEY": nil,
+		"auth_mode":      "chatgpt",
+	}
+	new := map[string]any{
+		"OPENAI_API_KEY": "key",
+		"auth_mode":      "apikey",
+	}
+	result := computeJSONDiffWithMask("auth.json", old, new, "OPENAI_API_KEY")
+
+	for _, l := range result.Lines {
+		// auth_mode 不是敏感字段，apikey 必须完整保留，不能被掩码成 api***
+		if strings.Contains(l.Content, "auth_mode") && strings.Contains(l.Content, "api***") {
+			t.Errorf("auth_mode value wrongly masked by short-key substring replace: %q", l.Content)
+		}
+		// OPENAI_API_KEY 的真实短值 "key" 必须被掩码
+		if strings.Contains(l.Content, "OPENAI_API_KEY") && strings.Contains(l.Content, `"key"`) {
+			t.Errorf("sensitive OPENAI_API_KEY value not masked: %q", l.Content)
+		}
+	}
+
+	// 必须能识别出 apikey 这一行的新增
+	foundApikey := false
+	for _, l := range result.Lines {
+		if l.Type == "added" && strings.Contains(l.Content, `"auth_mode": "apikey"`) {
+			foundApikey = true
+		}
+	}
+	if !foundApikey {
+		t.Errorf("expected added line with intact auth_mode=apikey")
+		for _, l := range result.Lines {
+			t.Logf("  %s: %s", l.Type, l.Content)
+		}
+	}
+}
+
 func TestComputeJSONDiffWithMask_SensitiveValueIdentical(t *testing.T) {
 	old := map[string]any{
 		"env": map[string]any{

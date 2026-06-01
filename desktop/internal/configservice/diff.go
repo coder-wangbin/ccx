@@ -128,14 +128,42 @@ func maskTextSensitiveValues(content string, keyValues map[string]string) string
 // 再对展示内容进行脱敏。敏感字段值虽均掩码为 "***"，但 diff 类型
 // （removed/added）基于原始值判定，用户仍能感知到变更。
 func computeJSONDiffWithMask(path string, oldData, newData map[string]any, keys ...string) FileDiff {
-	oldRaw := formatJSON(oldData)
-	newRaw := formatJSON(newData)
 	if len(keys) == 0 {
-		return computeTextDiff(path, oldRaw, newRaw)
+		return computeTextDiff(path, formatJSON(oldData), formatJSON(newData))
 	}
-	oldMasked := maskTextSensitiveValues(oldRaw, extractNestedStringValues(oldData, keys))
-	newMasked := maskTextSensitiveValues(newRaw, extractNestedStringValues(newData, keys))
-	return computeTextDiffFromMasked(path, oldRaw, newRaw, oldMasked, newMasked)
+	// 在数据层按字段掩码敏感值（含嵌套 map），再序列化做普通文本 diff，
+	// 避免文本级 ReplaceAll 对短值（如 "key"）造成的子串误伤（如 auth_mode="apikey"）。
+	oldMasked := maskDataSensitiveKeys(oldData, keys)
+	newMasked := maskDataSensitiveKeys(newData, keys)
+	return computeTextDiff(path, formatJSON(oldMasked), formatJSON(newMasked))
+}
+
+// maskDataSensitiveKeys 递归深拷贝 map，并对任意层级中命中 keys 的字符串值脱敏。
+// 不修改原始 map。
+func maskDataSensitiveKeys(data map[string]any, keys []string) map[string]any {
+	if data == nil {
+		return nil
+	}
+	keySet := make(map[string]bool, len(keys))
+	for _, k := range keys {
+		keySet[k] = true
+	}
+	result := make(map[string]any, len(data))
+	for k, v := range data {
+		switch val := v.(type) {
+		case string:
+			if keySet[k] && val != "" {
+				result[k] = maskSensitiveValue(val)
+			} else {
+				result[k] = val
+			}
+		case map[string]any:
+			result[k] = maskDataSensitiveKeys(val, keys)
+		default:
+			result[k] = v
+		}
+	}
+	return result
 }
 
 // computeTextDiffWithMask 在原始文本上计算 diff，再对展示内容进行脱敏。
