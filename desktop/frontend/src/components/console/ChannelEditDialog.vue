@@ -229,7 +229,9 @@ function populateFromChannel(ch: Channel) {
   form.reasoningParamStyle = ch.reasoningParamStyle || 'reasoning'
   form.textVerbosity = ch.textVerbosity || ''
   form.supportedModelsText = (ch.supportedModels || []).join('\n')
-  form.noVisionModelsText = (ch.noVisionModels || []).join('\n')
+  // noVisionModels 中命中映射 target 的由行级 toggle 表示，其余保留在文本框，避免重复展示
+  const mappedTargets = new Set(Object.values(ch.modelMapping || {}))
+  form.noVisionModelsText = (ch.noVisionModels || []).filter(m => !mappedTargets.has(m)).join('\n')
   form.visionFallbackModel = ch.visionFallbackModel || ''
   form.noVision = ch.noVision ?? false
   form.passbackReasoningContent = ch.passbackReasoningContent ?? false
@@ -849,7 +851,8 @@ function getReasoningMappingAsObject(): Record<string, 'none' | 'low' | 'medium'
 }
 
 function getNoVisionModelsFromRows(): string[] {
-  const set = new Set<string>()
+  // 合并：模型行勾选的 noVision target + 高级选项里手动维护的列表
+  const set = new Set<string>(parseLines(form.noVisionModelsText))
   for (const row of modelMappingRows.value) {
     if (row.noVision && row.target) set.add(row.target)
   }
