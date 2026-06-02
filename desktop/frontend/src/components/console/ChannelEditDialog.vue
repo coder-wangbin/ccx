@@ -723,6 +723,20 @@ const sourceModelOptions = computed(() => {
   return ['claude-opus-4-6', 'claude-sonnet-4-6', 'claude-haiku-4-5', 'gpt-5', 'gemini-2.5-pro']
 })
 
+const commonSupportedModelFilters = ['claude-*', 'gpt-5*', 'gpt-image-2', 'grok-4*', 'gemini-3*', '!*image*']
+const selectedSupportedModelSet = computed(() => new Set(parseLines(form.supportedModelsText)))
+
+function toggleSupportedModelFilter(filter: string) {
+  const current = parseLines(form.supportedModelsText)
+  const idx = current.indexOf(filter)
+  if (idx !== -1) {
+    current.splice(idx, 1)
+  } else {
+    current.push(filter)
+  }
+  form.supportedModelsText = current.join('\n')
+}
+
 async function fetchTargetModels() {
   if (!props.channel) return
   if (!form.baseUrl.trim() || getSubmitApiKeys().length === 0) {
@@ -1160,6 +1174,20 @@ function buildCurrentPayload() {
                   <div class="space-y-1.5">
                     <Label>{{ tf('console.form.supportedModels', '支持的模型（每行一个，留空=全部）') }}</Label>
                     <Textarea v-model="form.supportedModelsText" rows="3" placeholder="gpt-4*&#10;claude-3*" class="font-mono text-xs" />
+                    <div class="flex flex-wrap gap-1">
+                      <Button
+                        v-for="filter in commonSupportedModelFilters"
+                        :key="filter"
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        class="h-5 px-1.5 text-[10px]"
+                        :class="selectedSupportedModelSet.has(filter) ? 'border-primary bg-primary/10 text-primary' : ''"
+                        @click="toggleSupportedModelFilter(filter)"
+                      >
+                        {{ filter }}
+                      </Button>
+                    </div>
                   </div>
                 </section>
 
