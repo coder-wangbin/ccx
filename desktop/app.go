@@ -301,6 +301,13 @@ func (s *DesktopService) RestoreAgentConfig(platform string) error {
 	return s.configService.Restore(platform)
 }
 
+func (s *DesktopService) MigrateCodexSessions(req configservice.MigrateCodexSessionsRequest) (configservice.MigrateCodexSessionsResult, error) {
+	if s.configService == nil {
+		return configservice.MigrateCodexSessionsResult{}, fmt.Errorf("配置服务未初始化")
+	}
+	return s.configService.MigrateCodexSessions(req)
+}
+
 func (s *DesktopService) GetSavedProviderKeys() map[string]string {
 	if s.configService == nil {
 		return map[string]string{}

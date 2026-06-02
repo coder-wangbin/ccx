@@ -223,6 +223,18 @@ export type MessageKey =
   | 'agent.openFileInEditor'
   | 'agent.applyConfig'
   | 'agent.restoreConfig'
+  | 'agent.migrateSessions'
+  | 'agent.migrateConfirmTitle'
+  | 'agent.migrateConfirmDesc'
+  | 'agent.migrateTarget'
+  | 'agent.migrateRunning'
+  | 'agent.migrateConfirm'
+  | 'agent.migrateClose'
+  | 'agent.migrateResultSuccess'
+  | 'agent.migrateResultSkippedLabel'
+  | 'agent.migrateResultFailedLabel'
+  | 'agent.migrateSQLiteUpdated'
+  | 'agent.migrateSQLiteSkipped'
   | 'agent.openConsole'
   | 'agent.codexPlaceholderSaved'
   | 'agent.codexPlaceholderRequired'
@@ -591,6 +603,18 @@ export const messages: Record<SupportedLocale, Messages> = {
     'agent.openFileInEditor': 'Open in editor',
     'agent.applyConfig': 'Apply config',
     'agent.restoreConfig': 'Restore original config',
+    'agent.migrateSessions': 'Migrate sessions',
+    'agent.migrateConfirmTitle': 'Migrate Codex sessions',
+    'agent.migrateConfirmDesc': 'This will rewrite Codex local session metadata to the current provider. It updates history, archived sessions, and Codex state database, but never deletes sessions.',
+    'agent.migrateTarget': 'Target model_provider',
+    'agent.migrateRunning': 'Migrating sessions…',
+    'agent.migrateConfirm': 'Confirm migration',
+    'agent.migrateClose': 'Close',
+    'agent.migrateResultSuccess': 'Migration complete: {migrated}/{total} session files updated',
+    'agent.migrateResultSkippedLabel': 'Skipped files',
+    'agent.migrateResultFailedLabel': 'Failed files',
+    'agent.migrateSQLiteUpdated': 'SQLite database updated: {count} rows',
+    'agent.migrateSQLiteSkipped': 'SQLite database skipped',
     'agent.openConsole': 'Open official console',
     'agent.codexPlaceholderSaved': 'Saved locally; leave empty to reuse the key',
     'agent.codexPlaceholderRequired': 'Required: enter API Key',
@@ -956,6 +980,18 @@ export const messages: Record<SupportedLocale, Messages> = {
     'agent.openFileInEditor': '用编辑器打开',
     'agent.applyConfig': '应用配置',
     'agent.restoreConfig': '恢复原始配置',
+    'agent.migrateSessions': '迁移会话',
+    'agent.migrateConfirmTitle': '迁移 Codex 会话',
+    'agent.migrateConfirmDesc': '将 Codex 本地会话元数据改写为当前 provider，覆盖历史会话、归档会话和 Codex 状态数据库，但不会删除任何会话。',
+    'agent.migrateTarget': '目标 model_provider',
+    'agent.migrateRunning': '正在迁移会话...',
+    'agent.migrateConfirm': '确认迁移',
+    'agent.migrateClose': '关闭',
+    'agent.migrateResultSuccess': '迁移完成：{migrated}/{total} 个会话文件已更新',
+    'agent.migrateResultSkippedLabel': '跳过文件',
+    'agent.migrateResultFailedLabel': '失败文件',
+    'agent.migrateSQLiteUpdated': 'SQLite 数据库已更新：{count} 行',
+    'agent.migrateSQLiteSkipped': 'SQLite 数据库已跳过',
     'agent.openConsole': '访问官方控制台',
     'agent.codexPlaceholderSaved': '已保存，留空则使用已保存的 key',
     'agent.codexPlaceholderRequired': '必填：输入 API Key',

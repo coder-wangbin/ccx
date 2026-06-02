@@ -1,6 +1,7 @@
 package configservice
 
 import (
+	"database/sql"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -1271,6 +1272,107 @@ func assertDiffDoesNotLeak(t *testing.T, result ConfigDiffResult, rawValues ...s
 	}
 }
 
+func TestMigrateCodexSessions_RewritesJSONLAndSQLite(t *testing.T) {
+	svc := newTestService(t)
+	sessionsDir := svc.codexSessionsDir()
+	archivedDir := svc.codexArchivedSessionsDir()
+	activeChanged := filepath.Join(sessionsDir, "active.jsonl")
+	activeCurrent := filepath.Join(sessionsDir, "current.jsonl")
+	archivedChanged := filepath.Join(archivedDir, "archived.jsonl")
+	invalid := filepath.Join(archivedDir, "invalid.jsonl")
+	writeCodexSession(t, activeChanged, ProviderOpenAI, `{"role":"user","content":"model_provider openai should stay in body"}`)
+	writeCodexSession(t, activeCurrent, ProviderCCX, `{"role":"user","content":"already current"}`)
+	writeCodexSession(t, archivedChanged, "local", `{"role":"user","content":"archived"}`)
+	writeTextForTest(t, invalid, `{"type":"message","payload":{"model_provider":"openai"}}
+`)
+
+	db := openTestSQLite(t, svc.codexStateDBPath())
+	_, err := db.Exec(`CREATE TABLE threads (id TEXT PRIMARY KEY, model_provider TEXT)`)
+	if err != nil {
+		t.Fatalf("create threads failed: %v", err)
+	}
+	_, err = db.Exec(`INSERT INTO threads (id, model_provider) VALUES ('1', 'local'), ('2', 'ccx'), ('3', 'openai'), ('4', NULL)`)
+	if err != nil {
+		t.Fatalf("insert threads failed: %v", err)
+	}
+	db.Close()
+
+	result, err := svc.MigrateCodexSessions(MigrateCodexSessionsRequest{Provider: ProviderCCX, Mode: "plugin"})
+	if err != nil {
+		t.Fatalf("MigrateCodexSessions failed: %v", err)
+	}
+	if result.TargetProvider != ProviderCCX {
+		t.Fatalf("target provider = %q, want %q", result.TargetProvider, ProviderCCX)
+	}
+	if result.TotalFiles != 4 || result.MigratedFiles != 2 || result.SkippedFiles != 2 || result.FailedFiles != 0 {
+		t.Fatalf("unexpected file result: %+v", result)
+	}
+	if result.SQLiteSkipped || result.SQLiteRowsUpdated != 3 {
+		t.Fatalf("unexpected sqlite result: %+v", result)
+	}
+	if got := readCodexSessionProvider(t, activeChanged); got != ProviderCCX {
+		t.Fatalf("active provider = %q, want ccx", got)
+	}
+	if got := readCodexSessionProvider(t, activeCurrent); got != ProviderCCX {
+		t.Fatalf("current provider = %q, want ccx", got)
+	}
+	if got := readCodexSessionProvider(t, archivedChanged); got != ProviderCCX {
+		t.Fatalf("archived provider = %q, want ccx", got)
+	}
+	content, err := os.ReadFile(activeChanged)
+	if err != nil {
+		t.Fatalf("read migrated session failed: %v", err)
+	}
+	if !strings.Contains(string(content), `model_provider openai should stay in body`) {
+		t.Fatalf("conversation body was unexpectedly changed: %s", string(content))
+	}
+
+	db = openTestSQLite(t, svc.codexStateDBPath())
+	defer db.Close()
+	rows, err := db.Query(`SELECT model_provider, COUNT(*) FROM threads GROUP BY model_provider`)
+	if err != nil {
+		t.Fatalf("query threads failed: %v", err)
+	}
+	defer rows.Close()
+	providers := map[string]int{}
+	for rows.Next() {
+		var provider string
+		var count int
+		if err := rows.Scan(&provider, &count); err != nil {
+			t.Fatalf("scan threads failed: %v", err)
+		}
+		providers[provider] = count
+	}
+	if providers[ProviderCCX] != 4 || len(providers) != 1 {
+		t.Fatalf("providers after sqlite migration = %#v, want only ccx=4", providers)
+	}
+}
+
+func TestResolveCodexSessionModelProvider(t *testing.T) {
+	cases := []struct {
+		name string
+		req  MigrateCodexSessionsRequest
+		want string
+	}{
+		{"openai", MigrateCodexSessionsRequest{Provider: ProviderOpenAI}, ProviderOpenAI},
+		{"ccx quick", MigrateCodexSessionsRequest{Provider: ProviderCCX, Mode: "quick"}, ProviderOpenAI},
+		{"ccx plugin", MigrateCodexSessionsRequest{Provider: ProviderCCX, Mode: "plugin"}, ProviderCCX},
+		{"dashscope quick", MigrateCodexSessionsRequest{Provider: ProviderDashScope, Mode: "quick"}, ProviderOpenAI},
+		{"dashscope plugin", MigrateCodexSessionsRequest{Provider: ProviderDashScope, Mode: "plugin"}, ProviderDashScope},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			got, err := resolveCodexSessionModelProvider(c.req)
+			if err != nil {
+				t.Fatalf("resolve failed: %v", err)
+			}
+			if got != c.want {
+				t.Fatalf("provider = %q, want %q", got, c.want)
+			}
+		})
+	}
+}
+
 // ── helpers ──
 
 func writeJSON(path string, data any) {
@@ -1282,4 +1384,63 @@ func writeJSON(path string, data any) {
 func readJSON(path string, dest any) {
 	b, _ := os.ReadFile(path)
 	json.Unmarshal(b, dest)
+}
+
+func writeTextForTest(t *testing.T, path, content string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatalf("mkdir failed: %v", err)
+	}
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatalf("write %s failed: %v", path, err)
+	}
+}
+
+func writeCodexSession(t *testing.T, path, provider, body string) {
+	t.Helper()
+	firstLine, err := json.Marshal(map[string]any{
+		"type": "session_meta",
+		"payload": map[string]any{
+			"id":             filepath.Base(path),
+			"model_provider": provider,
+		},
+	})
+	if err != nil {
+		t.Fatalf("marshal session failed: %v", err)
+	}
+	writeTextForTest(t, path, string(firstLine)+"\n"+body+"\n")
+}
+
+func readCodexSessionProvider(t *testing.T, path string) string {
+	t.Helper()
+	content, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read %s failed: %v", path, err)
+	}
+	firstLine := strings.SplitN(string(content), "\n", 2)[0]
+	var meta map[string]any
+	if err := json.Unmarshal([]byte(firstLine), &meta); err != nil {
+		t.Fatalf("unmarshal first line failed: %v", err)
+	}
+	payload, ok := meta["payload"].(map[string]any)
+	if !ok {
+		t.Fatalf("payload missing in %s", path)
+	}
+	provider, ok := payload["model_provider"].(string)
+	if !ok {
+		t.Fatalf("model_provider missing in %s", path)
+	}
+	return provider
+}
+
+func openTestSQLite(t *testing.T, path string) *sql.DB {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatalf("mkdir sqlite dir failed: %v", err)
+	}
+	db, err := sql.Open("sqlite", path)
+	if err != nil {
+		t.Fatalf("open sqlite failed: %v", err)
+	}
+	return db
 }

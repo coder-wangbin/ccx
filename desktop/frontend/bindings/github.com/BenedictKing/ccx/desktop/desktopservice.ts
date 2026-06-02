@@ -150,6 +150,12 @@ export function IsSetupComplete(): $CancellablePromise<boolean> {
     return $Call.ByID(375603581);
 }
 
+export function MigrateCodexSessions(req: configservice$0.MigrateCodexSessionsRequest): $CancellablePromise<configservice$0.MigrateCodexSessionsResult> {
+    return $Call.ByID(3203400112, req).then(($result: any) => {
+        return $$createType15($result);
+    });
+}
+
 /**
  * OpenDirectory 在系统文件管理器中打开目录。
  */
@@ -177,13 +183,13 @@ export function OpenWebUIInBrowser(): $CancellablePromise<void> {
 
 export function PreviewAgentConfigDiff(req: configservice$0.ApplyAgentConfigRequest): $CancellablePromise<configservice$0.ConfigDiffResult> {
     return $Call.ByID(2249637809, req).then(($result: any) => {
-        return $$createType15($result);
+        return $$createType16($result);
     });
 }
 
 export function PreviewRestoreConfigDiff(platform: string): $CancellablePromise<configservice$0.ConfigDiffResult> {
     return $Call.ByID(2382293170, platform).then(($result: any) => {
-        return $$createType15($result);
+        return $$createType16($result);
     });
 }
 
@@ -257,4 +263,5 @@ const $$createType11 = $Create.Array($$createType10);
 const $$createType12 = $Create.Map($Create.Any, $Create.Any);
 const $$createType13 = backend$0.Status.createFrom;
 const $$createType14 = $models.VersionInfo.createFrom;
-const $$createType15 = configservice$0.ConfigDiffResult.createFrom;
+const $$createType15 = configservice$0.MigrateCodexSessionsResult.createFrom;
+const $$createType16 = configservice$0.ConfigDiffResult.createFrom;

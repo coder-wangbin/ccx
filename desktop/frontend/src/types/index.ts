@@ -54,6 +54,22 @@ export type ApplyAgentConfigRequest = {
   mode?: 'quick' | 'plugin'
 }
 
+export type MigrateCodexSessionsRequest = {
+  provider?: AgentProvider
+  mode?: 'quick' | 'plugin'
+}
+
+export type MigrateCodexSessionsResult = {
+  targetProvider: string
+  totalFiles: number
+  migratedFiles: number
+  skippedFiles: number
+  failedFiles: number
+  sqliteRowsUpdated: number
+  sqliteSkipped: boolean
+  sqliteError?: string
+}
+
 export type TabValue = 'status' | 'agent' | 'env' | 'channels' | 'web'
 
 export type ProviderPlan = {

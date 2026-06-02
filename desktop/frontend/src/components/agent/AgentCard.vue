@@ -42,11 +42,13 @@ const props = defineProps<{
   openCodeProviderLabels?: Record<string, string>
   openCodeProviderLabel?: (value?: string) => string
   openCodeTargetBaseUrl?: () => string
+  migrateLoading?: boolean
 }>()
 
 const emit = defineEmits<{
   apply: []
   restore: []
+  migrate: []
   'update:selectedClaudeProvider': [value: AgentProvider]
   'update:claudeProviderKeys': [value: Record<AgentProvider, string>]
   'update:claudeMimoBaseUrl': [value: string]
@@ -339,6 +341,9 @@ const openFileInEditor = async (editorPath: string, filePath: string) => {
         </Button>
         <Button size="sm" variant="secondary" :disabled="configLoading || !agentStatus?.hasState" @click="emit('restore')">
           {{ t('agent.restoreConfig') }}
+        </Button>
+        <Button v-if="platform === 'codex'" size="sm" variant="outline" :disabled="configLoading || migrateLoading" @click="emit('migrate')">
+          {{ t('agent.migrateSessions') }}
         </Button>
       </div>
     </CardContent>

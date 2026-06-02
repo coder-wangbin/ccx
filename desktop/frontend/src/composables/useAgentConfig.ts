@@ -1,5 +1,5 @@
 import { ref, computed } from 'vue'
-import type { AgentPlatform, AgentProvider, AgentConfigStatus, ApplyAgentConfigRequest, ConfigDiffResult } from '@/types'
+import type { AgentPlatform, AgentProvider, AgentConfigStatus, ApplyAgentConfigRequest, ConfigDiffResult, MigrateCodexSessionsResult } from '@/types'
 import { useLanguage } from '@/composables/useLanguage'
 import {
   GetAgentConfigStatus,
@@ -8,6 +8,7 @@ import {
   GetSavedProviderKeys,
   PreviewAgentConfigDiff,
   PreviewRestoreConfigDiff,
+  MigrateCodexSessions,
 } from '@bindings/github.com/BenedictKing/ccx/desktop/desktopservice'
 
 const { t } = useLanguage()
@@ -90,6 +91,10 @@ const diffMode = ref<'apply' | 'restore'>('apply')
 const diffLoading = ref(false)
 const diffPendingPlatform = ref<AgentPlatform>('claude')
 const diffWarning = ref<string | undefined>(undefined)
+const migrateDialogOpen = ref(false)
+const migrateLoading = ref(false)
+const migrateResult = ref<MigrateCodexSessionsResult | null>(null)
+const migrateError = ref('')
 
 const isClaudeProvider = (value?: string): value is AgentProvider => {
   return value === 'ccx' || value === 'deepseek' || value === 'mimo' || value === 'compshare' || value === 'kimi' || value === 'glm' || value === 'minimax' || value === 'dashscope' || value === 'opencode-zen' || value === 'opencode-go'
@@ -432,6 +437,43 @@ const closeDiffDialog = () => {
   diffDialogOpen.value = false
 }
 
+const codexSessionTargetProvider = computed(() => {
+  if (selectedCodexProvider.value === 'ccx') {
+    return codexMode.value === 'plugin' ? 'ccx' : 'openai'
+  }
+  if (isCodexThirdPartyWithMode(selectedCodexProvider.value)) {
+    return codexMode.value === 'plugin' ? selectedCodexProvider.value : 'openai'
+  }
+  return 'openai'
+})
+
+const showMigrateDialog = () => {
+  migrateResult.value = null
+  migrateError.value = ''
+  migrateDialogOpen.value = true
+}
+
+const confirmMigrate = async () => {
+  migrateLoading.value = true
+  migrateError.value = ''
+  migrateResult.value = null
+  try {
+    migrateResult.value = await MigrateCodexSessions({
+      provider: selectedCodexProvider.value,
+      mode: codexMode.value,
+    }) as MigrateCodexSessionsResult
+  } catch (error) {
+    migrateError.value = error instanceof Error ? error.message : String(error)
+  } finally {
+    migrateLoading.value = false
+  }
+}
+
+const closeMigrateDialog = () => {
+  if (migrateLoading.value) return
+  migrateDialogOpen.value = false
+}
+
 const restoreAgent = async (platform: AgentPlatform) => {
   configLoading.value = true
   try {
@@ -486,5 +528,14 @@ export function useAgentConfig() {
     confirmApply,
     confirmRestore,
     closeDiffDialog,
+    // Codex session migration
+    migrateDialogOpen,
+    migrateLoading,
+    migrateResult,
+    migrateError,
+    codexSessionTargetProvider,
+    showMigrateDialog,
+    confirmMigrate,
+    closeMigrateDialog,
   }
 }

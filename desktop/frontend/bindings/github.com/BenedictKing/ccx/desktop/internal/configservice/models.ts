@@ -182,6 +182,75 @@ export class FileDiff {
     }
 }
 
+export class MigrateCodexSessionsRequest {
+    "provider"?: string;
+
+    /**
+     * "quick" | "plugin"
+     */
+    "mode"?: string;
+
+    /** Creates a new MigrateCodexSessionsRequest instance. */
+    constructor($$source: Partial<MigrateCodexSessionsRequest> = {}) {
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new MigrateCodexSessionsRequest instance from a string or object.
+     */
+    static createFrom($$source: any = {}): MigrateCodexSessionsRequest {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new MigrateCodexSessionsRequest($$parsedSource as Partial<MigrateCodexSessionsRequest>);
+    }
+}
+
+export class MigrateCodexSessionsResult {
+    "targetProvider": string;
+    "totalFiles": number;
+    "migratedFiles": number;
+    "skippedFiles": number;
+    "failedFiles": number;
+    "sqliteRowsUpdated": number;
+    "sqliteSkipped": boolean;
+    "sqliteError"?: string;
+
+    /** Creates a new MigrateCodexSessionsResult instance. */
+    constructor($$source: Partial<MigrateCodexSessionsResult> = {}) {
+        if (!("targetProvider" in $$source)) {
+            this["targetProvider"] = "";
+        }
+        if (!("totalFiles" in $$source)) {
+            this["totalFiles"] = 0;
+        }
+        if (!("migratedFiles" in $$source)) {
+            this["migratedFiles"] = 0;
+        }
+        if (!("skippedFiles" in $$source)) {
+            this["skippedFiles"] = 0;
+        }
+        if (!("failedFiles" in $$source)) {
+            this["failedFiles"] = 0;
+        }
+        if (!("sqliteRowsUpdated" in $$source)) {
+            this["sqliteRowsUpdated"] = 0;
+        }
+        if (!("sqliteSkipped" in $$source)) {
+            this["sqliteSkipped"] = false;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new MigrateCodexSessionsResult instance from a string or object.
+     */
+    static createFrom($$source: any = {}): MigrateCodexSessionsResult {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new MigrateCodexSessionsResult($$parsedSource as Partial<MigrateCodexSessionsResult>);
+    }
+}
+
 export class ProviderKeyAsset {
     "provider": string;
     "apiKey": string;

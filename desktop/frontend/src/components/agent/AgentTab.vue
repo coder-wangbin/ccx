@@ -2,6 +2,7 @@
 import { onMounted } from 'vue'
 import AgentCard from '@/components/agent/AgentCard.vue'
 import ConfigDiffDialog from '@/components/agent/ConfigDiffDialog.vue'
+import MigrateSessionsDialog from '@/components/agent/MigrateSessionsDialog.vue'
 import { useStatus } from '@/composables/useStatus'
 import { useAgentConfig } from '@/composables/useAgentConfig'
 import type { AgentPlatform } from '@/types'
@@ -47,6 +48,14 @@ const {
   confirmApply,
   confirmRestore,
   closeDiffDialog,
+  migrateDialogOpen,
+  migrateLoading,
+  migrateResult,
+  migrateError,
+  codexSessionTargetProvider,
+  showMigrateDialog,
+  confirmMigrate,
+  closeMigrateDialog,
 } = useAgentConfig()
 
 onMounted(() => {
@@ -69,6 +78,11 @@ const handleRestore = async (platform: AgentPlatform) => {
   } catch (error) {
     actionError.value = error instanceof Error ? error.message : String(error)
   }
+}
+
+const handleMigrate = () => {
+  actionError.value = ''
+  showMigrateDialog()
 }
 
 const handleConfirm = async () => {
@@ -119,8 +133,10 @@ const handleConfirm = async () => {
         :open-code-provider-labels="codexProviderLabels"
         :open-code-provider-label="openCodeProviderLabel"
         :open-code-target-base-url="openCodeTargetBaseUrl"
+        :migrate-loading="migrateLoading"
         @apply="handleApply(platform)"
         @restore="handleRestore(platform)"
+        @migrate="handleMigrate"
         @update:selected-claude-provider="selectedClaudeProvider = $event"
         @update:claude-provider-keys="claudeProviderKeys = $event"
         @update:claude-mimo-base-url="claudeMimoBaseUrl = $event"
@@ -145,6 +161,16 @@ const handleConfirm = async () => {
       :warning="diffWarning"
       @confirm="handleConfirm"
       @cancel="closeDiffDialog"
+    />
+
+    <MigrateSessionsDialog
+      :open="migrateDialogOpen"
+      :loading="migrateLoading"
+      :target-provider="codexSessionTargetProvider"
+      :result="migrateResult"
+      :error="migrateError"
+      @confirm="confirmMigrate"
+      @cancel="closeMigrateDialog"
     />
   </div>
 </template>

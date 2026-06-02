@@ -7,5 +7,7 @@ export {
     ConfigDiffResult,
     DiffLine,
     FileDiff,
+    MigrateCodexSessionsRequest,
+    MigrateCodexSessionsResult,
     ProviderKeyAsset
 } from "./models.js";

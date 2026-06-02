@@ -1,6 +1,8 @@
 package configservice
 
 import (
+	"bytes"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -10,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/BenedictKing/ccx/desktop/internal/appdirs"
+	_ "modernc.org/sqlite"
 )
 
 const (
@@ -68,6 +71,22 @@ type ApplyAgentConfigRequest struct {
 	APIKey   string `json:"apiKey,omitempty"`
 	BaseURL  string `json:"baseUrl,omitempty"`
 	Mode     string `json:"mode,omitempty"` // "quick" | "plugin"
+}
+
+type MigrateCodexSessionsRequest struct {
+	Provider string `json:"provider,omitempty"`
+	Mode     string `json:"mode,omitempty"` // "quick" | "plugin"
+}
+
+type MigrateCodexSessionsResult struct {
+	TargetProvider    string `json:"targetProvider"`
+	TotalFiles        int    `json:"totalFiles"`
+	MigratedFiles     int    `json:"migratedFiles"`
+	SkippedFiles      int    `json:"skippedFiles"`
+	FailedFiles       int    `json:"failedFiles"`
+	SQLiteRowsUpdated int64  `json:"sqliteRowsUpdated"`
+	SQLiteSkipped     bool   `json:"sqliteSkipped"`
+	SQLiteError       string `json:"sqliteError,omitempty"`
 }
 
 type Service struct {
@@ -855,6 +874,152 @@ func (s *Service) restoreCodex() error {
 	return os.Remove(s.codexStatePath())
 }
 
+func (s *Service) MigrateCodexSessions(req MigrateCodexSessionsRequest) (MigrateCodexSessionsResult, error) {
+	targetProvider, err := resolveCodexSessionModelProvider(req)
+	result := MigrateCodexSessionsResult{TargetProvider: targetProvider}
+	if err != nil {
+		return result, err
+	}
+	for _, dir := range []string{s.codexSessionsDir(), s.codexArchivedSessionsDir()} {
+		if err := s.migrateCodexSessionDir(dir, targetProvider, &result); err != nil {
+			return result, err
+		}
+	}
+	s.migrateCodexStateDB(targetProvider, &result)
+	return result, nil
+}
+
+func resolveCodexSessionModelProvider(req MigrateCodexSessionsRequest) (string, error) {
+	provider := normalizeCodexProvider(req.Provider)
+	mode := strings.TrimSpace(req.Mode)
+	if mode != "plugin" {
+		mode = "quick"
+	}
+	switch provider {
+	case ProviderOpenAI:
+		return ProviderOpenAI, nil
+	case ProviderCCX:
+		if mode == "plugin" {
+			return ProviderCCX, nil
+		}
+		return ProviderOpenAI, nil
+	case ProviderDashScope, ProviderOpenCodeZen, ProviderOpenCodeGo:
+		if mode == "plugin" {
+			return provider, nil
+		}
+		return ProviderOpenAI, nil
+	default:
+		return "", fmt.Errorf("不支持的 Codex provider: %s", req.Provider)
+	}
+}
+
+func (s *Service) migrateCodexSessionDir(dir, targetProvider string, result *MigrateCodexSessionsResult) error {
+	if _, err := os.Stat(dir); err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+	return filepath.WalkDir(dir, func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			result.FailedFiles++
+			return nil
+		}
+		if entry.IsDir() || !strings.EqualFold(filepath.Ext(path), ".jsonl") {
+			return nil
+		}
+		result.TotalFiles++
+		migrated, err := migrateCodexSessionFile(path, targetProvider)
+		if err != nil {
+			result.FailedFiles++
+			return nil
+		}
+		if migrated {
+			result.MigratedFiles++
+		} else {
+			result.SkippedFiles++
+		}
+		return nil
+	})
+}
+
+func migrateCodexSessionFile(path, targetProvider string) (bool, error) {
+	content, err := os.ReadFile(path)
+	if err != nil {
+		return false, err
+	}
+	lineEnd := bytes.IndexByte(content, '\n')
+	firstLine := content
+	rest := []byte(nil)
+	if lineEnd >= 0 {
+		firstLine = content[:lineEnd]
+		rest = content[lineEnd:]
+	}
+	lineSuffix := []byte(nil)
+	if bytes.HasSuffix(firstLine, []byte("\r")) {
+		firstLine = firstLine[:len(firstLine)-1]
+		lineSuffix = []byte("\r")
+	}
+	var meta map[string]any
+	if err := json.Unmarshal(firstLine, &meta); err != nil {
+		return false, nil
+	}
+	if typ, ok := meta["type"].(string); !ok || typ != "session_meta" {
+		return false, nil
+	}
+	payload, ok := meta["payload"].(map[string]any)
+	if !ok {
+		return false, nil
+	}
+	currentProvider, ok := payload["model_provider"].(string)
+	if !ok || currentProvider == targetProvider {
+		return false, nil
+	}
+	payload["model_provider"] = targetProvider
+	updatedFirstLine, err := json.Marshal(meta)
+	if err != nil {
+		return false, err
+	}
+	updated := make([]byte, 0, len(updatedFirstLine)+len(lineSuffix)+len(rest))
+	updated = append(updated, updatedFirstLine...)
+	updated = append(updated, lineSuffix...)
+	updated = append(updated, rest...)
+	mode := os.FileMode(0o600)
+	if info, err := os.Stat(path); err == nil {
+		mode = info.Mode().Perm()
+	}
+	return true, writeBytesAtomicWithMode(path, updated, mode)
+}
+
+func (s *Service) migrateCodexStateDB(targetProvider string, result *MigrateCodexSessionsResult) {
+	path := s.codexStateDBPath()
+	if _, err := os.Stat(path); err != nil {
+		result.SQLiteSkipped = true
+		if !os.IsNotExist(err) {
+			result.SQLiteError = err.Error()
+		}
+		return
+	}
+	db, err := sql.Open("sqlite", path)
+	if err != nil {
+		result.SQLiteSkipped = true
+		result.SQLiteError = err.Error()
+		return
+	}
+	defer db.Close()
+	_, _ = db.Exec("PRAGMA busy_timeout = 500")
+	updateResult, err := db.Exec(`UPDATE threads SET model_provider = ? WHERE model_provider IS NULL OR model_provider <> ?`, targetProvider, targetProvider)
+	if err != nil {
+		result.SQLiteSkipped = true
+		result.SQLiteError = err.Error()
+		return
+	}
+	rows, err := updateResult.RowsAffected()
+	if err == nil {
+		result.SQLiteRowsUpdated = rows
+	}
+}
+
 func (s *Service) claudeSettingsPath() string {
 	return filepath.Join(s.homeDir, ".claude", "settings.json")
 }
@@ -873,6 +1038,18 @@ func (s *Service) codexConfigPath() string {
 
 func (s *Service) codexAuthPath() string {
 	return filepath.Join(s.homeDir, ".codex", "auth.json")
+}
+
+func (s *Service) codexSessionsDir() string {
+	return filepath.Join(s.homeDir, ".codex", "sessions")
+}
+
+func (s *Service) codexArchivedSessionsDir() string {
+	return filepath.Join(s.homeDir, ".codex", "archived_sessions")
+}
+
+func (s *Service) codexStateDBPath() string {
+	return filepath.Join(s.homeDir, ".codex", "state_5.sqlite")
 }
 
 func (s *Service) claudeStatePath() string {
@@ -1290,6 +1467,10 @@ func writeTextAtomic(path string, content string) error {
 }
 
 func writeBytesAtomic(path string, content []byte) error {
+	return writeBytesAtomicWithMode(path, content, 0o600)
+}
+
+func writeBytesAtomicWithMode(path string, content []byte, mode os.FileMode) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return err
 	}
@@ -1299,6 +1480,12 @@ func writeBytesAtomic(path string, content []byte) error {
 	}
 	tmpPath := tmp.Name()
 	defer func() { _ = os.Remove(tmpPath) }()
+	if mode != 0 {
+		if err := tmp.Chmod(mode); err != nil {
+			_ = tmp.Close()
+			return err
+		}
+	}
 	if _, err := tmp.Write(content); err != nil {
 		_ = tmp.Close()
 		return err
