@@ -731,14 +731,22 @@ const fetchingModels = ref(false)
 const targetModelOptions = ref<string[]>([])
 const fetchedModelsError = ref('')
 
-// ── Source 模型预置列表（按协议类型） ──
+// ── Source 模型预置列表（对齐 WebUI allSourceModelOptions） ──
 const sourceModelOptions = computed(() => {
-  const st = form.serviceType
-  if (st === 'claude') return ['claude-opus-4-6', 'claude-sonnet-4-6', 'claude-haiku-4-5', 'claude-opus-4-5', 'claude-sonnet-4-5']
-  if (st === 'gemini') return ['gemini-3.1-pro-preview', 'gemini-3.1-flash-preview', 'gemini-2.5-pro', 'gemini-2.5-flash']
-  if (st === 'responses') return ['gpt-5', 'gpt-mini', 'codex-auto-review', 'o3', 'o4-mini']
-  if (st === 'openai') return ['gpt-5', 'gpt-5.4', 'gpt-5.3', 'gpt-5.2', 'gpt-4.1', 'gpt-4.1-mini', 'o3', 'o4-mini']
-  return ['claude-opus-4-6', 'claude-sonnet-4-6', 'claude-haiku-4-5', 'gpt-5', 'gemini-2.5-pro']
+  if (props.channelType === 'chat') {
+    return ['codex', 'gpt', 'mini', 'gpt-5', 'gpt-5.5', 'gpt-5.4', 'gpt-5.4-mini', 'gpt-5.3-codex', 'gpt-5.2-codex', 'gpt-5.2']
+  }
+  if (props.channelType === 'images') {
+    return ['gpt-image-2', 'gpt-image-1', 'dall-e-3', 'dall-e-2']
+  }
+  if (props.channelType === 'gemini') {
+    return ['gemini-3.5-flash', 'gemini-3.1-pro-preview', 'gemini-3-pro-preview', 'gemini-3-flash-preview', 'gemini-3.1-flash-lite', 'gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2']
+  }
+  if (props.channelType === 'responses') {
+    return ['codex', 'codex-auto-review', 'gpt-5', 'gpt', 'mini', 'gpt-5.5', 'gpt-5.4', 'gpt-5.4-mini', 'gpt-5.3-codex', 'gpt-5.2-codex', 'gpt-5.2']
+  }
+  // messages (Claude)
+  return ['opus', 'sonnet', 'haiku']
 })
 
 const commonSupportedModelFilters = ['claude-*', 'gpt-5*', 'gpt-image-2', 'grok-4*', 'gemini-3*', '!*image*']
