@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, reactive, computed, watch } from 'vue'
+import { ref, reactive, computed, watch, onBeforeUnmount } from 'vue'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -337,10 +337,31 @@ async function handleSubmit() {
   }
 }
 
-function onKeyDown(e: KeyboardEvent) {
-  if (e.key === 'Escape') emit('close')
-  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleSubmit()
+// Keyboard shortcuts: Esc 取消，Enter 保存（与 Agent 配置卡片一致）
+const handleGlobalKeydown = (e: KeyboardEvent) => {
+  if (e.key === 'Escape') {
+    e.preventDefault()
+    emit('close')
+  } else if (e.key === 'Enter' && !e.shiftKey && !e.metaKey && !e.ctrlKey) {
+    // 如果焦点在 textarea 内，Enter 换行不触发提交
+    const tag = (e.target as HTMLElement)?.tagName
+    if (tag === 'TEXTAREA') return
+    e.preventDefault()
+    void handleSubmit()
+  }
 }
+
+watch(() => props.channel, (ch) => {
+  if (ch) {
+    window.addEventListener('keydown', handleGlobalKeydown)
+  } else {
+    window.removeEventListener('keydown', handleGlobalKeydown)
+  }
+}, { immediate: true })
+
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', handleGlobalKeydown)
+})
 </script>
 
 <template>
@@ -349,7 +370,6 @@ function onKeyDown(e: KeyboardEvent) {
       <div
         v-if="true"
         class="fixed inset-0 z-50 flex items-center justify-center"
-        @keydown="onKeyDown"
       >
         <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" @click="emit('close')" />
 
@@ -658,7 +678,11 @@ function onKeyDown(e: KeyboardEvent) {
             </form>
           </ScrollArea>
 
-          <div class="flex shrink-0 items-center justify-end gap-2 border-t border-border p-4">
+          <div class="flex shrink-0 items-center justify-end gap-2 border-t border-border bg-card p-4">
+            <span class="mr-auto text-[10px] text-muted-foreground">
+              <kbd class="rounded border border-border px-1 py-0.5 font-mono">Esc</kbd> {{ tf('console.form.cancel', '取消') }}
+              <kbd class="ml-2 rounded border border-border px-1 py-0.5 font-mono">Enter</kbd> {{ isEditMode ? tf('console.form.save', '保存') : tf('console.form.create', '创建') }}
+            </span>
             <Button variant="ghost" @click="emit('close')">
               {{ tf('common.cancel', '取消') }}
             </Button>

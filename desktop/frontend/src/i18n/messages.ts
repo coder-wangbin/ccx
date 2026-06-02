@@ -466,6 +466,7 @@ export type MessageKey =
   | 'console.form.customHeaders'
   | 'console.form.requestTimeoutMs'
   | 'console.form.requestTimeoutInvalid'
+  | 'console.form.cancel'
   | 'console.form.create'
   | 'console.form.save'
   | 'addChannel.quickMode'
@@ -969,6 +970,7 @@ export const messages: Record<SupportedLocale, Messages> = {
     'console.form.customHeaders': 'Custom headers (JSON)',
     'console.form.requestTimeoutMs': 'Request timeout (ms)',
     'console.form.requestTimeoutInvalid': 'Timeout must be a positive integer in ms',
+    'console.form.cancel': 'Cancel',
     'console.form.create': 'Create',
     'console.form.save': 'Save',
     'addChannel.quickMode': 'Quick Paste',
@@ -1469,6 +1471,7 @@ export const messages: Record<SupportedLocale, Messages> = {
     'console.form.customHeaders': '自定义 Headers（JSON）',
     'console.form.requestTimeoutMs': '请求超时（ms）',
     'console.form.requestTimeoutInvalid': '请求超时必须是正整数毫秒',
+    'console.form.cancel': '取消',
     'console.form.create': '创建',
     'console.form.save': '保存',
     'addChannel.quickMode': '快速粘贴',
