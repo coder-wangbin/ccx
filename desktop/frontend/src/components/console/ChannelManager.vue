@@ -125,11 +125,22 @@ async function refreshCurrentChannels() {
 }
 
 
-async function handleDelete(channelId: number) {
+function canDeleteChannel(channel: Channel) {
+  const activeCount = activeChannels.value.filter(ch => ch.status === 'active' || ch.status === undefined || ch.status === '').length
+  const isActive = channel.status === 'active' || channel.status === undefined || channel.status === ''
+  return !(isActive && activeCount <= 1)
+}
+
+async function handleDelete(channel: Channel) {
   clearActionError()
+  if (!canDeleteChannel(channel)) {
+    actionError.value = tf('orchestration.deleteActiveGuard', '至少保留一个活跃渠道')
+    return
+  }
+
   actionLoading.value = true
   try {
-    await deleteChannel(channelId)
+    await deleteChannel(channel.index)
   } catch (e) {
     actionError.value = e instanceof Error ? e.message : String(e)
   } finally {
@@ -174,13 +185,39 @@ async function handleResume(channelId: number) {
   }
 }
 
-async function handlePromote(channelId: number, duration: number) {
+function isBreakerManagedChannel(channel: Channel) {
+  const channelMetrics = metricsMap.value.get(channel.index)
+  return channel.status === 'suspended' || channelMetrics?.circuitState === 'open'
+}
+
+async function handlePromote(channel: Channel, duration: number) {
   clearActionError()
   try {
-    await promoteChannel(channelId, duration)
+    if (isBreakerManagedChannel(channel)) {
+      await resumeChannel(channel.index)
+    }
+    await promoteChannel(channel.index, duration)
   } catch (e) {
     actionError.value = e instanceof Error ? e.message : String(e)
   }
+}
+
+async function handleMoveTop(channelId: number) {
+  const ordered = activeChannels.value.map(channel => channel.index)
+  const index = ordered.indexOf(channelId)
+  if (index <= 0) return
+  ordered.splice(index, 1)
+  ordered.unshift(channelId)
+  await handleReorder(ordered)
+}
+
+async function handleMoveBottom(channelId: number) {
+  const ordered = activeChannels.value.map(channel => channel.index)
+  const index = ordered.indexOf(channelId)
+  if (index < 0 || index >= ordered.length - 1) return
+  ordered.splice(index, 1)
+  ordered.push(channelId)
+  await handleReorder(ordered)
 }
 
 function handleEdit(channel: Channel) {
@@ -354,13 +391,18 @@ onMounted(() => {
               :activity="activityMap.get(channel.index)"
               :priority="index + 1"
               :supports-capability="type !== 'images'"
+              :can-delete="canDeleteChannel(channel)"
+              :can-move-top="index > 0 && !normalizedSearch"
+              :can-move-bottom="index < activeChannels.length - 1 && !normalizedSearch"
               @edit="handleEdit(channel)"
-              @delete="handleDelete(channel.index)"
+              @delete="handleDelete(channel)"
               @status="handleStatusToggle(channel.index, channel.status || 'active')"
               @disable="handleDisable(channel.index)"
               @enable="handleEnable(channel.index)"
               @resume="handleResume(channel.index)"
-              @promote="handlePromote(channel.index, 300)"
+              @promote="handlePromote(channel, 300)"
+              @move-top="handleMoveTop(channel.index)"
+              @move-bottom="handleMoveBottom(channel.index)"
               @logs="handleLogs(channel)"
               @capability="handleCapability(channel)"
             />
@@ -385,13 +427,14 @@ onMounted(() => {
             :priority="index + 1"
             :supports-capability="type !== 'images'"
             inactive
+            :can-delete="canDeleteChannel(channel)"
             @edit="handleEdit(channel)"
-            @delete="handleDelete(channel.index)"
+            @delete="handleDelete(channel)"
             @status="handleStatusToggle(channel.index, channel.status || 'disabled')"
             @disable="handleDisable(channel.index)"
             @enable="handleEnable(channel.index)"
             @resume="handleResume(channel.index)"
-            @promote="handlePromote(channel.index, 300)"
+            @promote="handlePromote(channel, 300)"
             @logs="handleLogs(channel)"
             @capability="handleCapability(channel)"
           />

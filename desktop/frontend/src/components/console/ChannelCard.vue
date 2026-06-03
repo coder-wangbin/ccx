@@ -20,6 +20,8 @@ import {
 import {
   Activity,
   AlertTriangle,
+  ArrowDown,
+  ArrowUp,
   Ban,
   CheckCircle2,
   Copy,
@@ -46,10 +48,16 @@ const props = withDefaults(defineProps<{
   priority?: number
   inactive?: boolean
   supportsCapability?: boolean
+  canDelete?: boolean
+  canMoveTop?: boolean
+  canMoveBottom?: boolean
 }>(), {
   priority: 0,
   inactive: false,
   supportsCapability: true,
+  canDelete: true,
+  canMoveTop: false,
+  canMoveBottom: false,
 })
 
 const emit = defineEmits<{
@@ -60,6 +68,8 @@ const emit = defineEmits<{
   status: []
   resume: []
   promote: []
+  moveTop: []
+  moveBottom: []
   disable: []
   enable: []
 }>()
@@ -313,6 +323,14 @@ async function copyChannelInfo() {
               <Sparkles class="h-4 w-4" />
               {{ tf('console.actions.promote', 'Promote') }}
             </DropdownMenuItem>
+            <DropdownMenuItem v-if="canMoveTop" @click="emit('moveTop')">
+              <ArrowUp class="h-4 w-4" />
+              {{ tf('orchestration.moveTop', 'Move to top') }}
+            </DropdownMenuItem>
+            <DropdownMenuItem v-if="canMoveBottom" @click="emit('moveBottom')">
+              <ArrowDown class="h-4 w-4" />
+              {{ tf('orchestration.moveBottom', 'Move to bottom') }}
+            </DropdownMenuItem>
             <DropdownMenuItem v-if="!isDisabled" @click="emit('disable')">
               <Ban class="h-4 w-4" />
               {{ tf('console.actions.disable', 'Disable') }}
@@ -325,9 +343,10 @@ async function copyChannelInfo() {
             {{ keyCount }} {{ tf('console.keys.active', 'active keys') }}
             <span v-if="disabledKeyCount"> · {{ disabledKeyCount }} disabled</span>
           </div>
-          <DropdownMenuItem variant="destructive" @click="emit('delete')">
+          <DropdownMenuItem variant="destructive" :disabled="!canDelete" @click="canDelete && emit('delete')">
             <Trash2 class="h-4 w-4" />
             {{ tf('console.actions.delete', 'Delete Channel') }}
+            <span v-if="!canDelete" class="ml-1 text-[10px] opacity-70">{{ tf('orchestration.keepOne', 'keep one') }}</span>
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
