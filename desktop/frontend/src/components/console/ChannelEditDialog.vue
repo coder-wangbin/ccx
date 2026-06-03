@@ -85,8 +85,11 @@ const reasoningParamStyleOptions = [
 ]
 
 // 思考强度（effort）—— 模型映射第三列使用
+// 注意：reka-ui 的 SelectItem 不允许空字符串 value，用 DEFAULT_SELECT_VALUE 哨兵代表"默认/不设置"
+const DEFAULT_SELECT_VALUE = 'default'
+
 const reasoningEffortOptions = [
-  { label: 'Default', value: '' },
+  { label: 'Default', value: DEFAULT_SELECT_VALUE },
   { label: 'None', value: 'none' },
   { label: 'Low', value: 'low' },
   { label: 'Medium', value: 'medium' },
@@ -96,11 +99,20 @@ const reasoningEffortOptions = [
 ]
 
 const textVerbosityOptions = [
-  { label: 'Default', value: '' },
+  { label: 'Default', value: DEFAULT_SELECT_VALUE },
   { label: 'Low', value: 'low' },
   { label: 'Medium', value: 'medium' },
   { label: 'High', value: 'high' },
 ]
+
+// 空字符串 ↔ 哨兵值互转：form 内部保持空串语义，Select 层使用哨兵值
+function toSelectValue(value: string) {
+  return value === '' ? DEFAULT_SELECT_VALUE : value
+}
+
+function fromSelectValue(value: unknown) {
+  return value === DEFAULT_SELECT_VALUE ? '' : String(value ?? '')
+}
 
 const form = reactive({
   name: '',
@@ -1221,10 +1233,10 @@ function buildCurrentPayload() {
                       <datalist v-if="targetModelOptions.length" :id="`target-models-${index}`">
                         <option v-for="m in targetModelOptions" :key="m" :value="m" />
                       </datalist>
-                      <Select v-if="supportsOpenAIAdvanced" v-model="row.reasoning">
+                      <Select v-if="supportsOpenAIAdvanced" :model-value="toSelectValue(row.reasoning)" @update:model-value="row.reasoning = fromSelectValue($event) as ReasoningEffort | ''">
                         <SelectTrigger class="h-7 w-28 text-xs"><SelectValue :placeholder="tf('console.form.reasoningEffort', '思考强度')" /></SelectTrigger>
                         <SelectContent>
-                          <SelectItem v-for="opt in reasoningEffortOptions" :key="opt.value || 'default'" :value="opt.value">{{ opt.label }}</SelectItem>
+                          <SelectItem v-for="opt in reasoningEffortOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</SelectItem>
                         </SelectContent>
                       </Select>
                       <Button type="button" size="icon-sm" variant="ghost" :class="row.noVision ? 'text-amber-500' : 'text-muted-foreground'" :title="tf('console.form.noVision', '禁用视觉')" @click="row.noVision = !row.noVision">
@@ -1243,10 +1255,10 @@ function buildCurrentPayload() {
                       <datalist v-if="targetModelOptions.length" id="target-models-new">
                         <option v-for="m in targetModelOptions" :key="m" :value="m" />
                       </datalist>
-                      <Select v-if="supportsOpenAIAdvanced" v-model="newModelMapping.reasoning">
+                      <Select v-if="supportsOpenAIAdvanced" :model-value="toSelectValue(newModelMapping.reasoning)" @update:model-value="newModelMapping.reasoning = fromSelectValue($event) as ReasoningEffort | ''">
                         <SelectTrigger class="h-7 w-28 text-xs"><SelectValue :placeholder="tf('console.form.reasoningEffort', '思考强度')" /></SelectTrigger>
                         <SelectContent>
-                          <SelectItem v-for="opt in reasoningEffortOptions" :key="opt.value || 'default'" :value="opt.value">{{ opt.label }}</SelectItem>
+                          <SelectItem v-for="opt in reasoningEffortOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</SelectItem>
                         </SelectContent>
                       </Select>
                       <Button type="button" variant="outline" size="sm" :disabled="!newModelMapping.source.trim() || !newModelMapping.target.trim()" @click="addModelMappingRow">
@@ -1256,17 +1268,17 @@ function buildCurrentPayload() {
                   </div>
 
                   <!-- fastMode + textVerbosity（仅 OpenAI/Responses，对齐 WebUI 模型卡片内布局） -->
-                  <div v-if="supportsOpenAIAdvanced" class="grid gap-3 md:grid-cols-2">
-                    <div class="flex items-center gap-2">
+                  <div v-if="supportsOpenAIAdvanced" class="grid items-end gap-3 md:grid-cols-2">
+                    <div class="flex h-9 items-center gap-2">
                       <Switch v-model="form.fastMode" />
                       <Label class="text-xs">{{ tf('console.form.fastMode', '快速模式') }}</Label>
                     </div>
                     <div class="space-y-1">
                       <Label class="text-[10px]">{{ tf('console.form.textVerbosity', 'Text verbosity') }}</Label>
-                      <Select v-model="form.textVerbosity">
-                        <SelectTrigger class="h-7"><SelectValue /></SelectTrigger>
+                      <Select :model-value="toSelectValue(form.textVerbosity)" @update:model-value="form.textVerbosity = fromSelectValue($event) as 'low' | 'medium' | 'high' | ''">
+                        <SelectTrigger class="h-9 w-full"><SelectValue :placeholder="tf('console.form.textVerbosityPlaceholder', '默认')" /></SelectTrigger>
                         <SelectContent>
-                          <SelectItem v-for="item in textVerbosityOptions" :key="item.value || 'default'" :value="item.value">{{ item.label }}</SelectItem>
+                          <SelectItem v-for="item in textVerbosityOptions" :key="item.value" :value="item.value">{{ item.label }}</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
