@@ -123,16 +123,18 @@ func writeCLIHelp(out io.Writer) {
   --config PATH       指定运行时配置文件路径，默认 .config/config.json
   --statedir DIR      指定运行时状态目录，默认 .config
   --logdir DIR        指定日志目录，优先级高于 LOG_DIR，默认 logs
+                      使用 none 或 null 禁用日志文件写入（仅输出到控制台）
 	  --backupdir DIR     指定配置备份目录，默认 配置文件同级目录下的 backups
 
 示例:
   ccx --config ~/.config/ccx/config.json --statedir ~/.local/state/ccx --logdir ~/.local/state/ccx/logs --backupdir ~/.local/state/ccx/backups
+  ccx --logdir none   # 禁用日志文件，仅输出到控制台
 
 说明:
   --config 只改变配置文件位置。
   --statedir 会让 metrics.db、conversation_state.json、scheduled_recovery_state.json
   写入指定目录；不指定时保持默认 .config。
-  --logdir 只影响日志目录。
+  --logdir 只影响日志目录。使用 none 或 null 可禁用日志文件写入，适合 systemd/journald 等环境。
 	  --backupdir 只影响配置备份目录，不指定时默认为配置文件同级目录下的 backups。
 `)
 }
@@ -188,6 +190,14 @@ func resolveRuntimePaths(opts cliOptions, envCfg *config.EnvConfig) (runtimePath
 
 	logDir := envCfg.LogDir
 	if opts.LogDir != "" {
+		logDir = opts.LogDir
+	}
+
+	// 禁用日志文件 sentinel 归一化（none/null 不区分大小写）
+	if logger.IsLogDisabled(logDir) {
+		logDir = "none"
+	} else if opts.LogDir != "" {
+		// 非禁用值才需要展开路径
 		expandedLogDir, err := expandUserPath(opts.LogDir)
 		if err != nil {
 			return runtimePaths{}, fmt.Errorf("解析日志目录失败: %w", err)
@@ -784,7 +794,11 @@ func main() {
 	fmt.Printf("[Server-Info] 健康检查: GET /health\n")
 	fmt.Printf("[Server-Info] 环境: %s\n", envCfg.Env)
 	fmt.Printf("[Server-Info] 配置文件: %s\n", paths.ConfigPath)
-	fmt.Printf("[Server-Info] 日志目录: %s\n", paths.LogDir)
+	if paths.LogDir == "none" {
+		fmt.Printf("[Server-Info] 日志文件输出: 已禁用（仅控制台）\n")
+	} else {
+		fmt.Printf("[Server-Info] 日志目录: %s\n", paths.LogDir)
+	}
 	// 生产环境检查：必须设置有效的访问密钥
 	if envCfg.IsProduction() && envCfg.ProxyAccessKey == "your-proxy-access-key" {
 		log.Fatal("[Server-Fatal] 生产环境必须设置 PROXY_ACCESS_KEY，禁止使用默认值")
