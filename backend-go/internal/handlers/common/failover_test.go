@@ -766,6 +766,37 @@ func TestShouldBlacklistKey_BalanceMessages(t *testing.T) {
 				Message:         "您的套餐已过期，请续费后继续使用 (request id: 202606040135546143661918268d9d6tMVNpobz)",
 			},
 		},
+		// 以下用例验证双词组合匹配能覆盖旧精确关键词列表遗漏的变体
+		{
+			name:       "403 credit limit reached should blacklist via dual-word",
+			statusCode: 403,
+			body:       `{"error":{"message":"credit limit reached for this API key","type":"api_error"}}`,
+			want: BlacklistResult{
+				ShouldBlacklist: true,
+				Reason:          "insufficient_balance",
+				Message:         "credit limit reached for this API key",
+			},
+		},
+		{
+			name:       "403 额度到期请充值 should blacklist via dual-word",
+			statusCode: 403,
+			body:       `{"error":{"message":"您的额度已到期，请充值后重试","type":"error"}}`,
+			want: BlacklistResult{
+				ShouldBlacklist: true,
+				Reason:          "insufficient_balance",
+				Message:         "您的额度已到期，请充值后重试",
+			},
+		},
+		{
+			name:       "403 funds depleted should blacklist via dual-word",
+			statusCode: 403,
+			body:       `{"error":{"message":"Your account funds have been depleted. Please top up.","type":"billing_error"}}`,
+			want: BlacklistResult{
+				ShouldBlacklist: true,
+				Reason:          "insufficient_balance",
+				Message:         "Your account funds have been depleted. Please top up.",
+			},
+		},
 	}
 
 	for _, tt := range tests {

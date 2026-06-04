@@ -796,46 +796,70 @@ func isInsufficientBalanceMessage(msg string) bool {
 	}
 
 	msgLower := strings.ToLower(msg)
-	keywords := []string{
-		"insufficient balance",
-		"insufficient account balance",
-		"insufficient quota",
-		"insufficient credits",
-		"insufficient funds",
-		"balance too low",
-		"balance is negative",
+
+	// 精确短语兜底，避免双词组合遗漏极端变体
+	exactPhrases := []string{
 		"no balance",
+		"balance is negative",
 		"out of credits",
-		"quota exhausted",
 		"quota used up",
-		"quota is not enough",
-		"not enough quota",
-		"remain quota",
-		"need quota",
 		"daily limit exceeded",
 		"daily usage limit exceeded",
 		"tokenstatusexhausted",
 		"no active subscription found",
-		"余额不足",
-		"余额已用尽",
-		"额度不足",
-		"额度已用尽",
-		"额度已用完",
-		"额度耗尽",
-		"当日额度已用尽",
-		"每日额度已用尽",
-		"日额度已用尽",
-		"令牌额度已用尽",
-		"预扣费额度失败",
-		"需要预扣费额度",
-		"套餐已过期",
-		"请续费后继续使用",
 	}
-	for _, keyword := range keywords {
-		if strings.Contains(msgLower, keyword) {
+	for _, p := range exactPhrases {
+		if strings.Contains(msgLower, p) {
 			return true
 		}
 	}
+
+	// 资源词: 标识"跟余额/额度相关"
+	resourceWords := []string{
+		"balance", "quota", "credit", "funds",
+		"subscription", "limit", "allowance",
+		"余额", "额度", "充提",
+	}
+	// 弱资源词: 单独出现不足以下结论，须搭配 statusWords
+	companionWords := []string{
+		"payment", "billing", "recharge", "top up",
+		"充值", "续费", "续订",
+	}
+	// 状态词: 标识"不足/耗尽/过期等负面状态"
+	statusWords := []string{
+		"insufficient", "negative", "exhausted", "depleted",
+		"too low", "expired", "overdue", "reached", "exceeded",
+		"not enough", "not sufficient",
+		"failed",
+		"不足", "耗尽", "已用尽", "已用完", "已过期", "已到期",
+		"过期", "失败",
+	}
+
+	hasResource := false
+	for _, w := range resourceWords {
+		if strings.Contains(msgLower, w) {
+			hasResource = true
+			break
+		}
+	}
+	if !hasResource {
+		for _, w := range companionWords {
+			if strings.Contains(msgLower, w) {
+				hasResource = true
+				break
+			}
+		}
+	}
+	if !hasResource {
+		return false
+	}
+
+	for _, w := range statusWords {
+		if strings.Contains(msgLower, w) {
+			return true
+		}
+	}
+
 	return false
 }
 
