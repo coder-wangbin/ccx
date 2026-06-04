@@ -76,6 +76,7 @@ func TestResolveRuntimePathsDefaults(t *testing.T) {
 		ConversationStatePath:      filepath.Join(".config", "conversation_state.json"),
 		ScheduledRecoveryStatePath: filepath.Join(".config", "scheduled_recovery_state.json"),
 		LogDir:                     "logs",
+		BackupDir:                  filepath.Join(".config", "backups"),
 	}
 	if got != want {
 		t.Fatalf("resolveRuntimePaths() = %#v, want %#v", got, want)
@@ -180,5 +181,55 @@ func TestResolveRuntimePathsRejectsOtherUserHome(t *testing.T) {
 	}
 	if _, err := resolveRuntimePaths(cliOptions{LogDir: "~other/logs"}, &config.EnvConfig{LogDir: "logs"}); err == nil {
 		t.Fatalf("resolveRuntimePaths() error = nil, want error")
+	}
+}
+
+func TestResolveRuntimePathsLogDirNone(t *testing.T) {
+	tests := []struct {
+		name    string
+		logDir  string
+		wantDir string
+	}{
+		{"--logdir none", "none", "none"},
+		{"--logdir null", "null", "none"},
+		{"--logdir NONE", "NONE", "none"},
+		{"--logdir NULL", "NULL", "none"},
+		{"--logdir None", "None", "none"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := resolveRuntimePaths(cliOptions{LogDir: tt.logDir}, &config.EnvConfig{LogDir: "logs"})
+			if err != nil {
+				t.Fatalf("resolveRuntimePaths() error = %v", err)
+			}
+			if got.LogDir != tt.wantDir {
+				t.Fatalf("LogDir = %q, want %q", got.LogDir, tt.wantDir)
+			}
+		})
+	}
+}
+
+func TestResolveRuntimePathsLogDirNoneFromEnv(t *testing.T) {
+	tests := []struct {
+		name    string
+		envVal  string
+		wantDir string
+	}{
+		{"LOG_DIR=none", "none", "none"},
+		{"LOG_DIR=null", "null", "none"},
+		{"LOG_DIR=NONE", "NONE", "none"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := resolveRuntimePaths(cliOptions{}, &config.EnvConfig{LogDir: tt.envVal})
+			if err != nil {
+				t.Fatalf("resolveRuntimePaths() error = %v", err)
+			}
+			if got.LogDir != tt.wantDir {
+				t.Fatalf("LogDir = %q, want %q", got.LogDir, tt.wantDir)
+			}
+		})
 	}
 }
