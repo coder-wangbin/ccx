@@ -268,8 +268,12 @@ func executeRedirectModelTest(ctx context.Context, channel *config.UpstreamConfi
 	result.Latency = time.Since(startTime).Milliseconds()
 	result.TestedAt = time.Now().Format(time.RFC3339Nano)
 
-	baseURL := req.URL.String()
-	metricsKey := metrics.GenerateMetricsIdentityKey(baseURL, apiKey, protocol)
+	requestURL := req.URL.String()
+	metricsBaseURL := capabilityTestBaseURL(channel)
+	if metricsBaseURL == "" {
+		metricsBaseURL = requestURL
+	}
+	metricsKey := metrics.GenerateMetricsIdentityKey(metricsBaseURL, apiKey, protocol)
 	recordLog := func(success bool, statusCode int, errorInfo string) {
 		common.RecordChannelLogWithSource(
 			channelLogStore,
@@ -281,7 +285,7 @@ func executeRedirectModelTest(ctx context.Context, channel *config.UpstreamConfi
 			result.Latency,
 			success,
 			apiKey,
-			baseURL,
+			requestURL,
 			errorInfo,
 			protocol,
 			false,

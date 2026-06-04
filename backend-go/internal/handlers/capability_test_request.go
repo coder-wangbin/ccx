@@ -178,12 +178,19 @@ func channelKindToApiType(channelKind string) string {
 
 // ============== 请求构建 ==============
 
-func buildTestRequestWithModel(protocol string, channel *config.UpstreamConfig, model string) (*http.Request, error) {
+func capabilityTestBaseURL(channel *config.UpstreamConfig) string {
 	urls := channel.GetAllBaseURLs()
 	if len(urls) == 0 {
+		return ""
+	}
+	return urls[0]
+}
+
+func buildTestRequestWithModel(protocol string, channel *config.UpstreamConfig, model string) (*http.Request, error) {
+	baseURL := capabilityTestBaseURL(channel)
+	if baseURL == "" {
 		return nil, fmt.Errorf("no base URL configured")
 	}
-	baseURL := urls[0]
 
 	apiKey := ""
 	if len(channel.APIKeys) > 0 {

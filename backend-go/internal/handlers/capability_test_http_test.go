@@ -326,7 +326,7 @@ func TestExecuteModelTest_RecordsCapabilityLogOnSuccess(t *testing.T) {
 	defer cfgManager.Close()
 
 	cfg := cfgManager.GetConfig()
-	metricsKey := metrics.GenerateMetricsIdentityKey(server.URL+"/v1/messages", "test-key", "claude")
+	metricsKey := metrics.GenerateMetricsIdentityKey(server.URL, "test-key", "claude")
 	result := executeModelTest(context.Background(), &cfg.Upstream[0], "messages", "claude-test", 5*time.Second, job.JobID, cfgManager, 0, "messages", "test-key", store)
 	if !result.Success {
 		t.Fatalf("result.Success=false, want true")
@@ -441,7 +441,7 @@ func TestExecuteModelTest_RecordsCapabilityLogOnFailure(t *testing.T) {
 	defer cfgManager.Close()
 
 	cfg := cfgManager.GetConfig()
-	metricsKey := metrics.GenerateMetricsIdentityKey(server.URL+"/v1/messages", "test-key", "claude")
+	metricsKey := metrics.GenerateMetricsIdentityKey(server.URL, "test-key", "claude")
 	result := executeModelTest(context.Background(), &cfg.Upstream[0], "messages", "claude-test", 5*time.Second, job.JobID, cfgManager, 0, "messages", "test-key", store)
 	if result.Success {
 		t.Fatalf("result.Success=true, want false")
@@ -512,7 +512,7 @@ func TestExecuteModelTest_TruncatesLargeFailureBody(t *testing.T) {
 		t.Fatalf("result.Error len=%d, want 200", len(*result.Error))
 	}
 
-	metricsKey := metrics.GenerateMetricsIdentityKey(server.URL+"/v1/messages", "test-key", "claude")
+	metricsKey := metrics.GenerateMetricsIdentityKey(server.URL, "test-key", "claude")
 	logs := store.Get(metricsKey)
 	if len(logs) != 1 {
 		t.Fatalf("logs count=%d, want 1", len(logs))

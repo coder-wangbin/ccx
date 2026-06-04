@@ -655,8 +655,12 @@ func executeModelTest(ctx context.Context, channel *config.UpstreamConfig, proto
 	success, streamingSupported, statusCode, respBody, sendErr := sendAndCheckStream(reqCtx, channel, req, protocol)
 	modelResult.Latency = time.Since(startTime).Milliseconds()
 	modelResult.TestedAt = time.Now().Format(time.RFC3339Nano)
-	baseURL := req.URL.String()
-	metricsKey := metrics.GenerateMetricsIdentityKey(baseURL, apiKey, scheduler.NormalizedMetricsServiceType(scheduler.ChannelKind(channelKind), channel.ServiceType))
+	requestURL := req.URL.String()
+	metricsBaseURL := capabilityTestBaseURL(channel)
+	if metricsBaseURL == "" {
+		metricsBaseURL = requestURL
+	}
+	metricsKey := metrics.GenerateMetricsIdentityKey(metricsBaseURL, apiKey, scheduler.NormalizedMetricsServiceType(scheduler.ChannelKind(channelKind), channel.ServiceType))
 	recordCapabilityTestLog := func(success bool, statusCode int, errorInfo string) {
 		common.RecordChannelLogWithSource(
 			channelLogStore,
@@ -668,7 +672,7 @@ func executeModelTest(ctx context.Context, channel *config.UpstreamConfig, proto
 			modelResult.Latency,
 			success,
 			apiKey,
-			baseURL,
+			requestURL,
 			errorInfo,
 			protocol,
 			false,
