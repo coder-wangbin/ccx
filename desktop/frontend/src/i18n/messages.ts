@@ -515,6 +515,11 @@ export type MessageKey =
   | 'addChannel.noneDetected'
   | 'addChannel.fullSubtitle'
   | 'addChannel.editSubtitle'
+  | 'orchestration.moveTop'
+  | 'orchestration.moveBottom'
+  | 'orchestration.keepOne'
+  | 'orchestration.deleteActiveGuard'
+  | 'console.keys.disabled'
   | 'console.conversations.search'
   | 'console.conversations.allKinds'
   | 'console.conversations.refresh'
@@ -1004,6 +1009,11 @@ export const messages: Record<SupportedLocale, Messages> = {
     'console.actions.disable': 'Move to Standby',
     'console.actions.delete': 'Delete Channel',
     'console.actions.resetCircuit': 'Reset Circuit Breaker',
+    'orchestration.moveTop': 'Move to top',
+    'orchestration.moveBottom': 'Move to bottom',
+    'orchestration.keepOne': '(keep at least one)',
+    'orchestration.deleteActiveGuard': 'Cannot delete: keep at least one active channel in the failover sequence',
+    'console.keys.disabled': 'disabled keys',
     'console.form.addChannel': 'Add channel',
     'console.form.editChannel': 'Edit channel',
     'console.form.basicInfo': 'Basic info',
@@ -1585,6 +1595,11 @@ export const messages: Record<SupportedLocale, Messages> = {
     'console.actions.disable': '移至备用池',
     'console.actions.delete': '删除渠道',
     'console.actions.resetCircuit': '重置熔断器',
+    'orchestration.moveTop': '置顶',
+    'orchestration.moveBottom': '置底',
+    'orchestration.keepOne': '(至少保留一个)',
+    'orchestration.deleteActiveGuard': '无法删除：故障转移序列中至少需要保留一个活跃渠道',
+    'console.keys.disabled': '已禁用密钥',
     'console.form.addChannel': '添加渠道',
     'console.form.editChannel': '编辑渠道',
     'console.form.basicInfo': '基础信息',

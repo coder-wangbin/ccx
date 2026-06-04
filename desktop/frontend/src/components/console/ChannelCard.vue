@@ -338,7 +338,7 @@ async function copyChannelInfo() {
           <div class="px-2 py-1 text-[10px] text-muted-foreground">
             <Key class="mr-1 inline h-3 w-3" />
             {{ keyCount }} {{ tf('console.keys.active', 'active keys') }}
-            <span v-if="disabledKeyCount"> · {{ disabledKeyCount }} disabled</span>
+            <span v-if="disabledKeyCount"> · {{ disabledKeyCount }} {{ tf('console.keys.disabled', 'disabled keys') }}</span>
           </div>
           <DropdownMenuItem variant="destructive" :disabled="!canDelete" @click="canDelete && emit('delete')">
             <Trash2 class="h-4 w-4" />
