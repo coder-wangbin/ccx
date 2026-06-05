@@ -1,0 +1,567 @@
+package common
+
+import (
+	"testing"
+
+	"github.com/gin-gonic/gin"
+	"net/http"
+	"net/http/httptest"
+)
+
+func TestIsInsufficientBalanceMessage_HighConfidenceVariants(t *testing.T) {
+	tests := []struct {
+		name string
+		msg  string
+		want bool
+	}{
+		{name: "english insufficient credits", msg: "You have insufficient credits remaining", want: true},
+		{name: "english out of credits", msg: "This account is out of credits", want: true},
+		{name: "english no balance", msg: "no balance", want: true},
+		{name: "english insufficient funds", msg: "payment declined: insufficient funds", want: true},
+		{name: "english quota used up", msg: "quota used up for current billing period", want: true},
+		{name: "english token quota not enough", msg: "token quota is not enough, token remain quota: ¥0.100000, need quota: ¥0.300000", want: true},
+		{name: "english daily usage limit exceeded", msg: "daily usage limit exceeded", want: true},
+		{name: "english daily limit exceeded", msg: "reason=\"DAILY_LIMIT_EXCEEDED\" message=\"daily usage limit exceeded\"", want: true},
+		{name: "chinese balance exhausted", msg: "账户余额已用尽，请充值", want: true},
+		{name: "chinese quota used up", msg: "账户额度已用完", want: true},
+		{name: "chinese quota exhausted", msg: "当前额度耗尽", want: true},
+		{name: "english subscription not found", msg: "No active subscription found for this group", want: true},
+		{name: "negative billing setup", msg: "billing not enabled for this account", want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := isInsufficientBalanceMessage(tt.msg)
+			if got != tt.want {
+				t.Fatalf("isInsufficientBalanceMessage(%q) = %v, want %v", tt.msg, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestShouldBlacklistKey_BalanceMessages(t *testing.T) {
+	tests := []struct {
+		name       string
+		statusCode int
+		body       string
+		want       BlacklistResult
+	}{
+		{
+			name:       "403 top level code insufficient balance should blacklist",
+			statusCode: 403,
+			body:       `{"code":"INSUFFICIENT_BALANCE","message":"Insufficient account balance"}`,
+			want: BlacklistResult{
+				ShouldBlacklist: true,
+				Reason:          "insufficient_balance",
+				Message:         "Insufficient account balance",
+			},
+		},
+		{
+			name:       "403 nested error code insufficient balance should blacklist",
+			statusCode: 403,
+			body:       `{"error":{"code":"INSUFFICIENT_BALANCE","message":"Insufficient account balance"}}`,
+			want: BlacklistResult{
+				ShouldBlacklist: true,
+				Reason:          "insufficient_balance",
+				Message:         "Insufficient account balance",
+			},
+		},
+		{
+			name:       "403 string error field with insufficient balance should blacklist",
+			statusCode: 403,
+			body:       `{"error":"API Key额度不足，请访问https://right.codes查看详情"}`,
+			want: BlacklistResult{
+				ShouldBlacklist: true,
+				Reason:          "insufficient_balance",
+				Message:         "API Key额度不足，请访问https://right.codes查看详情",
+			},
+		},
+		{
+			name:       "401 string error should still honor top level authentication type",
+			statusCode: 401,
+			body:       `{"error":"认证失败","type":"authentication_error"}`,
+			want: BlacklistResult{
+				ShouldBlacklist: true,
+				Reason:          "authentication_error",
+				Message:         "认证失败",
+			},
+		},
+		{
+			name:       "401 string error invalid api key without type should blacklist",
+			statusCode: 401,
+			body:       `{"error":"无效的API Key"}`,
+			want: BlacklistResult{
+				ShouldBlacklist: true,
+				Reason:          "authentication_error",
+				Message:         "无效的API Key",
+			},
+		},
+		{
+			name:       "401 new api token expired message should blacklist as authentication",
+			statusCode: 401,
+			body:       `{"error":{"code":"","message":"该令牌已过期 (request id: 202605041407066680249308268d9d6QnF3nAtC)","type":"new_api_error"}}`,
+			want: BlacklistResult{
+				ShouldBlacklist: true,
+				Reason:          "authentication_error",
+				Message:         "该令牌已过期 (request id: 202605041407066680249308268d9d6QnF3nAtC)",
+			},
+		},
+		{
+			name:       "403 top level insufficient account balance message should blacklist",
+			statusCode: 403,
+			body:       `{"message":"Insufficient account balance"}`,
+			want: BlacklistResult{
+				ShouldBlacklist: true,
+				Reason:          "insufficient_balance",
+				Message:         "Insufficient account balance",
+			},
+		},
+		{
+			name:       "403 prededuct quota message should blacklist as insufficient balance",
+			statusCode: 403,
+			body:       `{"error":{"type":"new_api_error","message":"预扣费额度失败, 用户剩余额度: ＄0.411202, 需要预扣费额度: ＄0.553368"},"type":"error"}`,
+			want: BlacklistResult{
+				ShouldBlacklist: true,
+				Reason:          "insufficient_balance",
+				Message:         "预扣费额度失败, 用户剩余额度: ＄0.411202, 需要预扣费额度: ＄0.553368",
+			},
+		},
+		{
+			name:       "403 token quota not enough message should blacklist as insufficient balance",
+			statusCode: 403,
+			body:       `{"error":{"message":"token quota is not enough, token remain quota: ¥0.100000, need quota: ¥0.300000 (request id: 20260426121858142194522mDUp325B)","type":"new_api_error","param":"","code":"pre_consume_quota_failed"},"type":"error"}`,
+			want: BlacklistResult{
+				ShouldBlacklist: true,
+				Reason:          "insufficient_balance",
+				Message:         "token quota is not enough, token remain quota: ¥0.100000, need quota: ¥0.300000 (request id: 20260426121858142194522mDUp325B)",
+			},
+		},
+		{
+			name:       "429 insufficient quota message should blacklist as insufficient balance",
+			statusCode: 429,
+			body:       `{"error":{"message":"insufficient quota for current billing period"}}`,
+			want: BlacklistResult{
+				ShouldBlacklist: true,
+				Reason:          "insufficient_balance",
+				Message:         "insufficient quota for current billing period",
+			},
+		},
+		{
+			name:       "429 top level usage limit exceeded code should blacklist as insufficient balance",
+			statusCode: 429,
+			body:       `{"code":"USAGE_LIMIT_EXCEEDED","message":"error: code=429 reason=\"DAILY_LIMIT_EXCEEDED\" message=\"daily usage limit exceeded\" metadata=map[]"}`,
+			want: BlacklistResult{
+				ShouldBlacklist: true,
+				Reason:          "insufficient_balance",
+				Message:         "error: code=429 reason=\"DAILY_LIMIT_EXCEEDED\" message=\"daily usage limit exceeded\" metadata=map[]",
+			},
+		},
+		{
+			name:       "429 nested daily limit exceeded code should blacklist as insufficient balance",
+			statusCode: 429,
+			body:       `{"error":{"code":"DAILY_LIMIT_EXCEEDED","message":"daily usage limit exceeded"}}`,
+			want: BlacklistResult{
+				ShouldBlacklist: true,
+				Reason:          "insufficient_balance",
+				Message:         "daily usage limit exceeded",
+			},
+		},
+		{
+			name:       "401 token status exhausted message should blacklist as insufficient balance",
+			statusCode: 401,
+			body:       `{"error":{"code":"","message":"该令牌额度已用尽 TokenStatusExhausted[sk-duK***qqX]"}}`,
+			want: BlacklistResult{
+				ShouldBlacklist: true,
+				Reason:          "insufficient_balance",
+				Message:         "该令牌额度已用尽 TokenStatusExhausted[sk-duK***qqX]",
+			},
+		},
+		{
+			name:       "401 out of credits message should blacklist as insufficient balance",
+			statusCode: 401,
+			body:       `{"error":{"message":"This account is out of credits"}}`,
+			want: BlacklistResult{
+				ShouldBlacklist: true,
+				Reason:          "insufficient_balance",
+				Message:         "This account is out of credits",
+			},
+		},
+		{
+			name:       "403 billing not enabled should not be misclassified as balance",
+			statusCode: 403,
+			body:       `{"error":{"message":"billing not enabled for this account"}}`,
+			want:       BlacklistResult{},
+		},
+		{
+			name:       "403 permission denied should not be misclassified as balance",
+			statusCode: 403,
+			body:       `{"error":{"type":"forbidden","message":"permission denied for this resource"}}`,
+			want:       BlacklistResult{},
+		},
+		{
+			name:       "403 explicit permission error should still be permission blacklist",
+			statusCode: 403,
+			body:       `{"error":{"type":"permission_denied","message":"permission denied"}}`,
+			want: BlacklistResult{
+				ShouldBlacklist: true,
+				Reason:          "permission_error",
+				Message:         "permission denied",
+			},
+		},
+		{
+			name:       "403 subscription not found code should blacklist as insufficient balance",
+			statusCode: 403,
+			body:       `{"code":"SUBSCRIPTION_NOT_FOUND","message":"No active subscription found for this group"}`,
+			want: BlacklistResult{
+				ShouldBlacklist: true,
+				Reason:          "insufficient_balance",
+				Message:         "No active subscription found for this group",
+			},
+		},
+		{
+			name:       "403 subscription not found message should blacklist as insufficient balance",
+			statusCode: 403,
+			body:       `{"message":"No active subscription found for this group"}`,
+			want: BlacklistResult{
+				ShouldBlacklist: true,
+				Reason:          "insufficient_balance",
+				Message:         "No active subscription found for this group",
+			},
+		},
+		{
+			name:       "403 account balance is negative should blacklist as insufficient balance",
+			statusCode: 403,
+			body:       `{"error":{"message":"account balance is negative, please recharge first","type":"forbidden_error"},"type":"error"}`,
+			want: BlacklistResult{
+				ShouldBlacklist: true,
+				Reason:          "insufficient_balance",
+				Message:         "account balance is negative, please recharge first",
+			},
+		},
+		{
+			name:       "403 subscription expired should blacklist as insufficient balance",
+			statusCode: 403,
+			body:       `{"error":{"code":"","message":"您的套餐已过期，请续费后继续使用 (request id: 202606040135546143661918268d9d6tMVNpobz)","type":"new_api_error"}}`,
+			want: BlacklistResult{
+				ShouldBlacklist: true,
+				Reason:          "insufficient_balance",
+				Message:         "您的套餐已过期，请续费后继续使用 (request id: 202606040135546143661918268d9d6tMVNpobz)",
+			},
+		},
+		// 以下用例验证双词组合匹配能覆盖旧精确关键词列表遗漏的变体
+		{
+			name:       "403 credit limit reached should blacklist via dual-word",
+			statusCode: 403,
+			body:       `{"error":{"message":"credit limit reached for this API key","type":"api_error"}}`,
+			want: BlacklistResult{
+				ShouldBlacklist: true,
+				Reason:          "insufficient_balance",
+				Message:         "credit limit reached for this API key",
+			},
+		},
+		{
+			name:       "403 额度到期请充值 should blacklist via dual-word",
+			statusCode: 403,
+			body:       `{"error":{"message":"您的额度已到期，请充值后重试","type":"error"}}`,
+			want: BlacklistResult{
+				ShouldBlacklist: true,
+				Reason:          "insufficient_balance",
+				Message:         "您的额度已到期，请充值后重试",
+			},
+		},
+		{
+			name:       "403 funds depleted should blacklist via dual-word",
+			statusCode: 403,
+			body:       `{"error":{"message":"Your account funds have been depleted. Please top up.","type":"billing_error"}}`,
+			want: BlacklistResult{
+				ShouldBlacklist: true,
+				Reason:          "insufficient_balance",
+				Message:         "Your account funds have been depleted. Please top up.",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := ShouldBlacklistKey(tt.statusCode, []byte(tt.body))
+			if got != tt.want {
+				t.Fatalf("ShouldBlacklistKey(%d, %s) = %+v, want %+v", tt.statusCode, tt.body, got, tt.want)
+			}
+		})
+	}
+}
+
+// TestShouldRetryWithNextKey_SensitiveWordsDetected 测试敏感词检测错误不应重试
+// 这是修复的核心场景：500 + sensitive_words_detected 不应触发无限重试
+func TestShouldRetryWithNextKey_SensitiveWordsDetected(t *testing.T) {
+	// 模拟生产环境的敏感词检测错误
+	body := []byte(`{"error":{"message":"sensitive words detected","type":"new_api_error","param":"","code":"sensitive_words_detected"}}`)
+
+	tests := []struct {
+		name         string
+		statusCode   int
+		fuzzyMode    bool
+		wantFailover bool
+		wantQuota    bool
+	}{
+		{
+			name:         "500 with sensitive_words_detected - normal mode",
+			statusCode:   500,
+			fuzzyMode:    false,
+			wantFailover: false, // 不应重试
+			wantQuota:    false,
+		},
+		{
+			name:         "500 with sensitive_words_detected - fuzzy mode",
+			statusCode:   500,
+			fuzzyMode:    true,
+			wantFailover: false, // 即使在 fuzzy 模式下也不应重试
+			wantQuota:    false,
+		},
+		{
+			name:         "400 with sensitive_words_detected - normal mode",
+			statusCode:   400,
+			fuzzyMode:    false,
+			wantFailover: false,
+			wantQuota:    false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotFailover, gotQuota := ShouldRetryWithNextKey(tt.statusCode, body, tt.fuzzyMode, "Messages")
+			if gotFailover != tt.wantFailover {
+				t.Errorf("ShouldRetryWithNextKey(%d, sensitive_words_body, %v) failover = %v, want %v",
+					tt.statusCode, tt.fuzzyMode, gotFailover, tt.wantFailover)
+			}
+			if gotQuota != tt.wantQuota {
+				t.Errorf("ShouldRetryWithNextKey(%d, sensitive_words_body, %v) quota = %v, want %v",
+					tt.statusCode, tt.fuzzyMode, gotQuota, tt.wantQuota)
+			}
+		})
+	}
+}
+
+// TestIsModelRoutingError 测试模型路由错误识别（仅用于状态码归一化）
+func TestIsModelRoutingError(t *testing.T) {
+	tests := []struct {
+		name string
+		body string
+		want bool
+	}{
+		{
+			name: "model_not_found code",
+			body: `{"error":{"code":"model_not_found","message":"No available channel for model gpt-5.4 under group codex (distributor)","type":"new_api_error"}}`,
+			want: true,
+		},
+		{
+			name: "no available channel message without code",
+			body: `{"error":{"message":"No available channel for model gpt-5.4 under group codex","type":"new_api_error"}}`,
+			want: true,
+		},
+		{
+			name: "model_not_found code case insensitive",
+			body: `{"error":{"code":"MODEL_NOT_FOUND","message":"some error"}}`,
+			want: true,
+		},
+		{
+			name: "generic model not found without no available channel",
+			body: `{"error":{"message":"model not found: gpt-5.4","type":"error"}}`,
+			want: false,
+		},
+		{
+			name: "quota error not client config",
+			body: `{"error":{"type":"new_api_error","message":"预扣费额度失败, 用户剩余额度: ¥0.053950"}}`,
+			want: false,
+		},
+		{
+			name: "auth error not client config",
+			body: `{"error":{"type":"new_api_error","message":"该令牌已过期","code":""}}`,
+			want: false,
+		},
+		{
+			name: "invalid request not client config",
+			body: `{"error":{"code":"invalid_request","message":"bad request"}}`,
+			want: false,
+		},
+		{
+			name: "invalid json",
+			body: `not json`,
+			want: false,
+		},
+		{
+			name: "no error object",
+			body: `{"status":"ok"}`,
+			want: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := isModelRoutingError([]byte(tt.body))
+			if got != tt.want {
+				t.Errorf("isModelRoutingError() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+// TestNormalizeUpstreamErrorStatus 测试状态码归一化
+func TestNormalizeUpstreamErrorStatus(t *testing.T) {
+	modelNotFoundBody := []byte(`{"error":{"code":"model_not_found","message":"No available channel for model gpt-5.4 under group codex","type":"new_api_error"}}`)
+
+	tests := []struct {
+		name       string
+		status     int
+		body       []byte
+		wantStatus int
+	}{
+		{"503 model_not_found normalizes to 404", 503, modelNotFoundBody, 404},
+		{"500 model_not_found normalizes to 404", 500, modelNotFoundBody, 404},
+		{"502 model_not_found normalizes to 404", 502, modelNotFoundBody, 404},
+		{"403 model_not_found stays 403", 403, modelNotFoundBody, 403},
+		{"200 model_not_found stays 200", 200, modelNotFoundBody, 200},
+		{"503 empty body stays 503", 503, []byte{}, 503},
+		{"503 nil body stays 503", 503, nil, 503},
+		{"503 quota error stays 503", 503, []byte(`{"error":{"message":"quota exceeded"}}`), 503},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := normalizeUpstreamErrorStatus(tt.status, tt.body)
+			if got != tt.wantStatus {
+				t.Errorf("normalizeUpstreamErrorStatus(%d, ...) = %d, want %d", tt.status, got, tt.wantStatus)
+			}
+		})
+	}
+}
+
+func TestHandleAllFailedFuzzyMode_ModelNotFoundNormalizesTo404(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	modelNotFoundBody := []byte(`{"error":{"code":"model_not_found","message":"No available channel for model gpt-5.4 under group codex","type":"new_api_error"}}`)
+	quotaBody := []byte(`{"error":{"message":"quota exceeded"}}`)
+
+	tests := []struct {
+		name       string
+		handle     func(*gin.Context)
+		wantStatus int
+	}{
+		{
+			name: "all channels failed - model_not_found normalizes to 404",
+			handle: func(c *gin.Context) {
+				HandleAllChannelsFailed(c, true, &FailoverError{Status: http.StatusServiceUnavailable, Body: modelNotFoundBody}, nil, "Messages")
+			},
+			wantStatus: http.StatusNotFound,
+		},
+		{
+			name: "all keys failed - model_not_found normalizes to 404",
+			handle: func(c *gin.Context) {
+				HandleAllKeysFailed(c, true, &FailoverError{Status: http.StatusServiceUnavailable, Body: modelNotFoundBody}, nil, "Messages")
+			},
+			wantStatus: http.StatusNotFound,
+		},
+		{
+			name: "all channels failed - 429 quota stays generic 503 in fuzzy mode",
+			handle: func(c *gin.Context) {
+				HandleAllChannelsFailed(c, true, &FailoverError{Status: http.StatusTooManyRequests, Body: quotaBody}, nil, "Messages")
+			},
+			wantStatus: http.StatusServiceUnavailable,
+		},
+		{
+			name: "all keys failed - 429 quota stays generic 503 in fuzzy mode",
+			handle: func(c *gin.Context) {
+				HandleAllKeysFailed(c, true, &FailoverError{Status: http.StatusTooManyRequests, Body: quotaBody}, nil, "Messages")
+			},
+			wantStatus: http.StatusServiceUnavailable,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			recorder := httptest.NewRecorder()
+			ctx, _ := gin.CreateTestContext(recorder)
+
+			tt.handle(ctx)
+
+			if recorder.Code != tt.wantStatus {
+				t.Fatalf("status = %d, want %d", recorder.Code, tt.wantStatus)
+			}
+			if recorder.Body.String() == "" {
+				t.Fatal("response body is empty")
+			}
+		})
+	}
+}
+
+// TestShouldRetryWithNextKey_ModelNotFound 测试 model_not_found 允许 failover
+// 模拟生产环境真实响应：上游 new-api 对 model_not_found 返回 503
+// model_not_found 应允许 failover（不同 channel/上游实例可能支持该模型）
+func TestShouldRetryWithNextKey_ModelNotFound(t *testing.T) {
+	// 用户实际遇到的生产环境响应体
+	body := []byte(`{"error":{"code":"model_not_found","message":"No available channel for model gpt-5.4 under group codex (distributor) (request id: 20260506023117409510104ddJSBEMJ)","type":"new_api_error"}}`)
+
+	tests := []struct {
+		name         string
+		statusCode   int
+		fuzzyMode    bool
+		wantFailover bool
+		wantQuota    bool
+	}{
+		{
+			name:         "503 model_not_found - normal mode allows failover",
+			statusCode:   503,
+			fuzzyMode:    false,
+			wantFailover: true,
+			wantQuota:    false,
+		},
+		{
+			name:         "503 model_not_found - fuzzy mode allows failover",
+			statusCode:   503,
+			fuzzyMode:    true,
+			wantFailover: true,
+			wantQuota:    false,
+		},
+		{
+			name:         "500 model_not_found - normal mode allows failover",
+			statusCode:   500,
+			fuzzyMode:    false,
+			wantFailover: true,
+			wantQuota:    false,
+		},
+		{
+			name:         "500 model_not_found - fuzzy mode allows failover",
+			statusCode:   500,
+			fuzzyMode:    true,
+			wantFailover: true,
+			wantQuota:    false,
+		},
+		{
+			name:         "403 model_not_found - normal mode allows failover",
+			statusCode:   403,
+			fuzzyMode:    false,
+			wantFailover: true,
+			wantQuota:    false,
+		},
+		{
+			name:         "403 model_not_found - fuzzy mode allows failover",
+			statusCode:   403,
+			fuzzyMode:    true,
+			wantFailover: true,
+			wantQuota:    false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotFailover, gotQuota := ShouldRetryWithNextKey(tt.statusCode, body, tt.fuzzyMode, "Messages")
+			if gotFailover != tt.wantFailover {
+				t.Errorf("ShouldRetryWithNextKey(%d, model_not_found_body, %v) failover = %v, want %v",
+					tt.statusCode, tt.fuzzyMode, gotFailover, tt.wantFailover)
+			}
+			if gotQuota != tt.wantQuota {
+				t.Errorf("ShouldRetryWithNextKey(%d, model_not_found_body, %v) quota = %v, want %v",
+					tt.statusCode, tt.fuzzyMode, gotQuota, tt.wantQuota)
+			}
+		})
+	}
+}
