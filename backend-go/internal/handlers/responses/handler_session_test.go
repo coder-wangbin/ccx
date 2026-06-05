@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/BenedictKing/ccx/internal/config"
+	"github.com/BenedictKing/ccx/internal/handlers/common"
 	"github.com/BenedictKing/ccx/internal/providers"
 	"github.com/BenedictKing/ccx/internal/session"
 	"github.com/BenedictKing/ccx/internal/types"
@@ -50,7 +51,7 @@ func TestHandleSuccess_PreservesPreviousResponseID(t *testing.T) {
 		Input:              "hello",
 	}
 
-	if _, err := handleSuccess(c, resp, provider, "responses", envCfg, sessionManager, time.Now(), originalReq, []byte(`{"model":"gpt-5","input":"hello"}`), false); err != nil {
+	if _, err := handleSuccess(c, resp, provider, "responses", envCfg, sessionManager, time.Now(), originalReq, []byte(`{"model":"gpt-5","input":"hello"}`), false, common.StreamPreflightTimeouts{}); err != nil {
 		t.Fatalf("handleSuccess() err = %v", err)
 	}
 

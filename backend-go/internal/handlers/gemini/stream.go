@@ -2,11 +2,9 @@ package gemini
 
 import (
 	"bufio"
-	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"log"
 	"net/http"
 	"strings"
@@ -20,30 +18,11 @@ import (
 )
 
 // preflightGeminiStream Gemini 流式预检测（两阶段：首字等待 + 首字后断流检测）
-func preflightGeminiStream(resp *http.Response, upstreamType string, timeouts common.StreamPreflightTimeouts) (bufferedLines []string, err error) {
+func preflightGeminiStream(resp *http.Response, upstreamType string, timeouts common.StreamPreflightTimeouts) (bufferedLines []string, chunkChan <-chan []byte, bodyErrChan <-chan error, err error) {
 	hasFirstContent := false
 
-	// 启动 goroutine 读取 body chunk
-	chunkChan := make(chan []byte, 16)
-	bodyErrChan := make(chan error, 1)
-	go func() {
-		defer close(chunkChan)
-		buf := make([]byte, 32*1024)
-		for {
-			n, err := resp.Body.Read(buf)
-			if n > 0 {
-				chunk := make([]byte, n)
-				copy(chunk, buf[:n])
-				chunkChan <- chunk
-			}
-			if err != nil {
-				if err != io.EOF {
-					bodyErrChan <- err
-				}
-				return
-			}
-		}
-	}()
+	// 启动 goroutine 读取 body chunk。preflight 放行后继续由同一个 channel 驱动正常流式转发，避免丢 chunk。
+	chunkChan, bodyErrChan = common.StartBodyChunkReader(resp.Body, 32*1024, 16)
 
 	// 阶段A：首个有效内容等待超时
 	var firstContentTimer *time.Timer
@@ -108,20 +87,20 @@ func preflightGeminiStream(resp *http.Response, upstreamType string, timeouts co
 				if remainder != "" {
 					allLines = append(allLines, remainder)
 				}
-				return allLines, nil
+				return allLines, chunkChan, bodyErrChan, nil
 			}
 		case err := <-bodyErrChan:
-			return nil, err
+			return nil, chunkChan, bodyErrChan, err
 		case <-firstContentChan:
 			// 阶段A超时
 			if timeouts.FirstContentTimeoutMs > 0 {
-				return nil, common.ErrStreamFirstContentTimeout
+				return nil, chunkChan, bodyErrChan, common.ErrStreamFirstContentTimeout
 			}
 			// 超时被禁用（0），保守放行
-			return nil, nil
+			return nil, chunkChan, bodyErrChan, nil
 		case <-inactivityChan:
 			// 阶段B超时：首字后断流
-			return nil, common.ErrStreamStalled
+			return nil, nil, nil, common.ErrStreamStalled
 		}
 
 		if !chunkOk {
@@ -150,14 +129,14 @@ func preflightGeminiStream(resp *http.Response, upstreamType string, timeouts co
 					if remainder != "" {
 						allLines = append(allLines, remainder)
 					}
-					return allLines, nil
+					return allLines, chunkChan, bodyErrChan, nil
 				}
 			} else {
 				// 阶段B中收到第二个有效内容：健康流，放行
 				if remainder != "" {
 					allLines = append(allLines, remainder)
 				}
-				return allLines, nil
+				return allLines, chunkChan, bodyErrChan, nil
 			}
 		}
 
@@ -262,7 +241,7 @@ func handleStreamSuccess(
 	timeouts common.StreamPreflightTimeouts,
 ) (*types.Usage, error) {
 	// Preflight：在发送 HTTP Header 之前检测流是否可用
-	bufferedLines, err := preflightGeminiStream(resp, upstreamType, timeouts)
+	bufferedLines, chunkChan, bodyErrChan, err := preflightGeminiStream(resp, upstreamType, timeouts)
 	if err != nil {
 		if errors.Is(err, common.ErrStreamFirstContentTimeout) {
 			log.Printf("[Gemini-FirstContentTimeout] 流式首字超时: %dms，触发重试", timeouts.FirstContentTimeoutMs)
@@ -299,7 +278,8 @@ func handleStreamSuccess(
 	if bufferedBody != "" && !strings.HasSuffix(bufferedBody, "\n") {
 		bufferedBody += "\n"
 	}
-	resp.Body = io.NopCloser(io.MultiReader(bytes.NewReader([]byte(bufferedBody)), resp.Body))
+	channelBody := common.NewChunkChannelReadCloser(chunkChan, bodyErrChan, resp.Body)
+	resp.Body = common.NewPrefixedReadCloser([]byte(bufferedBody), channelBody)
 
 	switch upstreamType {
 	case "gemini":

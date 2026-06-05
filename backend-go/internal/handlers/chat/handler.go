@@ -919,7 +919,7 @@ func handleStreamSuccess(
 
 	common.LogUpstreamResponseHeaders(resp, envCfg, "Chat")
 
-	preflight, err := preflightChatStream(resp, upstreamType, timeouts)
+	preflight, chunkChan, bodyErrChan, err := preflightChatStream(resp, upstreamType, timeouts)
 	if err != nil {
 		if errors.Is(err, common.ErrStreamFirstContentTimeout) {
 			log.Printf("[Chat-FirstContentTimeout] 流式首字超时: %dms，触发重试", timeouts.FirstContentTimeoutMs)
@@ -928,6 +928,8 @@ func handleStreamSuccess(
 		}
 		return nil, err
 	}
+	resp.Body = common.NewChunkChannelReadCloser(chunkChan, bodyErrChan, resp.Body)
+
 	if preflight.malformedToolName != "" {
 		log.Printf("[Chat-EmptyResponse] 上游返回空或畸形 tool_call（流式，upstreamType=%s, tool=%s），触发 failover", upstreamType, preflight.malformedToolName)
 		return nil, common.ErrEmptyStreamResponse
@@ -977,7 +979,7 @@ type chatToolTracker interface {
 }
 
 // preflightChatStream Chat 流式预检测（两阶段：首字等待 + 首字后断流检测）
-func preflightChatStream(resp *http.Response, upstreamType string, timeouts common.StreamPreflightTimeouts) (*chatStreamPreflight, error) {
+func preflightChatStream(resp *http.Response, upstreamType string, timeouts common.StreamPreflightTimeouts) (*chatStreamPreflight, <-chan []byte, <-chan error, error) {
 	result := &chatStreamPreflight{}
 	tracker := common.NewStreamToolCallTracker()
 	chatTracker := newOpenAIChatToolCallTracker()
@@ -992,27 +994,8 @@ func preflightChatStream(resp *http.Response, upstreamType string, timeouts comm
 		}
 	}
 
-	// 启动 goroutine 读取 body chunk
-	chunkChan := make(chan []byte, 16)
-	bodyErrChan := make(chan error, 1)
-	go func() {
-		defer close(chunkChan)
-		buf := make([]byte, 32*1024)
-		for {
-			n, err := resp.Body.Read(buf)
-			if n > 0 {
-				chunk := make([]byte, n)
-				copy(chunk, buf[:n])
-				chunkChan <- chunk
-			}
-			if err != nil {
-				if err != io.EOF {
-					bodyErrChan <- err
-				}
-				return
-			}
-		}
-	}()
+	// 启动 goroutine 读取 body chunk。preflight 放行后继续由同一个 channel 驱动正常流式转发，避免丢 chunk。
+	chunkChan, bodyErrChan := common.StartBodyChunkReader(resp.Body, 32*1024, 16)
 
 	// 阶段A：首个有效内容等待超时
 	var firstContentTimer *time.Timer
@@ -1036,24 +1019,24 @@ func preflightChatStream(resp *http.Response, upstreamType string, timeouts comm
 			if !chunkOk {
 				// chunkChan 关闭：body 读取完成
 				flushRemainder()
-				return result, nil
+				return result, chunkChan, bodyErrChan, nil
 			}
 		case err := <-bodyErrChan:
 			flushRemainder()
-			return result, err
+			return result, chunkChan, bodyErrChan, err
 		case <-firstContentChan:
 			// 阶段A超时：首个有效内容等待超时
 			if timeouts.FirstContentTimeoutMs > 0 {
 				flushRemainder()
-				return result, common.ErrStreamFirstContentTimeout
+				return result, chunkChan, bodyErrChan, common.ErrStreamFirstContentTimeout
 			}
 			// 超时被禁用（0），保守放行
 			flushRemainder()
-			return result, nil
+			return result, chunkChan, bodyErrChan, nil
 		case <-inactivityChan:
 			// 阶段B超时：首字后断流
 			flushRemainder()
-			return result, common.ErrStreamStalled
+			return result, chunkChan, bodyErrChan, common.ErrStreamStalled
 		}
 
 		if !chunkOk {
@@ -1086,12 +1069,12 @@ func preflightChatStream(resp *http.Response, upstreamType string, timeouts comm
 				} else {
 					// 禁用阶段B，直接放行
 					flushRemainder()
-					return result, nil
+					return result, chunkChan, bodyErrChan, nil
 				}
 			} else {
 				// 阶段B中收到第二个有效内容：健康流，放行
 				flushRemainder()
-				return result, nil
+				return result, chunkChan, bodyErrChan, nil
 			}
 		}
 
@@ -1108,7 +1091,7 @@ func preflightChatStream(resp *http.Response, upstreamType string, timeouts comm
 	}
 
 	flushRemainder()
-	return result, nil
+	return result, chunkChan, bodyErrChan, nil
 }
 
 func detectMalformedChatStreamLines(lines []string, upstreamType string, tracker chatToolTracker, chatTracker *openAIChatToolCallTracker) (bool, string) {

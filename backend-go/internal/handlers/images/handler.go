@@ -254,7 +254,7 @@ func handleMultiChannel(
 					channelScheduler.MarkURLSuccess(scheduler.ChannelKindImages, channelIndex, url)
 				},
 				func(c *gin.Context, resp *http.Response, upstreamCopy *config.UpstreamConfig, apiKey string, actualRequestBody []byte) (*types.Usage, error) {
-					return handleSuccess(c, resp, envCfg, startTime, isStream)
+					return handleSuccess(c, resp, envCfg, startTime, isStream, common.ResolveStreamPreflightTimeouts(upstreamCopy, metricsManager.GetCircuitBreakerConfig()))
 				},
 				model,
 				operation,
@@ -328,7 +328,7 @@ func handleSingleChannel(
 		nil,
 		nil,
 		func(c *gin.Context, resp *http.Response, upstreamCopy *config.UpstreamConfig, apiKey string, actualRequestBody []byte) (*types.Usage, error) {
-			return handleSuccess(c, resp, envCfg, startTime, isStream)
+			return handleSuccess(c, resp, envCfg, startTime, isStream, common.ResolveStreamPreflightTimeouts(upstreamCopy, metricsManager.GetCircuitBreakerConfig()))
 		},
 		model,
 		operation,
@@ -464,10 +464,64 @@ func prepareImagesUpstreamHeaders(c *gin.Context, targetHost string, contentType
 	return headers
 }
 
-func handleSuccess(c *gin.Context, resp *http.Response, envCfg *config.EnvConfig, startTime time.Time, isStream bool) (*types.Usage, error) {
+func preflightImagesStream(resp *http.Response, timeouts common.StreamPreflightTimeouts) ([]byte, <-chan []byte, <-chan error, error) {
+	chunkChan, bodyErrChan := common.StartBodyChunkReader(resp.Body, 4*1024, 16)
+	var buffered bytes.Buffer
+	hasFirstContent := false
+
+	var firstContentTimer *time.Timer
+	firstContentChan := (<-chan time.Time)(nil)
+	if timeouts.FirstContentTimeoutMs > 0 {
+		firstContentTimer = time.NewTimer(time.Duration(timeouts.FirstContentTimeoutMs) * time.Millisecond)
+		firstContentChan = firstContentTimer.C
+		defer firstContentTimer.Stop()
+	}
+
+	var inactivityTimer *time.Timer
+	inactivityChan := (<-chan time.Time)(nil)
+
+	for {
+		select {
+		case chunk, ok := <-chunkChan:
+			if !ok {
+				if buffered.Len() == 0 {
+					return nil, chunkChan, bodyErrChan, common.ErrEmptyStreamResponse
+				}
+				return buffered.Bytes(), chunkChan, bodyErrChan, nil
+			}
+			if len(chunk) == 0 {
+				continue
+			}
+			buffered.Write(chunk)
+			if !hasFirstContent {
+				hasFirstContent = true
+				if firstContentTimer != nil {
+					firstContentTimer.Stop()
+				}
+				if timeouts.InactivityTimeoutMs > 0 {
+					inactivityTimer = time.NewTimer(time.Duration(timeouts.InactivityTimeoutMs) * time.Millisecond)
+					inactivityChan = inactivityTimer.C
+					defer inactivityTimer.Stop()
+				} else {
+					return buffered.Bytes(), chunkChan, bodyErrChan, nil
+				}
+				continue
+			}
+			return buffered.Bytes(), chunkChan, bodyErrChan, nil
+		case err := <-bodyErrChan:
+			return nil, chunkChan, bodyErrChan, err
+		case <-firstContentChan:
+			return nil, chunkChan, bodyErrChan, common.ErrStreamFirstContentTimeout
+		case <-inactivityChan:
+			return nil, chunkChan, bodyErrChan, common.ErrStreamStalled
+		}
+	}
+}
+
+func handleSuccess(c *gin.Context, resp *http.Response, envCfg *config.EnvConfig, startTime time.Time, isStream bool, timeouts common.StreamPreflightTimeouts) (*types.Usage, error) {
 	defer resp.Body.Close()
 	if isStream {
-		return nil, passthroughStreamingResponseWithLog(c, resp, envCfg, startTime)
+		return nil, passthroughStreamingResponseWithLog(c, resp, envCfg, startTime, timeouts)
 	}
 
 	bodyBytes, err := io.ReadAll(resp.Body)
@@ -494,15 +548,26 @@ func handleSuccess(c *gin.Context, resp *http.Response, envCfg *config.EnvConfig
 }
 
 func passthroughStreamingResponse(c *gin.Context, resp *http.Response) error {
-	return passthroughStreamingResponseWithLog(c, resp, config.NewEnvConfig(), time.Now())
+	return passthroughStreamingResponseWithLog(c, resp, config.NewEnvConfig(), time.Now(), common.StreamPreflightTimeouts{})
 }
 
-func passthroughStreamingResponseWithLog(c *gin.Context, resp *http.Response, envCfg *config.EnvConfig, startTime time.Time) error {
+func passthroughStreamingResponseWithLog(c *gin.Context, resp *http.Response, envCfg *config.EnvConfig, startTime time.Time, timeouts common.StreamPreflightTimeouts) error {
 	if envCfg.EnableResponseLogs {
 		responseTime := time.Since(startTime).Milliseconds()
 		log.Printf("[Images-Stream] 流式响应开始: %dms, 状态: %d", responseTime, resp.StatusCode)
 		common.LogUpstreamResponseHeaders(resp, envCfg, "Images")
 	}
+
+	bufferedBytes, chunkChan, bodyErrChan, err := preflightImagesStream(resp, timeouts)
+	if err != nil {
+		if err == common.ErrStreamFirstContentTimeout {
+			log.Printf("[Images-FirstContentTimeout] 流式首块超时: %dms，触发重试", timeouts.FirstContentTimeoutMs)
+		} else if err == common.ErrStreamStalled {
+			log.Printf("[Images-StreamStalled] 流式断流: 首块后 %dms 无活动，触发重试", timeouts.InactivityTimeoutMs)
+		}
+		return err
+	}
+	resp.Body = common.NewPrefixedReadCloser(bufferedBytes, common.NewChunkChannelReadCloser(chunkChan, bodyErrChan, resp.Body))
 
 	utils.ForwardResponseHeaders(resp.Header, c.Writer)
 	c.Status(resp.StatusCode)
