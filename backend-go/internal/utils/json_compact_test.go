@@ -240,6 +240,23 @@ func TestFormatJSONBytesForLog(t *testing.T) {
 	t.Logf("格式化结果:\n%s", result)
 }
 
+func TestFormatJSONBytesForLogTruncatesInstructions(t *testing.T) {
+	input := map[string]interface{}{
+		"instructions": strings.Repeat("系统提示词", 120),
+		"input":        "hello",
+	}
+
+	jsonBytes, _ := json.Marshal(input)
+	result := FormatJSONBytesForLog(jsonBytes, 20)
+
+	if !strings.Contains(result, `"instructions": "系统提示词系统提示词系统提示词系统提示词...`) {
+		t.Fatalf("instructions 字段未按预期截断:\n%s", result)
+	}
+	if strings.Contains(result, "�") {
+		t.Fatalf("截断后不应包含 Unicode 替换字符:\n%s", result)
+	}
+}
+
 // TestCodexResponsesFormat 测试 Codex Responses API 格式的压缩显示
 func TestCodexResponsesFormat(t *testing.T) {
 	// 模拟 Codex Responses API 的请求体

@@ -33,8 +33,9 @@ func TruncateJSONIntelligently(data interface{}, maxTextLength int) interface{} 
 
 	switch v := data.(type) {
 	case string:
-		if len(v) > maxTextLength {
-			return v[:maxTextLength] + "..."
+		runes := []rune(v)
+		if len(runes) > maxTextLength {
+			return string(runes[:maxTextLength]) + "..."
 		}
 		return v
 
