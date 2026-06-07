@@ -1141,3 +1141,137 @@ data: {"type":"content_block_stop","index":0}
 		t.Fatalf("expected no error after tool call closed, got %v", result.Error)
 	}
 }
+
+// TestProcessStreamEvent_TruncatesMalformedToolUse 验证当 text 后跟畸形 tool_use 时，
+// 代理层截断畸形 tool_use 并注入 end_turn 终止响应
+func TestProcessStreamEvent_TruncatesMalformedToolUse(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	envCfg := &config.EnvConfig{}
+	ctx := NewStreamContext(envCfg)
+
+	// 1. 先发送一些 text content（模拟正常文本输出）
+	textStart := "event: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"text\",\"text\":\"\"}}\n\n"
+	textDelta := "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"Hello world\"}}\n\n"
+	textStop := "event: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":0}\n\n"
+	ProcessStreamEvent(c, c.Writer, nopFlusher{}, textStart, ctx, envCfg, nil)
+	ProcessStreamEvent(c, c.Writer, nopFlusher{}, textDelta, ctx, envCfg, nil)
+	ProcessStreamEvent(c, c.Writer, nopFlusher{}, textStop, ctx, envCfg, nil)
+
+	// 验证 text 已正常透传
+	body := rec.Body.String()
+	if !strings.Contains(body, "Hello world") {
+		t.Fatalf("expected text to be forwarded, got: %s", body)
+	}
+
+	// 2. 发送一个畸形 tool_use（Bash 但参数为空）
+	toolStart := "event: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":1,\"content_block\":{\"type\":\"tool_use\",\"id\":\"toolu_abc\",\"name\":\"Bash\",\"input\":{}}}\n\n"
+	toolStop := "event: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":1}\n\n"
+	ProcessStreamEvent(c, c.Writer, nopFlusher{}, toolStart, ctx, envCfg, nil)
+	ProcessStreamEvent(c, c.Writer, nopFlusher{}, toolStop, ctx, envCfg, nil)
+
+	// 3. 验证截断行为
+	if !ctx.ToolUseTruncated {
+		t.Fatalf("expected ToolUseTruncated to be true")
+	}
+	if ctx.CommittedToolUseCount != 0 {
+		t.Fatalf("expected no committed tool use, got %d", ctx.CommittedToolUseCount)
+	}
+
+	// 验证注入了 end_turn
+	fullBody := rec.Body.String()
+	if !strings.Contains(fullBody, "end_turn") {
+		t.Fatalf("expected end_turn in truncated output, got: %s", fullBody)
+	}
+	if !strings.Contains(fullBody, "message_stop") {
+		t.Fatalf("expected message_stop in truncated output, got: %s", fullBody)
+	}
+	// 确认畸形的 tool_use block 事件没有透传（注：content_block_start 被缓冲了不会出现）
+	if strings.Contains(fullBody, "toolu_abc") {
+		t.Fatalf("malformed tool_use should not be forwarded, got: %s", fullBody)
+	}
+
+	// 4. 后续上游事件不透传
+	prevLen := rec.Body.Len()
+	messageDelta := "event: message_delta\ndata: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"tool_use\"},\"usage\":{\"output_tokens\":100}}\n\n"
+	messageStop := "event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n"
+	ProcessStreamEvent(c, c.Writer, nopFlusher{}, messageDelta, ctx, envCfg, nil)
+	ProcessStreamEvent(c, c.Writer, nopFlusher{}, messageStop, ctx, envCfg, nil)
+
+	if rec.Body.Len() != prevLen {
+		t.Fatalf("post-truncation events should not be forwarded, got additional: %s", rec.Body.String()[prevLen:])
+	}
+}
+
+// TestProcessStreamEvent_FlushesValidToolUse 验证正常工具调用被正常透传
+func TestProcessStreamEvent_FlushesValidToolUse(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	envCfg := &config.EnvConfig{}
+	ctx := NewStreamContext(envCfg)
+
+	// tool_use with valid non-empty input
+	toolStart := "event: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"tool_use\",\"id\":\"toolu_valid\",\"name\":\"Bash\",\"input\":{}}}\n\n"
+	toolDelta := "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\"{\\\"command\\\":\\\"ls\\\"}\"}}\n\n"
+	toolStop := "event: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":0}\n\n"
+
+	ProcessStreamEvent(c, c.Writer, nopFlusher{}, toolStart, ctx, envCfg, nil)
+	ProcessStreamEvent(c, c.Writer, nopFlusher{}, toolDelta, ctx, envCfg, nil)
+	ProcessStreamEvent(c, c.Writer, nopFlusher{}, toolStop, ctx, envCfg, nil)
+
+	if ctx.ToolUseTruncated {
+		t.Fatalf("valid tool use should not trigger truncation")
+	}
+	if ctx.CommittedToolUseCount != 1 {
+		t.Fatalf("expected 1 committed tool use, got %d", ctx.CommittedToolUseCount)
+	}
+
+	body := rec.Body.String()
+	if !strings.Contains(body, "toolu_valid") {
+		t.Fatalf("valid tool_use should be forwarded, got: %s", body)
+	}
+	if !strings.Contains(body, "input_json_delta") {
+		t.Fatalf("tool delta should be forwarded, got: %s", body)
+	}
+}
+
+// TestProcessStreamEvent_MalformedAfterValidToolUse 验证有已透传 tool_use 后，畸形的不截断
+func TestProcessStreamEvent_MalformedAfterValidToolUse(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	envCfg := &config.EnvConfig{}
+	ctx := NewStreamContext(envCfg)
+
+	// 先发一个有效 tool_use
+	toolStart1 := "event: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"tool_use\",\"id\":\"toolu_first\",\"name\":\"Bash\",\"input\":{}}}\n\n"
+	toolDelta1 := "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\"{\\\"command\\\":\\\"echo hi\\\"}\"}}\n\n"
+	toolStop1 := "event: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":0}\n\n"
+	ProcessStreamEvent(c, c.Writer, nopFlusher{}, toolStart1, ctx, envCfg, nil)
+	ProcessStreamEvent(c, c.Writer, nopFlusher{}, toolDelta1, ctx, envCfg, nil)
+	ProcessStreamEvent(c, c.Writer, nopFlusher{}, toolStop1, ctx, envCfg, nil)
+
+	if ctx.CommittedToolUseCount != 1 {
+		t.Fatalf("expected 1 committed, got %d", ctx.CommittedToolUseCount)
+	}
+
+	// 再发一个畸形 tool_use（参数为空）
+	toolStart2 := "event: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":1,\"content_block\":{\"type\":\"tool_use\",\"id\":\"toolu_bad\",\"name\":\"Read\",\"input\":{}}}\n\n"
+	toolStop2 := "event: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":1}\n\n"
+	ProcessStreamEvent(c, c.Writer, nopFlusher{}, toolStart2, ctx, envCfg, nil)
+	ProcessStreamEvent(c, c.Writer, nopFlusher{}, toolStop2, ctx, envCfg, nil)
+
+	// 不应截断
+	if ctx.ToolUseTruncated {
+		t.Fatalf("should not truncate when CommittedToolUseCount > 0")
+	}
+	if ctx.CommittedToolUseCount != 2 {
+		t.Fatalf("expected 2 committed, got %d", ctx.CommittedToolUseCount)
+	}
+	body := rec.Body.String()
+	if !strings.Contains(body, "toolu_bad") {
+		t.Fatalf("malformed tool_use after valid should still be forwarded, got: %s", body)
+	}
+}

@@ -424,9 +424,14 @@ func (t *StreamToolCallTracker) ProcessClaudeEvent(event string) (bool, string) 
 			if name, ok := contentBlock["name"].(string); ok {
 				state.Name = name
 			}
+			// 注意：在 Claude 流式协议中，content_block_start 的 input 字段始终为 {}（占位符），
+			// 实际参数通过后续 input_json_delta 事件流入。
+			// 仅当 input 非空对象时才写入 Arguments（兼容非流式或已内联参数的场景）。
 			if input, exists := contentBlock["input"]; exists && !IsMalformedToolArguments(input) {
-				if b, err := json.Marshal(input); err == nil {
-					state.Arguments.Write(b)
+				if inputMap, ok := input.(map[string]interface{}); ok && len(inputMap) > 0 {
+					if b, err := json.Marshal(input); err == nil {
+						state.Arguments.Write(b)
+					}
 				}
 			}
 			t.active[index] = state
@@ -678,6 +683,54 @@ func extractSSEJSONLine(line string) (string, bool) {
 // 这些 content block 不产生 delta.text，但属于有效响应内容
 func hasNonTextContentBlock(event string) bool {
 	return HasClaudeSemanticContent(event)
+}
+
+// isToolUseBlockStart 检测事件是否为 content_block_start type=tool_use 或 server_tool_use
+func isToolUseBlockStart(event string) bool {
+	if !strings.Contains(event, "content_block_start") {
+		return false
+	}
+	for _, line := range strings.Split(event, "\n") {
+		jsonStr, ok := extractSSEJSONLine(line)
+		if !ok {
+			continue
+		}
+		var data map[string]interface{}
+		if err := json.Unmarshal([]byte(jsonStr), &data); err != nil {
+			continue
+		}
+		if data["type"] != "content_block_start" {
+			continue
+		}
+		cb, ok := data["content_block"].(map[string]interface{})
+		if !ok {
+			continue
+		}
+		cbType, _ := cb["type"].(string)
+		if cbType == "tool_use" || cbType == "server_tool_use" {
+			return true
+		}
+	}
+	return false
+}
+
+// isContentBlockStop 检测事件是否为 content_block_stop
+func isContentBlockStop(event string) bool {
+	return strings.Contains(event, "content_block_stop")
+}
+
+// buildTruncationEndEvents 构建截断时注入的结束事件序列
+// 生成 message_delta(stop_reason=end_turn) + message_stop，让客户端认为模型正常结束
+func buildTruncationEndEvents(ctx *StreamContext) []string {
+	outputTokens := ctx.CollectedUsage.OutputTokens
+	if outputTokens <= 0 {
+		outputTokens = utils.EstimateTokens(ctx.OutputTextBuffer.String())
+	}
+
+	messageDelta := fmt.Sprintf("event: message_delta\ndata: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"end_turn\",\"stop_sequence\":null},\"usage\":{\"output_tokens\":%d}}\n\n", outputTokens)
+	messageStop := "event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n"
+
+	return []string{messageDelta, messageStop}
 }
 
 // HasStreamEventActivity 判断 SSE 事件是否包含可视为上游仍在输出的内容。
@@ -954,6 +1007,11 @@ type StreamContext struct {
 	MessageStartInputTokens int // message_start 事件中的 input_tokens（用于推断隐式缓存）
 	ResponseText            string
 	LogTag                  string
+	// 畸形工具调用缓冲（post-commit 阶段截断策略）
+	BufferingToolUse      bool     // 是否正在缓冲 tool_use block
+	ToolUseBuffer         []string // 缓冲的 tool_use block 事件
+	CommittedToolUseCount int      // 已透传给客户端的 tool_use block 数量
+	ToolUseTruncated      bool     // 是否已执行截断（注入 end_turn）
 }
 
 // CollectedUsageData 从流事件中收集的 usage 数据
@@ -1197,12 +1255,72 @@ func ProcessStreamEvent(
 		}
 	}
 
-	// 提取文本用于估算 token
+	// 如果已截断（注入了 end_turn），后续事件只消费不转发
+	if ctx.ToolUseTruncated {
+		// 仍需收集 usage 数据（下方正常路径会处理），但不转发给客户端
+		// 这里不 return 以便 usage 收集逻辑执行，但在转发处拦截
+	}
+
+	// 畸形工具调用检测
+	var malformedDetected bool
+	var malformedToolName string
 	if ctx.ToolCallTracker != nil {
-		if malformed, name := ctx.ToolCallTracker.ProcessClaudeEvent(event); malformed && envCfg.ShouldLog("info") {
-			RequestLogf(c, "[Messages-Stream-ToolCall] 检测到畸形工具调用: %s", name)
+		malformedDetected, malformedToolName = ctx.ToolCallTracker.ProcessClaudeEvent(event)
+		if malformedDetected && envCfg.ShouldLog("info") {
+			RequestLogf(c, "[Messages-Stream-ToolCall] 检测到畸形工具调用: %s", malformedToolName)
 		}
 	}
+
+	// 检测 tool_use block 开始：进入缓冲模式
+	if !ctx.ToolUseTruncated && isToolUseBlockStart(event) {
+		ctx.BufferingToolUse = true
+		ctx.ToolUseBuffer = []string{event}
+		// 仍需提取文本/usage，但不转发
+		ExtractTextFromEvent(event, &ctx.OutputTextBuffer)
+		ctx.ResponseText = ctx.OutputTextBuffer.String()
+		return
+	}
+
+	// 缓冲模式中：收集事件直到 content_block_stop
+	if ctx.BufferingToolUse && !ctx.ToolUseTruncated {
+		ctx.ToolUseBuffer = append(ctx.ToolUseBuffer, event)
+		ExtractTextFromEvent(event, &ctx.OutputTextBuffer)
+		ctx.ResponseText = ctx.OutputTextBuffer.String()
+
+		if isContentBlockStop(event) {
+			ctx.BufferingToolUse = false
+			if malformedDetected && ctx.CommittedToolUseCount == 0 {
+				// 畸形 + 尚无已透传的 tool_use → 截断：注入 end_turn 结束响应
+				ctx.ToolUseTruncated = true
+				RequestLogf(c, "[Messages-Stream-ToolCall] 截断畸形工具调用 %s，注入 end_turn 终止响应", malformedToolName)
+				if !ctx.ClientGone {
+					endEvents := buildTruncationEndEvents(ctx)
+					for _, ev := range endEvents {
+						w.Write([]byte(ev))
+					}
+					flusher.Flush()
+				}
+				ctx.HasMessageDeltaUsage = true // 防止后续注入 usage
+				return
+			}
+			// 正常或无法截断（已有已透传的 tool_use）：flush 缓冲事件
+			ctx.CommittedToolUseCount++
+			for _, buffered := range ctx.ToolUseBuffer {
+				if !ctx.ClientGone {
+					if _, err := w.Write([]byte(buffered)); err != nil {
+						ctx.ClientGone = true
+					}
+				}
+			}
+			if !ctx.ClientGone {
+				flusher.Flush()
+			}
+			ctx.ToolUseBuffer = nil
+			return
+		}
+		return
+	}
+
 	ExtractTextFromEvent(event, &ctx.OutputTextBuffer)
 	ctx.ResponseText = ctx.OutputTextBuffer.String()
 
@@ -1244,7 +1362,7 @@ func ProcessStreamEvent(
 	}
 
 	// 在 message_stop 前注入 usage（message_delta 未携带 usage 的兜底场景）
-	if !ctx.HasMessageDeltaUsage && !ctx.ClientGone && IsMessageStopEvent(event) {
+	if !ctx.HasMessageDeltaUsage && !ctx.ClientGone && !ctx.ToolUseTruncated && IsMessageStopEvent(event) {
 		usageEvent := BuildUsageEvent(requestBody, ctx.OutputTextBuffer.String())
 		if envCfg.EnableResponseLogs && envCfg.ShouldLog("debug") {
 			RequestLogf(c, "[Messages-Stream-Token] message_delta 缺少 usage, 在 message_stop 前注入兜底 usage 事件")
@@ -1359,8 +1477,8 @@ func ProcessStreamEvent(
 		ctx.HasMessageDeltaUsage = true
 	}
 
-	// 转发给客户端
-	if !ctx.ClientGone {
+	// 转发给客户端（已截断的流不再转发后续事件）
+	if !ctx.ClientGone && !ctx.ToolUseTruncated {
 		if _, err := w.Write([]byte(eventToSend)); err != nil {
 			ctx.ClientGone = true
 			if !IsClientDisconnectError(err) {
