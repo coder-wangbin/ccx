@@ -163,6 +163,7 @@ export class ProviderPlan {
 
 export class ProviderPreset {
     "id": string;
+    "order": number;
     "label": string;
     "description": string;
     "directAgent": boolean;
@@ -177,6 +178,9 @@ export class ProviderPreset {
     constructor($$source: Partial<ProviderPreset> = {}) {
         if (!("id" in $$source)) {
             this["id"] = "";
+        }
+        if (!("order" in $$source)) {
+            this["order"] = 0;
         }
         if (!("label" in $$source)) {
             this["label"] = "";
@@ -213,14 +217,14 @@ export class ProviderPreset {
      * Creates a new ProviderPreset instance from a string or object.
      */
     static createFrom($$source: any = {}): ProviderPreset {
-        const $$createField7_0 = $$createType1;
-        const $$createField8_0 = $$createType3;
+        const $$createField8_0 = $$createType1;
+        const $$createField9_0 = $$createType3;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("plans" in $$parsedSource) {
-            $$parsedSource["plans"] = $$createField7_0($$parsedSource["plans"]);
+            $$parsedSource["plans"] = $$createField8_0($$parsedSource["plans"]);
         }
         if ("targets" in $$parsedSource) {
-            $$parsedSource["targets"] = $$createField8_0($$parsedSource["targets"]);
+            $$parsedSource["targets"] = $$createField9_0($$parsedSource["targets"]);
         }
         return new ProviderPreset($$parsedSource as Partial<ProviderPreset>);
     }

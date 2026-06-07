@@ -149,6 +149,8 @@ export type MessageKey =
   | 'channel.preset.runapi.plan.anthropic.description'
   | 'channel.preset.runapi.plan.openai-chat.label'
   | 'channel.preset.runapi.plan.openai-chat.description'
+  | 'channel.preset.runapi.target.responses.plan.openai-chat.label'
+  | 'channel.preset.runapi.target.responses.plan.openai-chat.description'
   // Kimi plans
   | 'channel.preset.kimi.plan.anthropic.label'
   | 'channel.preset.kimi.plan.anthropic.description'
@@ -713,8 +715,8 @@ export const messages: Record<SupportedLocale, Messages> = {
     'channel.preset.deepseek.description': 'Messages native passthrough, Codex Responses, and Chat passthrough — three protocol support.',
     'channel.preset.mimo.label': 'MiMo',
     'channel.preset.mimo.description': 'Messages native passthrough, Codex Responses, and Chat passthrough; includes pay-as-you-go and Token Plan endpoints.',
-    'channel.preset.compshare.label': 'Compshare Plans',
-    'channel.preset.compshare.description': 'Standalone plan BaseURL and API Key, compatible with Anthropic Messages, OpenAI Chat, and Codex Responses.',
+    'channel.preset.compshare.label': 'Youyun Zhisuan Plans',
+    'channel.preset.compshare.description': "Youyun Zhisuan is UCloud's AI cloud platform, offering cost-effective domestic AI model Agent Plan packages by monthly subscription or pay-as-you-go, starting from 49 CNY/month. It also provides stable access to official overseas models, supports Claude Code, Codex, and API integrations, and offers enterprise-grade high concurrency, 24/7 technical support, and self-service invoicing. Users who register through the promotion link can receive a free 5 CNY platform trial credit.",
     'channel.preset.runapi.label': 'RunAPI',
     'channel.preset.runapi.description': "RunAPI is an efficient and stable API platform—an alternative to OpenRouter. A single API Key gives you access to 150+ leading models, including OpenAI, Claude, Gemini, DeepSeek, Grok, and more, at prices as low as 10% of the original (up to 90% off), with exceptional stability. It's seamlessly compatible with tools like Claude Code, OpenClaw, and others. RunAPI offers an exclusive perk for CCX users: register and contact an administrator to claim ¥7 in free credit.",
     'channel.preset.kimi.label': 'Kimi / Moonshot',
@@ -757,10 +759,12 @@ export const messages: Record<SupportedLocale, Messages> = {
     'channel.preset.compshare.plan.openai-chat.label': 'OpenAI-compatible',
     'channel.preset.compshare.plan.openai-chat.description': 'OpenAI Chat / Responses compatible endpoint',
     // RunAPI plans
-    'channel.preset.runapi.plan.anthropic.label': 'Messages-compatible',
+    'channel.preset.runapi.plan.anthropic.label': 'Anthropic-compatible',
     'channel.preset.runapi.plan.anthropic.description': 'Claude Messages native endpoint',
     'channel.preset.runapi.plan.openai-chat.label': 'OpenAI-compatible',
-    'channel.preset.runapi.plan.openai-chat.description': 'OpenAI Chat / Responses compatible endpoint',
+    'channel.preset.runapi.plan.openai-chat.description': 'OpenAI-compatible endpoint',
+    'channel.preset.runapi.target.responses.plan.openai-chat.label': 'Responses native',
+    'channel.preset.runapi.target.responses.plan.openai-chat.description': 'Native Responses endpoint for Codex',
     // Kimi plans
     'channel.preset.kimi.plan.anthropic.label': 'Anthropic-compatible',
     'channel.preset.kimi.plan.anthropic.description': 'Claude Messages native endpoint',
@@ -1323,7 +1327,7 @@ export const messages: Record<SupportedLocale, Messages> = {
     'channel.preset.mimo.label': 'MiMo',
     'channel.preset.mimo.description': 'Messages 原生透传、Codex Responses、Chat 渠道透传；内置按量与 token plan 入口。',
     'channel.preset.compshare.label': '优云智算套餐',
-    'channel.preset.compshare.description': '独立套餐 BaseURL 与 API Key，兼容 Anthropic Messages、OpenAI Chat 与 Codex Responses。',
+    'channel.preset.compshare.description': '优云智算是 UCloud 旗下 AI 云平台，提供高性价比国内 AI 模型 Agent Plan 套餐，支持包月订阅或按量付费（49 元/月起），同时提供官方海外模型稳定接入，支持 Claude Code、Codex 与 API 集成，具备企业级高并发、7×24 技术支持和自助开票能力；通过推广链接注册可领取 5 元平台试用金。',
     'channel.preset.runapi.label': 'RunAPI',
     'channel.preset.runapi.description': 'RunAPI 是高效稳定的API OpenRouter平替平台，一个 API Key 即可访问 OpenAI、Claude、Gemini、DeepSeek、Grok 等 150+ 主流模型，低至 1 折，极其稳定，可以无缝兼容 Claude Code、OpenClaw 等工具。RunAPI 为 CCX用户提供专属福利：注册联系管理员即可领取￥7的免费额度',
     'channel.preset.kimi.label': 'Kimi / Moonshot',
@@ -1366,10 +1370,12 @@ export const messages: Record<SupportedLocale, Messages> = {
     'channel.preset.compshare.plan.openai-chat.label': 'OpenAI-compatible',
     'channel.preset.compshare.plan.openai-chat.description': 'OpenAI Chat / Responses 兼容入口',
     // RunAPI plans
-    'channel.preset.runapi.plan.anthropic.label': 'Messages-compatible',
+    'channel.preset.runapi.plan.anthropic.label': 'Anthropic-compatible',
     'channel.preset.runapi.plan.anthropic.description': 'Claude Messages 原生入口',
     'channel.preset.runapi.plan.openai-chat.label': 'OpenAI-compatible',
-    'channel.preset.runapi.plan.openai-chat.description': 'OpenAI Chat / Responses 兼容入口',
+    'channel.preset.runapi.plan.openai-chat.description': 'OpenAI 兼容入口',
+    'channel.preset.runapi.target.responses.plan.openai-chat.label': 'Responses 原生',
+    'channel.preset.runapi.target.responses.plan.openai-chat.description': '面向 Codex 的 Responses 原生接口',
     // Kimi plans
     'channel.preset.kimi.plan.anthropic.label': 'Anthropic-compatible',
     'channel.preset.kimi.plan.anthropic.description': 'Claude Messages 原生入口',

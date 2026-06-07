@@ -40,27 +40,36 @@ const localError = ref('')
 
 onMounted(async () => {
   await loadChannelPresets()
-  if (!selectedProvider.value && sortedPresets.value.length > 0) {
-    selectedProvider.value = sortedPresets.value[0].id
+  if (!selectedProvider.value && orderedPresets.value.length > 0) {
+    selectedProvider.value = orderedPresets.value[0].id
   }
 })
 
-// 有保存 key 的 preset 排在前面，组内保持后端原始顺序
-const sortedPresets = computed(() => {
-  const withKey: ProviderPreset[] = []
-  const withoutKey: ProviderPreset[] = []
-  for (const preset of presets.value) {
-    if (keysByProvider.value[preset.id]) {
-      withKey.push(preset)
-    } else {
-      withoutKey.push(preset)
-    }
-  }
-  return [...withKey, ...withoutKey]
-})
+const presetOrder = [
+  'deepseek',
+  'mimo',
+  'compshare',
+  'runapi',
+  'kimi',
+  'glm',
+  'minimax',
+  'dashscope',
+  'opencode-zen',
+  'opencode-go',
+]
+const presetRank = new Map(presetOrder.map((id, index) => [id, index]))
+
+// 有 Key 的 provider 组整体提前；组内仍保持固定产品顺序，避免 Key 状态改变组内排序。
+const orderedPresets = computed(() =>
+  [...presets.value].sort((a, b) => {
+    const keyDiff = Number(!!keysByProvider.value[b.id]) - Number(!!keysByProvider.value[a.id])
+    if (keyDiff !== 0) return keyDiff
+    return (presetRank.get(a.id) ?? presetOrder.length) - (presetRank.get(b.id) ?? presetOrder.length)
+  }),
+)
 
 const currentPreset = computed(() => {
-  return sortedPresets.value.find((item) => item.id === selectedProvider.value) || null
+  return orderedPresets.value.find((item) => item.id === selectedProvider.value) || null
 })
 
 const localizePresetLabel = (preset: ProviderPreset) =>
@@ -69,11 +78,17 @@ const localizePresetLabel = (preset: ProviderPreset) =>
 const localizePresetDescription = (preset: ProviderPreset) =>
   tf(`channel.preset.${preset.id}.description`, preset.description)
 
-const localizePlanLabel = (preset: ProviderPreset, plan: ProviderPlan) =>
-  tf(`channel.preset.${preset.id}.plan.${plan.id}.label`, plan.label)
+const localizePlanLabel = (preset: ProviderPreset, plan: ProviderPlan) => {
+  const target = selectedTarget.value || preset.defaultTarget
+  const fallback = tf(`channel.preset.${preset.id}.plan.${plan.id}.label`, plan.label)
+  return tf(`channel.preset.${preset.id}.target.${target}.plan.${plan.id}.label`, fallback)
+}
 
-const localizePlanDescription = (preset: ProviderPreset, plan: ProviderPlan) =>
-  tf(`channel.preset.${preset.id}.plan.${plan.id}.description`, plan.description)
+const localizePlanDescription = (preset: ProviderPreset, plan: ProviderPlan) => {
+  const target = selectedTarget.value || preset.defaultTarget
+  const fallback = tf(`channel.preset.${preset.id}.plan.${plan.id}.description`, plan.description)
+  return tf(`channel.preset.${preset.id}.target.${target}.plan.${plan.id}.description`, fallback)
+}
 
 const localizeTargetLabel = (target: ChannelTarget) =>
   tf(`channel.target.${target.type}.label`, target.label)
@@ -100,7 +115,7 @@ const targetOptions = computed<ChannelTarget[]>(() => currentPreset.value?.targe
 // 切换左侧 provider 时重置表单；仅响应 selectedProvider 变化，
 // 避免 target 变化触发 loadChannelPresets 后因 presets 更新而级联重置 selectedTarget
 watch(selectedProvider, (id) => {
-  const preset = sortedPresets.value.find((item) => item.id === id)
+  const preset = orderedPresets.value.find((item) => item.id === id)
   if (!preset) return
   selectedTarget.value = preset.defaultTarget
   selectedPlan.value = bestPlanForTarget(preset, preset.defaultTarget)
@@ -216,15 +231,15 @@ const submit = async () => {
     </div>
 
     <div class="grid grid-cols-1 md:grid-cols-[280px_1fr] gap-4">
-      <div class="space-y-2">
+      <div class="space-y-1.5">
         <button
-          v-for="preset in sortedPresets"
+          v-for="preset in orderedPresets"
           :key="preset.id"
           :class="[
-            'w-full p-4 rounded-xl border text-left transition-all duration-200 bg-glass-hover',
+            'w-full h-[88px] p-4 rounded-xl border text-left transition-colors duration-200 overflow-hidden',
             selectedProvider === preset.id
-              ? 'border-primary/30 bg-primary/10 shadow-[0_0_18px_rgba(59,130,246,0.12)]'
-              : 'border-border bg-card/40 hover:border-border'
+              ? 'border-border bg-secondary/60 dark:border-white/10 dark:bg-white/[0.04]'
+              : 'border-border bg-card/40 hover:bg-card/70 dark:hover:bg-white/[0.03]'
           ]"
           @click="selectedProvider = preset.id"
         >

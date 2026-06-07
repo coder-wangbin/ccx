@@ -2,6 +2,8 @@
 
 ### 新增
 
+- **RunAPI 赞助商与桌面端直连预设** - 新增 RunAPI 赞助商展示、渠道中心预设与 Claude/Codex/OpenCode 直连配置，支持 Messages、Chat、Responses 三类目标
+- **流式 post-commit 阶段畸形工具调用截断策略** - 文本已输出后遇到畸形 `tool_use` 时缓冲并截断工具调用，注入 `end_turn` 与 `message_stop` 正常结束，避免客户端进入无效 `tool_result` 重试
 - **Responses 添加 tool_search 工具类型识别与兼容处理** - 新增 tool_search 工具类型的识别与兼容处理逻辑
 - **新增 stripImageGenerationTool 渠道开关** - 渠道配置新增 stripImageGenerationTool 开关，支持过滤图片生成工具
 - **桌面端同步 stripImageGenerationTool 渠道开关** - 桌面端编辑渠道界面同步支持 stripImageGenerationTool 开关
@@ -22,6 +24,8 @@
 
 ### 修复
 
+- **记录缓冲工具事件的原始流日志** - 修复 tool_use 缓冲期间原始 SSE 事件未写入响应日志的问题，确保工具开始、参数增量与结束事件可追踪
+- **渠道中心预设顺序与 RunAPI Responses 文案优化** - 保持后端预设顺序避免按 Key 分组导致列表跳位，并为 RunAPI Responses 目标显示原生 Responses 方案文案
 - **桌面端切换渠道时清除成功提示与错误状态** - 修复切换渠道时旧的成功提示和错误状态残留的问题
 - **修复三个疑似 bug (#162 #187 #188)** - 修复三个疑似 bug
 - **延长流式空闲超时限制** - 延长 stream idle timeout limits
@@ -54,6 +58,7 @@
 
 ### 测试
 
+- **补充 RunAPI 桌面端预设与 Agent 配置回归测试** - 覆盖 RunAPI Messages/Chat/Responses 渠道 payload、官网链接、Claude 状态识别与 Key 复用、Codex 快捷/插件模式、OpenCode 直连配置
 - **GPT 类渠道探测模型覆盖 codex-auto-review** - GPT 类渠道探测模型新增 codex-auto-review 覆盖
 - **覆盖无模型映射的协议转换测试组** - 新增无模型映射的协议转换测试组覆盖
 - **拆分 chat_to_responses 测试文件** - 拆分 converters chat_to_responses 测试文件

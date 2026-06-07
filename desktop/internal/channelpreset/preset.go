@@ -26,6 +26,7 @@ const (
 
 type ProviderPreset struct {
 	ID                  string          `json:"id"`
+	Order               int             `json:"order"`
 	Label               string          `json:"label"`
 	Description         string          `json:"description"`
 	DirectAgent         bool            `json:"directAgent"`
@@ -114,7 +115,7 @@ var providerConsoleURLs = map[string]string{
 	ProviderDeepSeek:    "https://platform.deepseek.com/usage",
 	ProviderMiMo:        "https://platform.xiaomimimo.com/console/balance",
 	ProviderCompshare:   "https://console.compshare.cn/light-gpu/model-manage",
-	ProviderRunAPI:      "https://runapi.co/register?aff=CqQO",
+	ProviderRunAPI:      "https://runapi.co/console",
 	ProviderKimi:        "https://platform.moonshot.cn/console/account",
 	ProviderGLM:         "https://open.bigmodel.cn/coding-plan/personal/overview",
 	ProviderMiniMax:     "https://platform.minimaxi.com/user-center/payment/balance",
@@ -127,6 +128,7 @@ func Presets() []ProviderPreset {
 	return []ProviderPreset{
 		{
 			ID:                  ProviderDeepSeek,
+			Order:               10,
 			Label:               "DeepSeek",
 			Description:         "Messages 原生透传、Codex Responses、Chat 渠道透传三种用法。",
 			DirectAgent:         true,
@@ -146,6 +148,7 @@ func Presets() []ProviderPreset {
 		},
 		{
 			ID:                  ProviderMiMo,
+			Order:               20,
 			Label:               "MiMo",
 			Description:         "Messages 原生透传、Codex Responses、Chat 渠道透传；内置按量与 token plan 入口。",
 			DirectAgent:         true,
@@ -171,8 +174,9 @@ func Presets() []ProviderPreset {
 		},
 		{
 			ID:                  ProviderCompshare,
-			Label:               "Compshare 套餐",
-			Description:         "独立套餐 BaseURL 与 API Key，兼容 Anthropic Messages、OpenAI Chat 与 Codex Responses。",
+			Order:               30,
+			Label:               "优云智算套餐",
+			Description:         "优云智算是 UCloud 旗下 AI 云平台，提供高性价比国内 AI 模型 Agent Plan 套餐，支持包月订阅或按量付费（49 元/月起），同时提供官方海外模型稳定接入，支持 Claude Code、Codex 与 API 集成，具备企业级高并发、7×24 技术支持和自助开票能力；通过推广链接注册可领取 5 元平台试用金。",
 			DirectAgent:         true,
 			NativeMessages:      true,
 			ChatCompatible:      true,
@@ -190,6 +194,7 @@ func Presets() []ProviderPreset {
 		},
 		{
 			ID:                  ProviderRunAPI,
+			Order:               40,
 			Label:               "RunAPI",
 			Description:         "RunAPI 是高效稳定的API OpenRouter平替平台，一个 API Key 即可访问 OpenAI、Claude、Gemini、DeepSeek、Grok 等 150+ 主流模型，低至 1 折，极其稳定，可以无缝兼容 Claude Code、OpenClaw 等工具。RunAPI 为 CCX用户提供专属福利：注册联系管理员即可领取￥7的免费额度",
 			DirectAgent:         true,
@@ -197,8 +202,8 @@ func Presets() []ProviderPreset {
 			ChatCompatible:      true,
 			ResponsesCompatible: true,
 			Plans: []ProviderPlan{
-				{ID: "anthropic", Label: "Messages-compatible", BaseURL: "https://runapi.co/v1", Description: "Claude Messages 原生入口", Recommended: true},
-				{ID: "openai-chat", Label: "OpenAI-compatible", BaseURL: "https://runapi.co/v1", Description: "OpenAI Chat / Responses 兼容入口"},
+				{ID: "anthropic", Label: "Anthropic-compatible", BaseURL: "https://runapi.co/v1", Description: "Claude Messages 原生入口", Recommended: true},
+				{ID: "openai-chat", Label: "OpenAI-compatible", BaseURL: "https://runapi.co/v1", Description: "OpenAI 兼容入口"},
 			},
 			Targets: []ChannelTarget{
 				{Type: TargetMessages, Label: "Messages 原生透传", Description: "Claude Code 直连或 CCX messages 渠道", Recommended: true},
@@ -209,6 +214,7 @@ func Presets() []ProviderPreset {
 		},
 		{
 			ID:                  ProviderKimi,
+			Order:               50,
 			Label:               "Kimi / Moonshot",
 			Description:         "Messages 原生透传、Codex Responses、Chat 渠道透传三种用法。",
 			DirectAgent:         true,
@@ -228,6 +234,7 @@ func Presets() []ProviderPreset {
 		},
 		{
 			ID:                  ProviderGLM,
+			Order:               60,
 			Label:               "GLM / BigModel",
 			Description:         "Messages 原生透传、Codex Responses、Chat 渠道透传三种用法。",
 			DirectAgent:         true,
@@ -248,6 +255,7 @@ func Presets() []ProviderPreset {
 		},
 		{
 			ID:                  ProviderMiniMax,
+			Order:               70,
 			Label:               "MiniMax",
 			Description:         "Messages 原生透传、Codex Responses、Chat 渠道透传三种用法。",
 			DirectAgent:         true,
@@ -267,6 +275,7 @@ func Presets() []ProviderPreset {
 		},
 		{
 			ID:                  ProviderDashScope,
+			Order:               80,
 			Label:               "阿里云 DashScope",
 			Description:         "Messages 原生透传、Codex Responses、Chat 渠道透传三种用法。",
 			DirectAgent:         true,
@@ -290,6 +299,7 @@ func Presets() []ProviderPreset {
 		},
 		{
 			ID:                  ProviderOpenCodeZen,
+			Order:               90,
 			Label:               "OpenCode Zen",
 			Description:         "按量付费精选模型网关，支持 Messages、Chat、Responses 三种协议。",
 			DirectAgent:         true,
@@ -309,6 +319,7 @@ func Presets() []ProviderPreset {
 		},
 		{
 			ID:                  ProviderOpenCodeGo,
+			Order:               100,
 			Label:               "OpenCode Go",
 			Description:         "低成本开源编程模型订阅服务（$5/月起），支持 Messages、Chat、Responses 三种协议。",
 			DirectAgent:         true,

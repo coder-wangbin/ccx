@@ -571,7 +571,7 @@ func TestBuildPayloadSetsRunAPIWebsite(t *testing.T) {
 	if err != nil {
 		t.Fatalf("BuildPayload() error = %v", err)
 	}
-	want := "https://runapi.co/register?aff=CqQO"
+	want := "https://runapi.co/console"
 	if got.Website != want {
 		t.Fatalf("Website = %q, want %q", got.Website, want)
 	}

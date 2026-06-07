@@ -54,9 +54,9 @@ export const presetMessages: Record<SupportedLocale, Record<string, string>> = {
       'Europe subscription plan (Anthropic endpoint)',
 
     // Compshare
-    'channel.preset.compshare.label': 'Compshare Plans',
+    'channel.preset.compshare.label': 'Youyun Zhisuan Plans',
     'channel.preset.compshare.description':
-      'Standalone plan BaseURL and API Key, compatible with Anthropic Messages, OpenAI Chat, and Codex Responses.',
+      "Youyun Zhisuan is UCloud's AI cloud platform, offering cost-effective domestic AI model Agent Plan packages by monthly subscription or pay-as-you-go, starting from 49 CNY/month. It also provides stable access to official overseas models, supports Claude Code, Codex, and API integrations, and offers enterprise-grade high concurrency, 24/7 technical support, and self-service invoicing. Users who register through the promotion link can receive a free 5 CNY platform trial credit.",
     'channel.preset.compshare.plan.anthropic.description': 'Claude Messages native endpoint',
     'channel.preset.compshare.plan.openai-chat.description':
       'OpenAI Chat / Responses-compatible endpoint',
@@ -67,7 +67,9 @@ export const presetMessages: Record<SupportedLocale, Record<string, string>> = {
       "RunAPI is an efficient and stable API platform—an alternative to OpenRouter. A single API Key gives you access to 150+ leading models, including OpenAI, Claude, Gemini, DeepSeek, Grok, and more, at prices as low as 10% of the original (up to 90% off), with exceptional stability. It's seamlessly compatible with tools like Claude Code, OpenClaw, and others. RunAPI offers an exclusive perk for CCX users: register and contact an administrator to claim ¥7 in free credit.",
     'channel.preset.runapi.plan.anthropic.description': 'Claude Messages native endpoint',
     'channel.preset.runapi.plan.openai-chat.description':
-      'OpenAI Chat / Responses-compatible endpoint',
+      'OpenAI-compatible endpoint',
+    'channel.preset.runapi.target.responses.plan.openai-chat.label': 'Responses native',
+    'channel.preset.runapi.target.responses.plan.openai-chat.description': 'Native Responses endpoint for Codex',
 
     // Kimi
     'channel.preset.kimi.description':

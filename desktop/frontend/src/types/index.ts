@@ -90,6 +90,7 @@ export type ChannelTarget = {
 
 export type ProviderPreset = {
   id: string
+  order?: number
   label: string
   description: string
   directAgent: boolean
