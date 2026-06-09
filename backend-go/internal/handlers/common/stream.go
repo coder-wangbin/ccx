@@ -685,10 +685,9 @@ func hasNonTextContentBlock(event string) bool {
 	return HasClaudeSemanticContent(event)
 }
 
-// isToolUseBlockStart 检测事件是否为 content_block_start type=tool_use 或 server_tool_use
-func isToolUseBlockStart(event string) bool {
+func toolUseBlockStartIndex(event string) (int, bool) {
 	if !strings.Contains(event, "content_block_start") {
-		return false
+		return 0, false
 	}
 	for _, line := range strings.Split(event, "\n") {
 		jsonStr, ok := extractSSEJSONLine(line)
@@ -702,21 +701,43 @@ func isToolUseBlockStart(event string) bool {
 		if data["type"] != "content_block_start" {
 			continue
 		}
+		index := 0
+		if idx, ok := data["index"].(float64); ok {
+			index = int(idx)
+		}
 		cb, ok := data["content_block"].(map[string]interface{})
 		if !ok {
 			continue
 		}
 		cbType, _ := cb["type"].(string)
 		if cbType == "tool_use" || cbType == "server_tool_use" {
-			return true
+			return index, true
 		}
 	}
-	return false
+	return 0, false
 }
 
-// isContentBlockStop 检测事件是否为 content_block_stop
-func isContentBlockStop(event string) bool {
-	return strings.Contains(event, "content_block_stop")
+func contentBlockEventIndex(event string) (string, int, bool) {
+	for _, line := range strings.Split(event, "\n") {
+		jsonStr, ok := extractSSEJSONLine(line)
+		if !ok {
+			continue
+		}
+		var data map[string]interface{}
+		if err := json.Unmarshal([]byte(jsonStr), &data); err != nil {
+			continue
+		}
+		eventType, _ := data["type"].(string)
+		if eventType != "content_block_delta" && eventType != "content_block_stop" {
+			continue
+		}
+		index := 0
+		if idx, ok := data["index"].(float64); ok {
+			index = int(idx)
+		}
+		return eventType, index, true
+	}
+	return "", 0, false
 }
 
 // buildTruncationEndEvents 构建截断时注入的结束事件序列
@@ -731,6 +752,115 @@ func buildTruncationEndEvents(ctx *StreamContext) []string {
 	messageStop := "event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n"
 
 	return []string{messageDelta, messageStop}
+}
+
+func handleToolUseBufferEvent(
+	c *gin.Context,
+	w gin.ResponseWriter,
+	flusher http.Flusher,
+	event string,
+	ctx *StreamContext,
+	malformedDetected bool,
+	malformedToolName string,
+) bool {
+	if ctx == nil || ctx.ToolUseTruncated {
+		return false
+	}
+
+	if index, ok := toolUseBlockStartIndex(event); ok {
+		if ctx.ToolUseBuffers == nil {
+			ctx.ToolUseBuffers = make(map[int]*ToolUseBlockBuffer)
+		}
+		buffer := ctx.ToolUseBuffers[index]
+		if buffer == nil {
+			buffer = &ToolUseBlockBuffer{Index: index}
+			ctx.ToolUseBuffers[index] = buffer
+			ctx.ToolUseBufferOrder = append(ctx.ToolUseBufferOrder, index)
+		}
+		buffer.Events = append(buffer.Events, event)
+		return true
+	}
+
+	eventType, index, ok := contentBlockEventIndex(event)
+	if !ok || ctx.ToolUseBuffers == nil {
+		return false
+	}
+	buffer := ctx.ToolUseBuffers[index]
+	if buffer == nil {
+		return false
+	}
+
+	buffer.Events = append(buffer.Events, event)
+	if eventType == "content_block_stop" {
+		buffer.Closed = true
+		buffer.Malformed = malformedDetected
+		buffer.MalformedToolName = malformedToolName
+		flushClosedToolUseBuffers(c, w, flusher, ctx)
+	}
+	return true
+}
+
+func flushClosedToolUseBuffers(c *gin.Context, w gin.ResponseWriter, flusher http.Flusher, ctx *StreamContext) {
+	if ctx == nil || ctx.ToolUseTruncated {
+		return
+	}
+
+	wrote := false
+	for len(ctx.ToolUseBufferOrder) > 0 {
+		index := ctx.ToolUseBufferOrder[0]
+		buffer := ctx.ToolUseBuffers[index]
+		if buffer == nil {
+			ctx.ToolUseBufferOrder = ctx.ToolUseBufferOrder[1:]
+			continue
+		}
+		if !buffer.Closed {
+			break
+		}
+
+		if buffer.Malformed && ctx.CommittedToolUseCount == 0 {
+			// 畸形 + 尚无已透传的 tool_use → 截断：注入 end_turn 结束响应
+			ctx.ToolUseTruncated = true
+			toolName := buffer.MalformedToolName
+			if toolName == "" {
+				toolName = "unknown_tool"
+			}
+			RequestLogf(c, "[Messages-Stream-ToolCall] 截断畸形工具调用 %s，注入 end_turn 终止响应", toolName)
+			if !ctx.ClientGone {
+				endEvents := buildTruncationEndEvents(ctx)
+				for _, ev := range endEvents {
+					if _, err := w.Write([]byte(ev)); err != nil {
+						ctx.ClientGone = true
+						break
+					}
+				}
+				if !ctx.ClientGone {
+					flusher.Flush()
+				}
+			}
+			ctx.HasMessageDeltaUsage = true // 防止后续注入 usage
+			ctx.ToolUseBuffers = nil
+			ctx.ToolUseBufferOrder = nil
+			return
+		}
+
+		ctx.CommittedToolUseCount++
+		for _, buffered := range buffer.Events {
+			if ctx.ClientGone {
+				break
+			}
+			if _, err := w.Write([]byte(buffered)); err != nil {
+				ctx.ClientGone = true
+				break
+			}
+		}
+		wrote = true
+		delete(ctx.ToolUseBuffers, index)
+		ctx.ToolUseBufferOrder = ctx.ToolUseBufferOrder[1:]
+	}
+
+	if wrote && !ctx.ClientGone {
+		flusher.Flush()
+	}
 }
 
 // HasStreamEventActivity 判断 SSE 事件是否包含可视为上游仍在输出的内容。
@@ -985,6 +1115,14 @@ func drainChannels(eventChan <-chan string, errChan <-chan error) {
 	}()
 }
 
+type ToolUseBlockBuffer struct {
+	Index             int
+	Events            []string
+	Closed            bool
+	Malformed         bool
+	MalformedToolName string
+}
+
 // StreamContext 流处理上下文
 type StreamContext struct {
 	LogBuffer            *LimitedLogBuffer
@@ -1014,10 +1152,10 @@ type StreamContext struct {
 	ResponseText            string
 	LogTag                  string
 	// 畸形工具调用缓冲（post-commit 阶段截断策略）
-	BufferingToolUse      bool     // 是否正在缓冲 tool_use block
-	ToolUseBuffer         []string // 缓冲的 tool_use block 事件
-	CommittedToolUseCount int      // 已透传给客户端的 tool_use block 数量
-	ToolUseTruncated      bool     // 是否已执行截断（注入 end_turn）
+	ToolUseBuffers        map[int]*ToolUseBlockBuffer // 按 content_block index 缓冲 tool_use 事件
+	ToolUseBufferOrder    []int                       // tool_use block 的开始顺序，用于正规化重叠块
+	CommittedToolUseCount int                         // 已透传给客户端的 tool_use block 数量
+	ToolUseTruncated      bool                        // 是否已执行截断（注入 end_turn）
 }
 
 // CollectedUsageData 从流事件中收集的 usage 数据
@@ -1293,53 +1431,9 @@ func ProcessStreamEvent(
 		}
 	}
 
-	// 检测 tool_use block 开始：进入缓冲模式
-	if !ctx.ToolUseTruncated && isToolUseBlockStart(event) {
-		ctx.BufferingToolUse = true
-		ctx.ToolUseBuffer = []string{event}
-		// 仍需提取文本/usage，但不转发
+	if handleToolUseBufferEvent(c, w, flusher, event, ctx, malformedDetected, malformedToolName) {
 		ExtractTextFromEvent(event, &ctx.OutputTextBuffer)
 		ctx.ResponseText = ctx.OutputTextBuffer.String()
-		return
-	}
-
-	// 缓冲模式中：收集事件直到 content_block_stop
-	if ctx.BufferingToolUse && !ctx.ToolUseTruncated {
-		ctx.ToolUseBuffer = append(ctx.ToolUseBuffer, event)
-		ExtractTextFromEvent(event, &ctx.OutputTextBuffer)
-		ctx.ResponseText = ctx.OutputTextBuffer.String()
-
-		if isContentBlockStop(event) {
-			ctx.BufferingToolUse = false
-			if malformedDetected && ctx.CommittedToolUseCount == 0 {
-				// 畸形 + 尚无已透传的 tool_use → 截断：注入 end_turn 结束响应
-				ctx.ToolUseTruncated = true
-				RequestLogf(c, "[Messages-Stream-ToolCall] 截断畸形工具调用 %s，注入 end_turn 终止响应", malformedToolName)
-				if !ctx.ClientGone {
-					endEvents := buildTruncationEndEvents(ctx)
-					for _, ev := range endEvents {
-						w.Write([]byte(ev))
-					}
-					flusher.Flush()
-				}
-				ctx.HasMessageDeltaUsage = true // 防止后续注入 usage
-				return
-			}
-			// 正常或无法截断（已有已透传的 tool_use）：flush 缓冲事件
-			ctx.CommittedToolUseCount++
-			for _, buffered := range ctx.ToolUseBuffer {
-				if !ctx.ClientGone {
-					if _, err := w.Write([]byte(buffered)); err != nil {
-						ctx.ClientGone = true
-					}
-				}
-			}
-			if !ctx.ClientGone {
-				flusher.Flush()
-			}
-			ctx.ToolUseBuffer = nil
-			return
-		}
 		return
 	}
 

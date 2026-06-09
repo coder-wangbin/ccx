@@ -1265,6 +1265,56 @@ func TestProcessStreamEvent_FlushesValidToolUse(t *testing.T) {
 	}
 }
 
+func TestProcessStreamEvent_FlushesOverlappingToolUseBlocksSequentially(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	envCfg := &config.EnvConfig{}
+	ctx := NewStreamContext(envCfg)
+
+	agentStart := "event: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":2,\"content_block\":{\"type\":\"tool_use\",\"id\":\"toolu_agent\",\"name\":\"Agent\",\"input\":{}}}\n\n"
+	agentDelta := "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":2,\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\"{\\\"description\\\":\\\"agent command\\\"}\"}}\n\n"
+	mcpStart := "event: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":3,\"content_block\":{\"type\":\"tool_use\",\"id\":\"toolu_mcp\",\"name\":\"mcp__serena__initial_instructions\",\"input\":{}}}\n\n"
+	mcpDelta := "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":3,\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\"{}\"}}\n\n"
+	agentStop := "event: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":2}\n\n"
+	mcpStop := "event: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":3}\n\n"
+
+	ProcessStreamEvent(c, c.Writer, nopFlusher{}, agentStart, ctx, envCfg, nil)
+	ProcessStreamEvent(c, c.Writer, nopFlusher{}, agentDelta, ctx, envCfg, nil)
+	ProcessStreamEvent(c, c.Writer, nopFlusher{}, mcpStart, ctx, envCfg, nil)
+	ProcessStreamEvent(c, c.Writer, nopFlusher{}, mcpDelta, ctx, envCfg, nil)
+	ProcessStreamEvent(c, c.Writer, nopFlusher{}, agentStop, ctx, envCfg, nil)
+	ProcessStreamEvent(c, c.Writer, nopFlusher{}, mcpStop, ctx, envCfg, nil)
+
+	if ctx.ToolUseTruncated {
+		t.Fatalf("overlapping valid tool_use blocks should not trigger truncation")
+	}
+	if ctx.CommittedToolUseCount != 2 {
+		t.Fatalf("expected 2 committed tool uses, got %d", ctx.CommittedToolUseCount)
+	}
+
+	body := rec.Body.String()
+	orderedTokens := []string{
+		"toolu_agent",
+		"agent command",
+		"{\"type\":\"content_block_stop\",\"index\":2}",
+		"toolu_mcp",
+		"mcp__serena__initial_instructions",
+		"{\"type\":\"content_block_stop\",\"index\":3}",
+	}
+	previous := -1
+	for _, token := range orderedTokens {
+		position := strings.Index(body, token)
+		if position < 0 {
+			t.Fatalf("expected forwarded body to include %q, got: %s", token, body)
+		}
+		if position <= previous {
+			t.Fatalf("expected %q to appear after previous token, got body: %s", token, body)
+		}
+		previous = position
+	}
+}
+
 func TestProcessStreamEvent_LogsBufferedToolUseEvents(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	rec := httptest.NewRecorder()
