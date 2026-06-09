@@ -10,7 +10,7 @@
             {{ isEditing ? t('addChannel.editTitle') : t('addChannel.createTitle') }}
           </div>
           <div class="modal-subtitle" :class="subtitleClasses">
-            {{ isEditing ? t('addChannel.editSubtitle') : isQuickMode ? t('addChannel.quickSubtitle') : t('addChannel.fullSubtitle') }}
+            {{ isEditing ? t('addChannel.editSubtitle') : t('addChannel.quickSubtitle') }}
           </div>
         </div>
         <div v-if="isEditing && props.channelType !== 'images'" class="header-capability-actions">
@@ -41,16 +41,11 @@
             {{ t('addChannel.testCapability') }}
           </v-btn>
         </div>
-        <!-- 模式切换按钮（仅在添加模式显示） -->
-        <v-btn v-if="!isEditing" variant="outlined" size="small" class="mode-toggle-btn" @click="toggleMode">
-          <v-icon start size="16">{{ isQuickMode ? 'mdi-form-textbox' : 'mdi-lightning-bolt' }}</v-icon>
-          {{ isQuickMode ? t('addChannel.detailedMode') : t('addChannel.quickMode') }}
-        </v-btn>
       </v-card-title>
 
       <v-card-text class="pa-6">
         <!-- 快速添加模式 -->
-        <div v-if="!isEditing && isQuickMode">
+        <div v-if="!isEditing">
           <v-textarea
             v-model="quickInput"
             :label="t('addChannel.quickInputLabel')"
@@ -1329,7 +1324,7 @@
         <v-spacer />
         <v-btn variant="text" @click="handleCancel"> {{ t('app.actions.cancel') }} </v-btn>
         <v-btn
-          v-if="!isEditing && isQuickMode"
+          v-if="!isEditing"
           color="primary"
           variant="elevated"
           :disabled="!isQuickFormValid"
@@ -1404,9 +1399,6 @@ const theme = useTheme()
 // 表单引用
 const formRef = ref()
 
-// 模式切换: 快速添加 vs 详细表单
-const isQuickMode = ref(true)
-
 // 快速添加模式的数据
 const quickInput = ref('')
 const detectedBaseUrl = ref('')
@@ -1422,32 +1414,6 @@ const getImagesServiceType = (_serviceType: 'openai' | 'gemini' | 'claude' | 're
 // 详细表单预期请求 URL 预览（防止输入时抖动）
 const formBaseUrlPreview = ref('')
 let formBaseUrlPreviewTimer: number | null = null
-
-// 切换模式时，将快速模式检测到的值同步到详细表单，但不清空快速模式输入
-const toggleMode = () => {
-  if (isQuickMode.value) {
-    const effectiveServiceType = props.channelType === 'images'
-      ? getImagesServiceType(detectedServiceType.value)
-      : (detectedServiceType.value || getDefaultServiceTypeValue())
-    const sourceUrls = detectedRawBaseUrls.value.length > 0
-      ? detectedRawBaseUrls.value.join('\n')
-      : (detectedBaseUrl.value || '')
-
-    const { baseUrl, baseUrls } = syncBaseUrlsFormState(sourceUrls, effectiveServiceType)
-    form.baseUrl = baseUrl
-    form.baseUrls = baseUrls
-    baseUrlsText.value = sourceUrls
-    if (detectedApiKeys.value.length > 0) {
-      form.apiKeys = [...detectedApiKeys.value]
-    }
-    if (generatedChannelName.value) {
-      form.name = generatedChannelName.value
-    }
-    form.serviceType = effectiveServiceType
-  }
-  // 切换回快速模式时不做任何清理，保留 quickInput 原有内容
-  isQuickMode.value = !isQuickMode.value
-}
 
 // 解析快速输入内容
 const parseQuickInput = () => {
@@ -3251,12 +3217,10 @@ watch(
       localRestoredKeys.value = new Set<string>()
 
       if (dialogMode.value === 'edit' && props.channel) {
-        // 编辑模式：使用表单模式
-        isQuickMode.value = false
+        // 编辑模式：使用完整表单
         loadChannelData(props.channel)
       } else {
-        // 添加模式：默认使用快速模式
-        isQuickMode.value = true
+        // 添加模式：固定使用快速添加
         resetForm()
       }
     }
@@ -3274,14 +3238,12 @@ watch(
 
     if (action === 'load-edit-channel' && newChannel) {
       dialogMode.value = 'edit'
-      isQuickMode.value = false
       loadChannelData(newChannel)
       return
     }
 
     if (action === 'reset-new-form') {
       dialogMode.value = 'create'
-      isQuickMode.value = true
       resetForm()
     }
   }
@@ -3437,19 +3399,6 @@ onUnmounted(() => {
 
 .base-url-item + .base-url-item {
   margin-top: 4px;
-}
-
-.mode-toggle-btn {
-  text-transform: none;
-  font-size: 0.8125rem;
-  font-weight: 600;
-  letter-spacing: 0;
-  padding-inline: 12px;
-}
-
-.mode-toggle-btn :deep(.v-btn__content) {
-  gap: 4px;
-  line-height: 1.5;
 }
 
 .capability-test-btn {
