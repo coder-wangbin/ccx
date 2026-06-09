@@ -139,6 +139,7 @@ watch(selectedProvider, (id) => {
 // 若当前 plan 被协议过滤掉，尝试切换同区域的协议变体（如 token-cn ↔ token-cn-anthropic）
 watch(selectedTarget, async (target) => {
   if (!target) return
+  result.value = null
   const prevPlan = selectedPlan.value
   await loadChannelPresets(target)
   const preset = currentPreset.value
