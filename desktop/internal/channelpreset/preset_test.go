@@ -359,6 +359,43 @@ func TestBuildPayload(t *testing.T) {
 			wantStripCodex: true,
 			wantModelMap:   map[string]string{"codex": "glm-5.1", "gpt": "glm-5.1"},
 		},
+		{
+			name:         "volc-ark messages (anthropic endpoint)",
+			req:          CreateChannelRequest{Provider: ProviderVolcArk, Target: TargetMessages, APIKey: "ark-test"},
+			wantBaseURL:  "https://ark.cn-beijing.volces.com/api/coding#",
+			wantService:  "claude",
+			wantPassback: true,
+			wantModelMap: map[string]string{
+				"fable":  "minimax-m3",
+				"haiku":  "deepseek-v4-flash",
+				"opus":   "minimax-m3",
+				"sonnet": "minimax-m3",
+			},
+			wantNoVisionModels: []string{"deepseek-v4-flash"},
+			wantFallback:       "minimax-m2.7",
+		},
+		{
+			name:          "volc-ark chat",
+			req:           CreateChannelRequest{Provider: ProviderVolcArk, Target: TargetChat, APIKey: "ark-test"},
+			wantBaseURL:   "https://ark.cn-beijing.volces.com/api/coding/v3",
+			wantService:   "openai",
+			wantNormalize: true,
+		},
+		{
+			name:        "volc-ark responses",
+			req:         CreateChannelRequest{Provider: ProviderVolcArk, Target: TargetResponses, APIKey: "ark-test"},
+			wantBaseURL: "https://ark.cn-beijing.volces.com/api/coding/v3",
+			wantService: "openai",
+			wantModelMap: map[string]string{
+				"codex": "deepseek-v4-flash",
+				"gpt":   "minimax-m3",
+				"mini":  "deepseek-v4-flash",
+			},
+			wantNormalize:      true,
+			wantNativeTool:     true,
+			wantNoVisionModels: []string{"deepseek-v4-flash"},
+			wantFallback:       "minimax-m2.7",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

@@ -388,7 +388,7 @@ func Presets() []ProviderPreset {
 			ChatCompatible:      true,
 			ResponsesCompatible: true,
 			Plans: []ProviderPlan{
-				{ID: "anthropic", Label: "Anthropic-compatible", BaseURL: "https://ark.cn-beijing.volces.com/api/coding", Description: "Claude Messages 原生入口", Recommended: true},
+				{ID: "anthropic", Label: "Anthropic-compatible", BaseURL: "https://ark.cn-beijing.volces.com/api/coding#", Description: "Claude Messages 原生入口", Recommended: true},
 				{ID: "openai-chat", Label: "OpenAI-compatible", BaseURL: "https://ark.cn-beijing.volces.com/api/coding/v3", Description: "Chat / Responses 通用入口"},
 			},
 			Targets: []ChannelTarget{
@@ -753,6 +753,18 @@ var channelTargetConfigs = map[string]map[string]channelTargetConfig{
 			NoVisionModels:      []string{"deepseek-ai/DeepSeek-V4-Flash"},
 			VisionFallbackModel: "MiniMax/MiniMax-M2.7",
 		},
+		ProviderVolcArk: {
+			ModelMapping: map[string]string{
+				"fable":  "minimax-m3",
+				"haiku":  "deepseek-v4-flash",
+				"opus":   "minimax-m3",
+				"sonnet": "minimax-m3",
+			},
+			PassbackReasoningContent: true,
+			PassbackThinkingBlocks:   true,
+			NoVisionModels:           []string{"deepseek-v4-flash"},
+			VisionFallbackModel:      "minimax-m2.7",
+		},
 	},
 	TargetChat: {
 		ProviderDeepSeek: {
@@ -779,6 +791,9 @@ var channelTargetConfigs = map[string]map[string]channelTargetConfig{
 		ProviderDashScope:   {},
 		ProviderOpenCodeZen: {},
 		ProviderOpenCodeGo:  {},
+		ProviderVolcArk: {
+			NormalizeNonstandardChatRoles: true,
+		},
 	},
 	TargetResponses: {
 		ProviderDeepSeek: {
@@ -864,6 +879,19 @@ var channelTargetConfigs = map[string]map[string]channelTargetConfig{
 			CodexToolCompat:               boolRef(false),
 			StripCodexClientTools:         boolRef(false),
 			NormalizeNonstandardChatRoles: true,
+		},
+		ProviderVolcArk: {
+			ModelMapping: map[string]string{
+				"codex": "deepseek-v4-flash",
+				"gpt":   "minimax-m3",
+				"mini":  "deepseek-v4-flash",
+			},
+			CodexToolCompat:               boolRef(false),
+			StripCodexClientTools:         boolRef(false),
+			CodexNativeToolPassthrough:    true,
+			NormalizeNonstandardChatRoles: true,
+			NoVisionModels:                []string{"deepseek-v4-flash"},
+			VisionFallbackModel:           "minimax-m2.7",
 		},
 	},
 }
