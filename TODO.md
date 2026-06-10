@@ -119,7 +119,9 @@ Web 端与后端已支持渠道级「去除 image_generation 工具」开关（R
 - `cd frontend && bun run type-check && bun run test && bun run build` ✅
 - `cd desktop/frontend && bun run type-check && bun run test && bun run build` ✅（构建通过，Rolldown 对 `@vueuse/core` 的 `/* #__PURE__ */` 给出上游依赖 warning，不影响产物生成）
 
-## 上游版本变更
+---
+
+> **上游版本变更**
 
 ## [ ] Claude Code v2.1.169 上游协议/工具变更评估
 
