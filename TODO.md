@@ -27,9 +27,20 @@
 
 ---
 
-## [ ] OpenRouter 免费路由工具调用失败
+## [x] OpenRouter 免费路由工具调用失败
 
 使用 OpenRouter 的免费路由（free routing）时，工具调用（tool call）会报失败。需要排查 OpenRouter 免费层对 tool_use 请求的处理差异，确认是否为上游限制或协议转换问题，并给出相应修复或降级提示。
+
+**排查结论：上游平台限制，非 CCX Bug。**
+
+OpenRouter `:free` 变体模型被路由到受限 provider 池，这些 provider 频繁不支持原生 API 级别的 tool calling / tool_choice。请求携带 `tools` 参数时，路由器按 tool-use 支持能力过滤 endpoint，免费池中往往无符合条件的 endpoint，返回 404：`No endpoints found that support the provided tool_choice value.`。CCX 协议转换链路（Claude ↔ OpenAI ↔ Responses ↔ Gemini）完整且测试覆盖充分，不存在转换 Bug。
+
+参考：goose#3054（确认是 OpenRouter 限制而非 Bug，已关闭）、claude-task-master#696（free endpoint 不暴露 tool_use 能力）。
+
+**可选改进（未实施）：**
+1. 用户教育：渠道预设描述标注免费模型 tool_use 限制
+2. 错误识别与降级提示：识别 OpenRouter tool_use 404 错误，返回友好中文提示
+3. Prompt-based 降级回退（不建议：实现复杂且可靠性差）
 
 ## [ ] 火山 coding plan 模型列表与功能 Bug (#204)
 
