@@ -682,6 +682,7 @@ import UserGuideDialog from './components/UserGuideDialog.vue'
 // 异步加载图表组件，减少首屏 JS 体积
 const GlobalStatsChart = defineAsyncComponent(() => import('./components/GlobalStatsChart.vue'))
 import { useAppTheme } from './composables/useTheme'
+import { streamTimeoutPresets as sharedStreamPresets } from './utils/streamTimeoutPresets'
 
 // 路由
 const route = useRoute()
@@ -1761,10 +1762,10 @@ const cbForm = reactive({
 
 // 工具调用 idle 预设按低速 5 TPS 粗估：60/120/300s 分别预留约 300/600/1500 token 的参数生成窗口。
 const cbPresets = [
-  { key: 'gentle', labelKey: 'dialog.circuitBreaker.presetGentle' as const, windowSize: 20, failureThreshold: 0.70, consecutiveFailuresThreshold: 5, streamFirstContentTimeoutMs: 90000, streamInactivityTimeoutMs: 90000, streamToolCallIdleTimeoutMs: 300000 },
-  { key: 'balanced', labelKey: 'dialog.circuitBreaker.presetBalanced' as const, windowSize: 10, failureThreshold: 0.50, consecutiveFailuresThreshold: 3, streamFirstContentTimeoutMs: 60000, streamInactivityTimeoutMs: 60000, streamToolCallIdleTimeoutMs: 180000 },
-  { key: 'aggressive', labelKey: 'dialog.circuitBreaker.presetAggressive' as const, windowSize: 5, failureThreshold: 0.30, consecutiveFailuresThreshold: 2, streamFirstContentTimeoutMs: 30000, streamInactivityTimeoutMs: 30000, streamToolCallIdleTimeoutMs: 60000 },
-  { key: 'custom', labelKey: 'dialog.circuitBreaker.presetCustom' as const, windowSize: 10, failureThreshold: 0.50, consecutiveFailuresThreshold: 3, streamFirstContentTimeoutMs: 60000, streamInactivityTimeoutMs: 60000, streamToolCallIdleTimeoutMs: 180000 },
+  { key: 'gentle', labelKey: 'dialog.circuitBreaker.presetGentle' as const, windowSize: 20, failureThreshold: 0.70, consecutiveFailuresThreshold: 5, streamFirstContentTimeoutMs: sharedStreamPresets.gentle.firstContentMs, streamInactivityTimeoutMs: sharedStreamPresets.gentle.inactivityMs, streamToolCallIdleTimeoutMs: sharedStreamPresets.gentle.toolCallIdleMs },
+  { key: 'balanced', labelKey: 'dialog.circuitBreaker.presetBalanced' as const, windowSize: 10, failureThreshold: 0.50, consecutiveFailuresThreshold: 3, streamFirstContentTimeoutMs: sharedStreamPresets.balanced.firstContentMs, streamInactivityTimeoutMs: sharedStreamPresets.balanced.inactivityMs, streamToolCallIdleTimeoutMs: sharedStreamPresets.balanced.toolCallIdleMs },
+  { key: 'aggressive', labelKey: 'dialog.circuitBreaker.presetAggressive' as const, windowSize: 5, failureThreshold: 0.30, consecutiveFailuresThreshold: 2, streamFirstContentTimeoutMs: sharedStreamPresets.aggressive.firstContentMs, streamInactivityTimeoutMs: sharedStreamPresets.aggressive.inactivityMs, streamToolCallIdleTimeoutMs: sharedStreamPresets.aggressive.toolCallIdleMs },
+  { key: 'custom', labelKey: 'dialog.circuitBreaker.presetCustom' as const, windowSize: 10, failureThreshold: 0.50, consecutiveFailuresThreshold: 3, streamFirstContentTimeoutMs: sharedStreamPresets.balanced.firstContentMs, streamInactivityTimeoutMs: sharedStreamPresets.balanced.inactivityMs, streamToolCallIdleTimeoutMs: sharedStreamPresets.balanced.toolCallIdleMs },
 ]
 
 const matchPreset = () => {

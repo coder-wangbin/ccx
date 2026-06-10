@@ -1370,6 +1370,7 @@ import {
   filterValidSupportedModelPatterns,
   parseSupportedModelInput
 } from '../utils/add-channel-modal-state'
+import { streamTimeoutPresets } from '../utils/streamTimeoutPresets'
 import { useI18n } from '../i18n'
 
 interface Props {
@@ -2119,29 +2120,10 @@ const sortModelNamesDesc = (models: string[]): string[] => {
   })
 }
 
-// 表单数据
-const defaultStreamTimeouts = {
-  firstContentMs: 30000,
-  inactivityMs: 20000,
-  toolCallIdleMs: 120000,
-} as const
+// 表单数据：balanced 预设值作为渠道级默认回退值
+const defaultStreamTimeouts = { ...streamTimeoutPresets.balanced }
 
-// 工具调用 idle 预设按低速 5 TPS 粗估：60/120/300s 分别预留约 300/600/1500 token 的参数生成窗口。
-const streamTimeoutPresets = {
-  gentle: {
-    firstContentMs: 60000,
-    inactivityMs: 45000,
-    toolCallIdleMs: 300000,
-  },
-  balanced: defaultStreamTimeouts,
-  aggressive: {
-    firstContentMs: 15000,
-    inactivityMs: 10000,
-    toolCallIdleMs: 60000,
-  },
-} as const
-
-type StreamTimeoutPresetKey = keyof typeof streamTimeoutPresets
+type StreamTimeoutPresetKey = 'gentle' | 'balanced' | 'aggressive' | 'custom'
 
 const form = reactive({
   name: '',
@@ -2399,7 +2381,7 @@ const selectedStreamTimeoutStrategy = computed(() => {
   if (!form.streamFirstContentTimeoutEnabled && !form.streamInactivityTimeoutEnabled && !form.streamToolCallIdleTimeoutEnabled) {
     return 'inherit'
   }
-  for (const [key, preset] of Object.entries(streamTimeoutPresets) as Array<[StreamTimeoutPresetKey, typeof streamTimeoutPresets[StreamTimeoutPresetKey]]>) {
+  for (const [key, preset] of Object.entries(streamTimeoutPresets) as Array<[StreamTimeoutPresetKey, { firstContentMs: number; inactivityMs: number; toolCallIdleMs: number }]>) {
     if (
       form.streamFirstContentTimeoutEnabled
       && form.streamInactivityTimeoutEnabled
@@ -2423,7 +2405,7 @@ const applyStreamTimeoutStrategy = (strategy: string | null) => {
     return
   }
 
-  const preset = streamTimeoutPresets[strategy as StreamTimeoutPresetKey]
+  const preset = streamTimeoutPresets[strategy as keyof typeof streamTimeoutPresets]
   if (!preset) return
   form.streamFirstContentTimeoutEnabled = true
   form.streamFirstContentTimeoutMs = preset.firstContentMs
