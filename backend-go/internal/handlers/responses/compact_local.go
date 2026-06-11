@@ -399,6 +399,11 @@ func handleLocalCompactStream(
 		}
 
 		for _, event := range eventsToSend {
+			// 过滤 reasoning 相关事件（Codex compaction v2 期望恰好一个 message output item）
+			if shouldSkipCompactStreamEvent(event) {
+				continue
+			}
+
 			// 收集摘要文本
 			collectStreamSummary(event, &summaryBuf, &responseID)
 
@@ -433,6 +438,20 @@ func handleLocalCompactStream(
 	}
 
 	return true, nil
+}
+
+func shouldSkipCompactStreamEvent(event string) bool {
+	// 跳过所有 reasoning 相关事件
+	if strings.Contains(event, `"type":"reasoning"`) {
+		return true
+	}
+	if strings.Contains(event, `"response.reasoning_summary_part.added"`) ||
+		strings.Contains(event, `"response.reasoning_summary_text.delta"`) ||
+		strings.Contains(event, `"response.reasoning_summary_text.done"`) ||
+		strings.Contains(event, `"response.reasoning_summary_part.done"`) {
+		return true
+	}
+	return false
 }
 
 func collectStreamSummary(event string, buf *strings.Builder, responseID *string) {

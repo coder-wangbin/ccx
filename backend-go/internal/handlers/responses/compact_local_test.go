@@ -374,3 +374,66 @@ func TestNormalizeCompactResponseBodyKeepsOnlyMessageOutput(t *testing.T) {
 		t.Fatal("期望保留 usage.output_tokens_details")
 	}
 }
+
+func TestShouldSkipCompactStreamEvent(t *testing.T) {
+	tests := []struct {
+		name  string
+		event string
+		skip  bool
+	}{
+		{
+			name:  "skip reasoning output_item.added",
+			event: `event: response.output_item.added` + "\n" + `data: {"type":"response.output_item.added","item":{"type":"reasoning","id":"rs_1"}}` + "\n",
+			skip:  true,
+		},
+		{
+			name:  "skip reasoning_summary_part.added",
+			event: `event: response.reasoning_summary_part.added` + "\n" + `data: {"type":"response.reasoning_summary_part.added"}` + "\n",
+			skip:  true,
+		},
+		{
+			name:  "skip reasoning_summary_text.delta",
+			event: `event: response.reasoning_summary_text.delta` + "\n" + `data: {"type":"response.reasoning_summary_text.delta","text":"thinking..."}` + "\n",
+			skip:  true,
+		},
+		{
+			name:  "skip reasoning_summary_text.done",
+			event: `event: response.reasoning_summary_text.done` + "\n" + `data: {"type":"response.reasoning_summary_text.done"}` + "\n",
+			skip:  true,
+		},
+		{
+			name:  "skip reasoning_summary_part.done",
+			event: `event: response.reasoning_summary_part.done` + "\n" + `data: {"type":"response.reasoning_summary_part.done"}` + "\n",
+			skip:  true,
+		},
+		{
+			name:  "skip reasoning output_item.done",
+			event: `event: response.output_item.done` + "\n" + `data: {"type":"response.output_item.done","item":{"type":"reasoning","status":"completed"}}` + "\n",
+			skip:  true,
+		},
+		{
+			name:  "keep message output_item.added",
+			event: `event: response.output_item.added` + "\n" + `data: {"type":"response.output_item.added","item":{"type":"message","id":"msg_1"}}` + "\n",
+			skip:  false,
+		},
+		{
+			name:  "keep output_text.delta",
+			event: `event: response.output_text.delta` + "\n" + `data: {"type":"response.output_text.delta","delta":"hello"}` + "\n",
+			skip:  false,
+		},
+		{
+			name:  "keep response.completed",
+			event: `event: response.completed` + "\n" + `data: {"type":"response.completed","response":{"id":"resp_1"}}` + "\n",
+			skip:  false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := shouldSkipCompactStreamEvent(tt.event)
+			if got != tt.skip {
+				t.Errorf("shouldSkipCompactStreamEvent() = %v, want %v for event: %s", got, tt.skip, tt.event)
+			}
+		})
+	}
+}

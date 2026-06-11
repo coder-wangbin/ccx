@@ -71,10 +71,16 @@ OpenRouter `:free` 变体模型被路由到受限 provider 池，这些 provider
 
 在桌面端管理面板上直接显示使用情况（如 WebUI 中的用量图表），无需再打开网页版面板。
 
-## [ ] Codex remote compaction v2 在 DeepSeek think 响应下失败 (#179)
+## [x] Codex remote compaction v2 在 DeepSeek think 响应下失败 (#179)
 
 当 Codex 对话触发远程 compaction v2 时，CCX 将 `<think>...</think>` 内容无条件拆分为独立的 reasoning output item，导致 compaction 响应产生两个 output items（reasoning + message），而 Codex compaction v2 解析器期望恰好一个 compaction output item，报错退出。
 
 修复方向：检测 compaction 响应时跳过 think tag 拆分，将 reasoning 合并回 message output item；或增加渠道/模型级 toggle 控制 think 内容是否拆分为独立 reasoning item。
 
 相关 Issue：#97（reasoning_tokens 缺失）、#83/#82（MiniMax think tag 拆分问题）。
+
+**已修复**（2026-06-11）：
+- 非流式 compact：`normalizeCompactOutput` 过滤 reasoning items，仅保留 message item
+- 原生 compact：`normalizeCompactResponseBody` 规范化响应体
+- 流式 compact：新增 `shouldSkipCompactStreamEvent` 过滤所有 reasoning 相关 SSE 事件
+- 测试覆盖：新增 `TestShouldSkipCompactStreamEvent` 验证事件过滤逻辑
