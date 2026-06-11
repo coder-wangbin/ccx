@@ -137,11 +137,11 @@
         <v-spacer />
         <v-btn v-if="step < STEP_COUNT - 1" color="primary" variant="flat" append-icon="mdi-arrow-right" @click="next">
           {{ t('guide.next') }}
-          <span class="shortcut-hint ml-4 text-xs opacity-50">Enter</span>
+          <span class="shortcut-hint ml-2 text-xs opacity-50">Enter</span>
         </v-btn>
         <v-btn v-else color="primary" variant="flat" prepend-icon="mdi-check" @click="close">
           {{ t('guide.gotIt') }}
-          <span class="shortcut-hint ml-4 text-xs opacity-50">Enter</span>
+          <span class="shortcut-hint ml-2 text-xs opacity-50">Enter</span>
         </v-btn>
       </v-card-actions>
     </v-card>

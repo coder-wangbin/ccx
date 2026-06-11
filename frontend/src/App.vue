@@ -39,7 +39,7 @@
 
             <v-btn type="submit" color="primary" block size="large" class="mt-4" :loading="authStore.authLoading">
               {{ t('app.auth.submit') }}
-              <span class="shortcut-hint ml-4 text-xs opacity-50">Enter</span>
+              <span class="shortcut-hint ml-2 text-xs opacity-50">Enter</span>
             </v-btn>
           </v-form>
 
@@ -590,11 +590,11 @@
           <v-spacer />
           <v-btn variant="flat" class="cb-dialog-btn" @click="circuitBreakerDialogOpen = false">
             {{ t('app.actions.cancel') }}
-            <span class="shortcut-hint ml-4 text-xs opacity-50">Esc</span>
+            <span class="shortcut-hint ml-2 text-xs opacity-50">Esc</span>
           </v-btn>
           <v-btn color="primary" variant="flat" class="cb-dialog-btn cb-dialog-btn-primary" :loading="cbSaving" @click="saveCircuitBreaker">
             {{ t('app.actions.confirm') }}
-            <span class="shortcut-hint ml-4 text-xs opacity-50">{{ isMac ? '⌘Enter' : 'Ctrl+Enter' }}</span>
+            <span class="shortcut-hint ml-2 text-xs opacity-50">{{ isMac ? '⌘Enter' : 'Ctrl+Enter' }}</span>
           </v-btn>
         </v-card-actions>
       </v-card>
@@ -620,8 +620,8 @@
         </v-card-text>
         <v-card-actions>
           <v-spacer/>
-          <v-btn variant="text" @click="dialogStore.closeAddKeyModal()">{{ t('app.actions.cancel') }} <span class="shortcut-hint ml-4 text-xs opacity-50">Esc</span></v-btn>
-          <v-btn :disabled="!dialogStore.newApiKey.trim()" color="primary" variant="elevated" @click="addApiKey">{{ t('app.actions.add') }} <span class="shortcut-hint ml-4 text-xs opacity-50">Enter</span></v-btn>
+          <v-btn variant="text" @click="dialogStore.closeAddKeyModal()">{{ t('app.actions.cancel') }} <span class="shortcut-hint ml-2 text-xs opacity-50">Esc</span></v-btn>
+          <v-btn :disabled="!dialogStore.newApiKey.trim()" color="primary" variant="elevated" @click="addApiKey">{{ t('app.actions.add') }} <span class="shortcut-hint ml-2 text-xs opacity-50">Enter</span></v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -638,11 +638,11 @@
           <v-spacer/>
           <v-btn variant="text" @click="dialogStore.resolveConfirm(false)">
             {{ dialogStore.confirmDialogCancelText || t('app.actions.cancel') }}
-            <span class="shortcut-hint ml-4 text-xs opacity-50">Esc</span>
+            <span class="shortcut-hint ml-2 text-xs opacity-50">Esc</span>
           </v-btn>
           <v-btn :color="dialogStore.confirmDialogColor" variant="elevated" @click="dialogStore.resolveConfirm(true)">
             {{ dialogStore.confirmDialogConfirmText || t('app.actions.confirm') }}
-            <span class="shortcut-hint ml-4 text-xs opacity-50">{{ isMac ? '⌘Enter' : 'Ctrl+Enter' }}</span>
+            <span class="shortcut-hint ml-2 text-xs opacity-50">{{ isMac ? '⌘Enter' : 'Ctrl+Enter' }}</span>
           </v-btn>
         </v-card-actions>
       </v-card>
