@@ -67,9 +67,15 @@ OpenRouter `:free` 变体模型被路由到受限 provider 池，这些 provider
 - MSIX `package.ps1` 改为优先复制静态磁贴资产，回退到动态生成；`sourceIcon` 改用 `appicon-windows.png`
 - 重新生成 `.icns` 和 `.ico`
 
-## [ ] 桌面端管理面板显示用量信息 (#199)
+## [x] 桌面端管理面板显示用量信息 (#199)
 
 在桌面端管理面板上直接显示使用情况（如 WebUI 中的用量图表），无需再打开网页版面板。
+
+**关键变更：**
+- 在 `ChannelManager.vue` 中集成 `GlobalStatsChart` 组件
+- 添加 `loadGlobalStats()` 方法调用后端 `/api/{type}/global/stats/history` API
+- 在统计卡片下方展示用量图表（紧凑模式）
+- 服务启动和类型切换时自动加载统计数据
 
 ## [x] Codex remote compaction v2 在 DeepSeek think 响应下失败 (#179)
 

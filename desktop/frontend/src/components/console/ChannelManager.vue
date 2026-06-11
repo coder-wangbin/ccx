@@ -14,8 +14,9 @@ import ChannelEditDialog from '@/components/console/ChannelEditDialog.vue'
 import ChannelLogsDialog from '@/components/console/ChannelLogsDialog.vue'
 import CapabilityTestDialog from '@/components/console/CapabilityTestDialog.vue'
 import CircuitBreakerDialog from '@/components/console/CircuitBreakerDialog.vue'
+import GlobalStatsChart from '@/components/console/charts/GlobalStatsChart.vue'
 import type { ManagedChannelType } from '@/utils/channel-type-api'
-import type { Channel, ChannelMetrics, ChannelRecentActivity } from '@/services/admin-api'
+import type { Channel, ChannelMetrics, ChannelRecentActivity, GlobalStatsHistoryResponse } from '@/services/admin-api'
 
 interface Props {
   type: ManagedChannelType
@@ -103,6 +104,31 @@ const fuzzyEnabled = ref(false)
 const fuzzyLoading = ref(false)
 const fuzzyLoadError = ref(false)
 const showCbDialog = ref(false)
+
+// 用量统计
+const statsData = ref<GlobalStatsHistoryResponse | null>(null)
+const statsLoading = ref(false)
+const statsDuration = ref('6h')
+
+async function loadGlobalStats() {
+  statsLoading.value = true
+  try {
+    const adminApi = useAdminApi()
+    const typeMap: Record<ManagedChannelType, string> = {
+      messages: 'messages',
+      chat: 'chat',
+      responses: 'responses',
+      gemini: 'gemini',
+      images: 'images'
+    }
+    const apiPath = typeMap[props.type]
+    statsData.value = await adminApi.get<GlobalStatsHistoryResponse>(`/api/${apiPath}/global/stats/history?duration=${statsDuration.value}`)
+  } catch {
+    statsData.value = null
+  } finally {
+    statsLoading.value = false
+  }
+}
 
 async function loadFuzzyMode() {
   fuzzyLoadError.value = false
@@ -344,10 +370,20 @@ onMounted(() => {
   activeTab.value = props.type
 })
 
-// 服务状态变化时自动加载 Fuzzy 模式
+// 服务状态变化时自动加载 Fuzzy 模式和统计数据
 watch(() => status.value.running, (running) => {
-  if (running) loadFuzzyMode()
+  if (running) {
+    loadFuzzyMode()
+    loadGlobalStats()
+  }
 }, { immediate: true })
+
+// 类型切换时重新加载统计
+watch(() => props.type, () => {
+  if (status.value.running) {
+    loadGlobalStats()
+  }
+})
 </script>
 
 <template>
@@ -416,6 +452,20 @@ watch(() => status.value.running, (running) => {
             {{ stats?.multiChannelMode ? tf('console.mode.multi', 'Multi-channel') : tf('console.mode.single', 'Single-channel') }}
           </div>
         </div>
+      </div>
+
+      <!-- 用量统计图表 -->
+      <div v-if="statsData && !statsLoading" class="mt-3 border border-border bg-background/60">
+        <GlobalStatsChart
+          :data="statsData.dataPoints"
+          :summary="statsData.summary"
+          :model-data-points="statsData.modelDataPoints"
+          :duration="statsDuration"
+          compact
+        />
+      </div>
+      <div v-else-if="statsLoading" class="mt-3 border border-border bg-background/60 p-4 flex items-center justify-center">
+        <Loader2 class="h-4 w-4 animate-spin text-muted-foreground" />
       </div>
     </div>
 
