@@ -324,7 +324,10 @@ async function copyRawUserId() {
     <div v-if="expanded && hasOverride" class="override-alert mt-3 border border-amber-500/70 bg-amber-500/10 p-2">
       <div class="flex items-center gap-2">
         <span class="alert-bang">[!]</span>
-        <span class="text-xs text-amber-600 dark:text-amber-400">
+        <span v-if="override?.isPerpetual" class="text-xs text-amber-600 dark:text-amber-400">
+          {{ tf('cockpit.overrideActivePerpetual', '正在使用自定义渠道顺序（手动恢复前不会自动过期）') }}
+        </span>
+        <span v-else class="text-xs text-amber-600 dark:text-amber-400">
           {{ tf('cockpit.overrideActive', '正在使用自定义渠道顺序，{time} 后自动恢复默认调度', { time: remainingTime }) }}
         </span>
         <div class="flex-1" />

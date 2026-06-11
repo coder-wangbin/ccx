@@ -531,6 +531,7 @@ export interface SequenceOverrideInfo {
   sequence: ChannelSequenceEntry[]
   setAt: string
   expiresAt: string
+  isPerpetual?: boolean
 }
 
 export interface ConversationInfo {

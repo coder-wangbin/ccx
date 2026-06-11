@@ -3,6 +3,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch, type Compon
 import { useIntervalFn } from '@vueuse/core'
 import { Alert } from '@/components/ui/alert'
 import { Input } from '@/components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { MessageSquare, Search } from 'lucide-vue-next'
 import { useConversations } from '@/composables/useConversations'
@@ -26,6 +27,7 @@ const {
 
 const kindFilter = ref('')
 const searchQuery = ref('')
+const overrideDuration = ref('0') // Select 需要 string value: '0'=系统默认, '-1'=永不恢复, '>0'=秒数
 const nowMs = ref(Date.now())
 const expandedCards = ref(new Set<string>())
 const masonryEl = ref<HTMLElement | null>(null)
@@ -94,6 +96,20 @@ const visibleConversations = computed(() => {
 const overrideCount = computed(() => Object.keys(overrides.value).length)
 const shouldRefresh = computed(() => status.value.running)
 
+const durationOptions = computed(() => [
+  { label: tf('cockpit.durationDefault', '系统默认'), value: '0' },
+  { label: '15 min', value: '900' },
+  { label: '30 min', value: '1800' },
+  { label: '1 hour', value: '3600' },
+  { label: '2 hours', value: '7200' },
+  { label: tf('cockpit.durationNever', '永不恢复'), value: '-1' },
+])
+
+function overrideDurationAsNumber(): number | undefined {
+  const v = Number(overrideDuration.value)
+  return v === 0 ? undefined : v
+}
+
 function showNotice(variant: 'success' | 'destructive', message: string) {
   notice.value = { variant, message }
   if (noticeTimer) clearTimeout(noticeTimer)
@@ -125,7 +141,7 @@ function toggleExpand(id: string) {
 
 async function handleSetOverride(conversationId: string, sequence: ChannelSequenceEntry[]) {
   try {
-    await setOverride(conversationId, sequence)
+    await setOverride(conversationId, sequence, overrideDurationAsNumber())
   } catch (e) {
     showNotice('destructive', e instanceof Error ? e.message : String(e))
   }
@@ -322,6 +338,17 @@ watch(shouldRefresh, running => {
           class="h-9 pl-9"
         />
       </div>
+
+      <Select v-model="overrideDuration">
+        <SelectTrigger class="h-9 w-[140px] shrink-0">
+          <SelectValue :placeholder="tf('cockpit.overrideDuration', 'Override 有效期')" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem v-for="opt in durationOptions" :key="opt.value" :value="opt.value">
+            {{ opt.label }}
+          </SelectItem>
+        </SelectContent>
+      </Select>
 
       <span class="system-status-indicator" :class="`status-${systemState}`">
         <span class="status-dot" />

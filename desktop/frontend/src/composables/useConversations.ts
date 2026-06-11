@@ -40,8 +40,10 @@ export function useConversations() {
     }
   }
 
-  async function setOverride(conversationId: string, sequence: ChannelSequenceEntry[]) {
-    await api.post(`/api/conversations/${encodeURIComponent(conversationId)}/override`, { sequence })
+  async function setOverride(conversationId: string, sequence: ChannelSequenceEntry[], duration?: number) {
+    const body: { sequence: ChannelSequenceEntry[]; duration?: number } = { sequence }
+    if (duration !== undefined && duration !== 0) body.duration = duration
+    await api.post(`/api/conversations/${encodeURIComponent(conversationId)}/override`, body)
     await fetchConversations()
   }
 
