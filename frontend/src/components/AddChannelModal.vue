@@ -1155,102 +1155,111 @@
               </v-btn-toggle>
             </v-col>
 
-            <v-col cols="12" md="6">
-              <v-card variant="tonal" class="pa-4 h-100">
-                <v-switch
-                  v-model="form.streamFirstContentTimeoutEnabled"
-                  :label="t('addChannel.streamFirstContentTimeoutOverrideLabel')"
-                  color="primary"
-                  density="comfortable"
-                  hide-details
-                />
-                <div class="mt-3" :class="{ 'opacity-50': !form.streamFirstContentTimeoutEnabled }">
-                  <div class="d-flex justify-space-between align-center mb-2">
-                    <span class="text-caption text-medium-emphasis">{{ t('addChannel.streamFirstContentTimeoutLabel') }}</span>
-                    <span class="text-caption font-weight-medium">{{ (form.streamFirstContentTimeoutMs / 1000) }}s</span>
-                  </div>
-                  <input
-                    v-model.number="form.streamFirstContentTimeoutMs"
-                    type="range"
-                    min="5000"
-                    max="300000"
-                    step="1000"
-                    class="w-100"
-                    :disabled="!form.streamFirstContentTimeoutEnabled"
-                  />
-                  <div class="d-flex justify-space-between text-caption text-medium-emphasis">
-                    <span>5s</span><span>300s</span>
-                  </div>
-                  <div class="text-caption text-medium-emphasis mt-2">
-                    {{ form.streamFirstContentTimeoutEnabled ? t('addChannel.streamTimeoutOverrideHint') : t('addChannel.streamTimeoutInheritHint') }}
-                  </div>
-                </div>
-              </v-card>
-            </v-col>
+            <v-col cols="12">
+              <v-card variant="outlined" class="timeout-config-card">
+                <v-card-text class="pa-4">
+                  <div class="timeout-grid">
+                    <!-- 首字等待超时 -->
+                    <div class="timeout-item">
+                      <div class="d-flex align-center justify-space-between mb-3">
+                        <div class="d-flex align-center ga-2">
+                          <v-icon size="18" color="primary">mdi-timer-sand</v-icon>
+                          <span class="timeout-label">{{ t('addChannel.streamFirstContentTimeoutLabel') }}</span>
+                        </div>
+                        <v-switch
+                          v-model="form.streamFirstContentTimeoutEnabled"
+                          color="primary"
+                          density="compact"
+                          hide-details
+                          inset
+                        />
+                      </div>
+                      <div :class="{ 'timeout-disabled': !form.streamFirstContentTimeoutEnabled }">
+                        <div class="d-flex justify-space-between align-center mb-2">
+                          <span class="text-caption text-medium-emphasis">{{ (form.streamFirstContentTimeoutMs / 1000) }}s</span>
+                          <span class="text-caption text-medium-emphasis">5s — 300s</span>
+                        </div>
+                        <input
+                          v-model.number="form.streamFirstContentTimeoutMs"
+                          type="range"
+                          min="5000"
+                          max="300000"
+                          step="1000"
+                          class="timeout-slider"
+                          :disabled="!form.streamFirstContentTimeoutEnabled"
+                        />
+                      </div>
+                    </div>
 
-            <v-col cols="12" md="6">
-              <v-card variant="tonal" class="pa-4 h-100">
-                <v-switch
-                  v-model="form.streamInactivityTimeoutEnabled"
-                  :label="t('addChannel.streamInactivityTimeoutOverrideLabel')"
-                  color="primary"
-                  density="comfortable"
-                  hide-details
-                />
-                <div class="mt-3" :class="{ 'opacity-50': !form.streamInactivityTimeoutEnabled }">
-                  <div class="d-flex justify-space-between align-center mb-2">
-                    <span class="text-caption text-medium-emphasis">{{ t('addChannel.streamInactivityTimeoutLabel') }}</span>
-                    <span class="text-caption font-weight-medium">{{ (form.streamInactivityTimeoutMs / 1000) }}s</span>
-                  </div>
-                  <input
-                    v-model.number="form.streamInactivityTimeoutMs"
-                    type="range"
-                    min="1000"
-                    max="180000"
-                    step="1000"
-                    class="w-100"
-                    :disabled="!form.streamInactivityTimeoutEnabled"
-                  />
-                  <div class="d-flex justify-space-between text-caption text-medium-emphasis">
-                    <span>1s</span><span>180s</span>
-                  </div>
-                  <div class="text-caption text-medium-emphasis mt-2">
-                    {{ form.streamInactivityTimeoutEnabled ? t('addChannel.streamTimeoutOverrideHint') : t('addChannel.streamTimeoutInheritHint') }}
-                  </div>
-                </div>
-              </v-card>
-            </v-col>
+                    <!-- 首字后断流超时 -->
+                    <div class="timeout-item">
+                      <div class="d-flex align-center justify-space-between mb-3">
+                        <div class="d-flex align-center ga-2">
+                          <v-icon size="18" color="primary">mdi-timer-outline</v-icon>
+                          <span class="timeout-label">{{ t('addChannel.streamInactivityTimeoutLabel') }}</span>
+                        </div>
+                        <v-switch
+                          v-model="form.streamInactivityTimeoutEnabled"
+                          color="primary"
+                          density="compact"
+                          hide-details
+                          inset
+                        />
+                      </div>
+                      <div :class="{ 'timeout-disabled': !form.streamInactivityTimeoutEnabled }">
+                        <div class="d-flex justify-space-between align-center mb-2">
+                          <span class="text-caption text-medium-emphasis">{{ (form.streamInactivityTimeoutMs / 1000) }}s</span>
+                          <span class="text-caption text-medium-emphasis">1s — 180s</span>
+                        </div>
+                        <input
+                          v-model.number="form.streamInactivityTimeoutMs"
+                          type="range"
+                          min="1000"
+                          max="180000"
+                          step="1000"
+                          class="timeout-slider"
+                          :disabled="!form.streamInactivityTimeoutEnabled"
+                        />
+                      </div>
+                    </div>
 
-            <v-col cols="12" md="6">
-              <v-card variant="tonal" class="pa-4 h-100">
-                <v-switch
-                  v-model="form.streamToolCallIdleTimeoutEnabled"
-                  :label="t('addChannel.streamToolCallIdleTimeoutOverrideLabel')"
-                  color="primary"
-                  density="comfortable"
-                  hide-details
-                />
-                <div class="mt-3" :class="{ 'opacity-50': !form.streamToolCallIdleTimeoutEnabled }">
-                  <div class="d-flex justify-space-between align-center mb-2">
-                    <span class="text-caption text-medium-emphasis">{{ t('addChannel.streamToolCallIdleTimeoutLabel') }}</span>
-                    <span class="text-caption font-weight-medium">{{ (form.streamToolCallIdleTimeoutMs / 1000) }}s</span>
+                    <!-- 工具调用空闲超时 -->
+                    <div class="timeout-item">
+                      <div class="d-flex align-center justify-space-between mb-3">
+                        <div class="d-flex align-center ga-2">
+                          <v-icon size="18" color="primary">mdi-tools</v-icon>
+                          <span class="timeout-label">{{ t('addChannel.streamToolCallIdleTimeoutLabel') }}</span>
+                        </div>
+                        <v-switch
+                          v-model="form.streamToolCallIdleTimeoutEnabled"
+                          color="primary"
+                          density="compact"
+                          hide-details
+                          inset
+                        />
+                      </div>
+                      <div :class="{ 'timeout-disabled': !form.streamToolCallIdleTimeoutEnabled }">
+                        <div class="d-flex justify-space-between align-center mb-2">
+                          <span class="text-caption text-medium-emphasis">{{ (form.streamToolCallIdleTimeoutMs / 1000) }}s</span>
+                          <span class="text-caption text-medium-emphasis">30s — 300s</span>
+                        </div>
+                        <input
+                          v-model.number="form.streamToolCallIdleTimeoutMs"
+                          type="range"
+                          min="30000"
+                          max="300000"
+                          step="1000"
+                          class="timeout-slider"
+                          :disabled="!form.streamToolCallIdleTimeoutEnabled"
+                        />
+                      </div>
+                    </div>
                   </div>
-                  <input
-                    v-model.number="form.streamToolCallIdleTimeoutMs"
-                    type="range"
-                    min="30000"
-                    max="300000"
-                    step="1000"
-                    class="w-100"
-                    :disabled="!form.streamToolCallIdleTimeoutEnabled"
-                  />
-                  <div class="d-flex justify-space-between text-caption text-medium-emphasis">
-                    <span>30s</span><span>300s</span>
+                  <div class="text-caption text-medium-emphasis mt-3 px-1">
+                    <v-icon size="14" class="mr-1">mdi-information-outline</v-icon>
+                    {{ t('addChannel.streamTimeoutOverrideHint') }}
                   </div>
-                  <div class="text-caption text-medium-emphasis mt-2">
-                    {{ form.streamToolCallIdleTimeoutEnabled ? t('addChannel.streamTimeoutOverrideHint') : t('addChannel.streamTimeoutInheritHint') }}
-                  </div>
-                </div>
+                </v-card-text>
               </v-card>
             </v-col>
 
@@ -3523,6 +3532,85 @@ onUnmounted(() => {
 
 :deep(.v-theme--dark .v-btn.v-btn--variant-flat.v-btn--color-success) {
   background-color: rgba(52, 211, 153, 0.92) !important;
+}
+
+/* 超时配置卡片 */
+.timeout-config-card {
+  border: 1px solid rgba(var(--v-theme-primary), 0.12);
+}
+
+.timeout-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 24px;
+}
+
+.timeout-item {
+  padding: 12px;
+  border-radius: 8px;
+  background: rgba(var(--v-theme-surface-variant), 0.3);
+  transition: background 0.2s ease;
+}
+
+.timeout-label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.timeout-slider {
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(var(--v-theme-on-surface), 0.12);
+  outline: none;
+  appearance: none;
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+}
+
+.timeout-slider::-webkit-slider-thumb {
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: rgb(var(--v-theme-primary));
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.timeout-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+}
+
+.timeout-slider::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: rgb(var(--v-theme-primary));
+  border: none;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.timeout-slider::-moz-range-thumb:hover {
+  transform: scale(1.2);
+}
+
+.timeout-slider:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.timeout-disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+@media (max-width: 768px) {
+  .timeout-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 </style>
