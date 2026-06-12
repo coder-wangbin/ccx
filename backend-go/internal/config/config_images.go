@@ -315,11 +315,11 @@ func (cm *ConfigManager) UpdateImagesUpstream(index int, updates UpstreamUpdate)
 		}
 		upstream.RateLimitRPM = *updates.RateLimitRPM
 	}
-	if updates.RateLimitWindowSeconds != nil {
-		if *updates.RateLimitWindowSeconds < 0 {
-			return false, fmt.Errorf("rateLimitWindowSeconds 不能为负数")
+	if updates.RateLimitWindowMinutes != nil {
+		if *updates.RateLimitWindowMinutes < 0 {
+			return false, fmt.Errorf("rateLimitWindowMinutes 不能为负数")
 		}
-		upstream.RateLimitWindowSeconds = *updates.RateLimitWindowSeconds
+		upstream.RateLimitWindowMinutes = *updates.RateLimitWindowMinutes
 	}
 	if updates.RateLimitBurst != nil {
 		if *updates.RateLimitBurst < 0 {

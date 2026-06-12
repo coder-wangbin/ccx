@@ -79,7 +79,7 @@ type UpstreamConfig struct {
 	RoutePrefix string `json:"routePrefix,omitempty"` // 路由前缀（如 "kimi"），客户端可通过 /:routePrefix/v1/messages 访问
 	// 主动限速配置（渠道级，默认 0=不限）
 	RateLimitRPM             int   `json:"rateLimitRpm,omitempty"`             // 每分钟请求数上限（0=不限）
-	RateLimitWindowSeconds   int   `json:"rateLimitWindowSeconds,omitempty"`   // 滑动窗口时长（秒，0=默认60秒）
+	RateLimitWindowMinutes   int   `json:"rateLimitWindowMinutes,omitempty"`   // 滑动窗口时长（分钟，0=默认1分钟）
 	RateLimitBurst           int   `json:"rateLimitBurst,omitempty"`           // 已废弃，保留仅为兼容性
 	RateLimitMaxConcurrent   int   `json:"rateLimitMaxConcurrent,omitempty"`   // 最大并发上游请求数（0=不限）
 	RateLimitAutoFromHeaders *bool `json:"rateLimitAutoFromHeaders,omitempty"` // 自动从上游响应头解析限流信息并动态调速（默认 false）
@@ -218,7 +218,7 @@ type UpstreamUpdate struct {
 	RoutePrefix *string `json:"routePrefix"` // 路由前缀（如 "kimi"）
 	// 主动限速配置（渠道级，默认 0=不限）
 	RateLimitRPM             *int  `json:"rateLimitRpm"`
-	RateLimitWindowSeconds   *int  `json:"rateLimitWindowSeconds"`
+	RateLimitWindowMinutes   *int  `json:"rateLimitWindowSeconds"`
 	RateLimitBurst           *int  `json:"rateLimitBurst"`
 	RateLimitMaxConcurrent   *int  `json:"rateLimitMaxConcurrent"`
 	RateLimitAutoFromHeaders *bool `json:"rateLimitAutoFromHeaders"`

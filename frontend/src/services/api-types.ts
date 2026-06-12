@@ -103,7 +103,7 @@ export interface Channel {
   visionFallbackModel?: string               // 含图请求命中 noVisionModels 时使用的替代模型
   // 主动限速（渠道级生产代理限速，区别于能力测试的 rpm）
   rateLimitRpm?: number                      // 每分钟请求数上限（0/空=不限）
-  rateLimitWindowSeconds?: number            // 滑动窗口时长（秒，0/空=默认60秒）
+  rateLimitWindowMinutes?: number            // 滑动窗口时长（秒，0/空=默认60秒）
   rateLimitBurst?: number                    // 已废弃，保留仅为兼容性
   rateLimitMaxConcurrent?: number            // 最大并发上游请求数（0/空=不限）
   rateLimitAutoFromHeaders?: boolean         // 自动从上游响应头解析限流信息并动态调速（默认 false）

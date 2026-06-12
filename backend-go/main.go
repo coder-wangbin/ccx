@@ -382,10 +382,14 @@ func main() {
 		for _, ct := range channelTypes {
 			for idx, upstream := range ct.upstreams {
 				autoFromHeaders := upstream.RateLimitAutoFromHeaders != nil && *upstream.RateLimitAutoFromHeaders
+				windowSeconds := 0
+				if upstream.RateLimitWindowMinutes > 0 {
+					windowSeconds = upstream.RateLimitWindowMinutes * 60
+				}
 				rateLimitManager.GetOrCreate(ct.apiType, idx, ratelimit.Config{
-					RPM:           upstream.RateLimitRPM,
-					WindowSeconds: upstream.RateLimitWindowSeconds,
-					MaxConcurrent: upstream.RateLimitMaxConcurrent,
+					RPM:             upstream.RateLimitRPM,
+					WindowSeconds:   windowSeconds,
+					MaxConcurrent:   upstream.RateLimitMaxConcurrent,
 					AutoFromHeaders: autoFromHeaders,
 				})
 			}

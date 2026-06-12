@@ -107,7 +107,7 @@ export interface Channel {
   historicalImageTurnLimit?: number
   // 主动限速（渠道级生产代理限速）
   rateLimitRpm?: number
-  rateLimitWindowSeconds?: number
+  rateLimitWindowMinutes?: number
   rateLimitMaxConcurrent?: number
   rateLimitAutoFromHeaders?: boolean
   rpm?: number
