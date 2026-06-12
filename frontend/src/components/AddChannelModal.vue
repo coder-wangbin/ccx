@@ -2772,9 +2772,9 @@ const loadChannelData = (channel: Channel) => {
   form.streamInactivityTimeoutMs = channel.streamInactivityTimeoutMs && channel.streamInactivityTimeoutMs > 0 ? channel.streamInactivityTimeoutMs : defaultStreamTimeouts.inactivityMs
   form.streamToolCallIdleTimeoutEnabled = !!(channel.streamToolCallIdleTimeoutMs && channel.streamToolCallIdleTimeoutMs >= 30000)
   form.streamToolCallIdleTimeoutMs = channel.streamToolCallIdleTimeoutMs && channel.streamToolCallIdleTimeoutMs >= 30000 ? channel.streamToolCallIdleTimeoutMs : defaultStreamTimeouts.toolCallIdleMs
-  form.rateLimitRpm = channel.rateLimitRpm || null
-  form.rateLimitWindowMinutes = channel.rateLimitWindowMinutes || null
-  form.rateLimitMaxConcurrent = channel.rateLimitMaxConcurrent || null
+  form.rateLimitRpm = channel.rateLimitRpm ?? null
+  form.rateLimitWindowMinutes = channel.rateLimitWindowMinutes ?? null
+  form.rateLimitMaxConcurrent = channel.rateLimitMaxConcurrent ?? null
   form.rateLimitAutoFromHeaders = !!channel.rateLimitAutoFromHeaders
   form.routePrefix = channel.routePrefix || ''
   const { validPatterns, hasInvalidPatterns } = filterValidSupportedModelPatterns(channel.supportedModels || [])
