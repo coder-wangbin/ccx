@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, reactive, computed, watch, onMounted, onBeforeUnmount } from 'vue'
+import { ref, reactive, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -333,8 +333,11 @@ watch(() => props.channel, (ch) => {
   if (ch) {
     populateFromChannel(ch)
     // 如果有模型映射配置，主动触发一次模型列表获取
+    // 使用 nextTick 确保表单数据已填充完成
     if (ch.modelMapping && Object.keys(ch.modelMapping).length > 0) {
-      void fetchTargetModels()
+      nextTick(() => {
+        void fetchTargetModels()
+      })
     }
   }
 }, { immediate: true })
