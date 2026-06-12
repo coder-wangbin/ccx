@@ -329,41 +329,49 @@
 
                   <!-- 现有映射列表 -->
                   <div v-if="modelMappingRows.length" class="mb-4">
+                    <div class="text-caption text-medium-emphasis mb-2 d-flex align-center justify-space-between">
+                      <span>{{ t('addChannel.configuredMappings') }}</span>
+                      <v-chip size="x-small" variant="tonal" color="primary">{{ modelMappingRows.length }}</v-chip>
+                    </div>
                     <v-list density="compact" class="bg-transparent">
                       <v-list-item
                         v-for="(row, index) in modelMappingRows"
                         :key="row.id"
-                        class="mb-2 pa-2"
+                        class="mb-2 pa-3"
                         rounded="lg"
                         variant="tonal"
                         color="surface-variant"
                       >
                         <div class="d-flex align-center ga-2 flex-wrap">
-                          <!-- 源模型输入 -->
-                          <v-combobox
-                            v-model="row.source"
-                            :items="sourceModelOptions"
-                            density="compact"
-                            variant="outlined"
-                            hide-details
-                            placeholder="source-model"
-                            class="text-caption"
-                            style="max-width: 200px; font-family: monospace;"
-                          />
+                          <!-- 源模型只读展示 -->
+                          <v-sheet
+                            rounded="lg"
+                            color="surface"
+                            class="pa-2"
+                            style="min-width: 140px; max-width: 180px;"
+                          >
+                            <div class="text-caption text-medium-emphasis mb-1" style="font-size: 9px; font-weight: 600; letter-spacing: 0.16em;">SOURCE</div>
+                            <div class="text-caption text-truncate" style="font-family: monospace; font-size: 11px;" :title="row.source">
+                              {{ row.source || 'source-model' }}
+                            </div>
+                          </v-sheet>
 
                           <v-icon size="small" color="primary">mdi-arrow-right</v-icon>
 
                           <!-- 目标模型输入 -->
-                          <v-combobox
-                            v-model="row.target"
-                            :items="targetModelOptions"
-                            density="compact"
-                            variant="outlined"
-                            hide-details
-                            placeholder="target-model"
-                            class="text-caption"
-                            style="max-width: 200px; font-family: monospace;"
-                          />
+                          <div style="min-width: 160px; max-width: 220px; flex: 1;">
+                            <div class="text-caption text-medium-emphasis mb-1" style="font-size: 9px; font-weight: 600; letter-spacing: 0.16em;">TARGET</div>
+                            <v-combobox
+                              v-model="row.target"
+                              :items="targetModelOptions"
+                              density="compact"
+                              variant="outlined"
+                              hide-details
+                              placeholder="target-model"
+                              class="text-caption"
+                              style="font-family: monospace;"
+                            />
+                          </div>
 
                           <!-- Reasoning 级别选择 -->
                           <v-select

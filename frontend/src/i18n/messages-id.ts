@@ -200,6 +200,7 @@ export const idMessages: Record<MessageKey, string> = {
     'addChannel.websitePlaceholder': 'Contoh: https://platform.openai.com',
     'addChannel.modelRedirect': 'Redirect model (opsional)',
     'addChannel.autoConvertModelNames': 'Konversi nama model otomatis',
+    'addChannel.configuredMappings': 'Dikonfigurasi',
     'addChannel.oneClickSetup': 'Setup sekali klik',
     'addChannel.modelHint': 'Atur pemetaan model sumber ke model target di sini.',
     'addChannel.modelHintTip': 'Klik field model target untuk memuat model upstream yang didukung. Status deteksi tiap API key akan tampil di daftar key.',
