@@ -7,13 +7,13 @@ import (
 
 func TestManager_GetOrCreate_New(t *testing.T) {
 	m := NewManager()
-	l := m.GetOrCreate("messages", 0, Config{RPM: 60, Burst: 5})
+	l := m.GetOrCreate("messages", 0, Config{RPM: 60})
 	if l == nil {
 		t.Fatal("expected non-nil limiter")
 	}
 	s := l.Status(time.Now())
-	if s.Burst != 5 {
-		t.Fatalf("burst = %v, want 5", s.Burst)
+	if s.MaxRequests != 60 {
+		t.Fatalf("maxRequests = %v, want 60", s.MaxRequests)
 	}
 }
 
@@ -26,8 +26,8 @@ func TestManager_GetOrCreate_Existing(t *testing.T) {
 	}
 	// Verify updated config
 	s := l2.Status(time.Now())
-	if s.RatePerSec != 2.0 {
-		t.Fatalf("rate = %v, want 2.0 (120/60)", s.RatePerSec)
+	if s.MaxRequests != 120 {
+		t.Fatalf("maxRequests = %v, want 120", s.MaxRequests)
 	}
 }
 
@@ -67,8 +67,8 @@ func TestManager_UpdateAll(t *testing.T) {
 	if l0 == nil {
 		t.Fatal("messages limiter disappeared")
 	}
-	if s := l0.Status(time.Now()); s.RatePerSec != 2.0 {
-		t.Fatalf("messages rate = %v, want 2.0", s.RatePerSec)
+	if s := l0.Status(time.Now()); s.MaxRequests != 120 {
+		t.Fatalf("messages maxRequests = %v, want 120", s.MaxRequests)
 	}
 
 	// chat unchanged
@@ -76,8 +76,8 @@ func TestManager_UpdateAll(t *testing.T) {
 	if l1 == nil {
 		t.Fatal("chat limiter disappeared")
 	}
-	if s := l1.Status(time.Now()); s.RatePerSec != 0.5 {
-		t.Fatalf("chat rate = %v, want 0.5", s.RatePerSec)
+	if s := l1.Status(time.Now()); s.MaxRequests != 30 {
+		t.Fatalf("chat maxRequests = %v, want 30", s.MaxRequests)
 	}
 }
 

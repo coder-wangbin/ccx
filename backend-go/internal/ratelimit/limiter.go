@@ -7,20 +7,18 @@ import (
 	"time"
 )
 
-// ChannelLimiter 是单个渠道的限速器，组合了令牌桶、并发信号量和动态 cooldown。
+// ChannelLimiter 是单个渠道的限速器，使用滑动窗口算法。
 // 零值表示不限速（所有字段为 0 时 Acquire 立即成功）。
 type ChannelLimiter struct {
 	mu sync.Mutex
 
-	// --- 令牌桶 ---
-	// tokens 是当前可用令牌数（浮点，允许小步累积）。
-	// rate 是每秒填充速率（= RPM / 60）；burst 是桶容量（最大令牌数）。
-	// rate=0 || burst=0 时令牌桶不生效（始终放行）。
-	tokens float64
-	rate   float64
-	burst  float64
-	// lastRefill 是上一次补充令牌的时间，用于按时间差计算累积。
-	lastRefill time.Time
+	// --- 滑动窗口 ---
+	// window 是时间窗口大小（默认60秒=1分钟）
+	// maxRequests 是窗口内允许的最大请求数（RPM）
+	// timestamps 记录最近的请求时间戳
+	window      time.Duration
+	maxRequests int
+	timestamps  []time.Time
 
 	// --- 并发信号量 ---
 	// maxConcurrent=0 表示不限并发。
@@ -35,7 +33,7 @@ type ChannelLimiter struct {
 type Config struct {
 	// RPM 是每分钟请求数上限。0=不限。
 	RPM int
-	// Burst 是令牌桶容量（允许的突发请求数）。0=不限（取 RPM 值的默认 burst）。
+	// Burst 已废弃，保留字段仅为兼容性，不再使用。
 	Burst int
 	// MaxConcurrent 是最大并发上游请求数。0=不限。
 	MaxConcurrent int
@@ -47,38 +45,25 @@ type Config struct {
 var (
 	ErrInCooldown  = fmt.Errorf("rate limited: channel is in cooldown")
 	ErrAcquireBusy = fmt.Errorf("rate limited: max concurrent requests reached")
-	ErrBucketEmpty = fmt.Errorf("rate limited: token bucket exhausted")
+	ErrWindowFull  = fmt.Errorf("rate limited: sliding window full")
 )
 
-// NewChannelLimiter 创建一个新的 ChannelLimiter。now 用于初始化令牌桶时间基准。
+// NewChannelLimiter 创建一个新的 ChannelLimiter。now 参数保留用于兼容性但不使用。
 func NewChannelLimiter(cfg Config, now time.Time) *ChannelLimiter {
 	l := &ChannelLimiter{
-		lastRefill: now,
+		window:     60 * time.Second, // 固定1分钟窗口
+		timestamps: make([]time.Time, 0),
 	}
 	l.applyConfig(cfg)
 	return l
 }
 
-// applyConfig 将配置应用到 limiter；保留运行态的 tokens/cooldown。
+// applyConfig 将配置应用到 limiter。
 func (l *ChannelLimiter) applyConfig(cfg Config) {
 	if cfg.RPM > 0 {
-		l.rate = float64(cfg.RPM) / 60.0
-		if cfg.Burst > 0 {
-			l.burst = float64(cfg.Burst)
-		} else {
-			// 默认 burst = 1（强制平滑限速，避免瞬间突发导致上游 429）
-			l.burst = 1
-		}
-		// 初始填满
-		if l.tokens > l.burst {
-			l.tokens = l.burst
-		} else if l.tokens == 0 {
-			l.tokens = l.burst
-		}
+		l.maxRequests = cfg.RPM
 	} else {
-		l.rate = 0
-		l.burst = 0
-		l.tokens = 0
+		l.maxRequests = 0
 	}
 
 	if cfg.MaxConcurrent > 0 {
@@ -113,7 +98,7 @@ func (l *ChannelLimiter) InCooldown(now time.Time) (bool, time.Time) {
 
 // Acquire 尝试获取一个请求许可。返回 release 函数（必须在请求完成后调用以释放并发信号量）。
 // maxWait 是最长排队等待时间；ctx 支持客户端断开取消。
-// 返回的 error 可能是 ErrInCooldown / ErrAcquireBusy / ErrBucketEmpty / context.Canceled。
+// 返回的 error 可能是 ErrInCooldown / ErrAcquireBusy / ErrWindowFull / context.Canceled。
 func (l *ChannelLimiter) Acquire(ctx context.Context, maxWait time.Duration, now time.Time) (release func(), err error) {
 	if l == nil {
 		return func() {}, nil
@@ -185,33 +170,36 @@ func (l *ChannelLimiter) makeSemaphoreRelease() func() {
 	}
 }
 
-// acquireToken 从令牌桶扣减一个令牌。需要等待时循环 sleep，支持 ctx/timeout 取消。
+// acquireToken 使用滑动窗口检查是否允许请求。需要等待时循环 sleep，支持 ctx/timeout 取消。
 func (l *ChannelLimiter) acquireToken(ctx context.Context, maxWait time.Duration, now time.Time) error {
 	l.mu.Lock()
 
-	if l.rate <= 0 || l.burst <= 0 {
-		// 令牌桶不生效
+	if l.maxRequests <= 0 {
+		// 不限速
 		l.mu.Unlock()
 		return nil
 	}
 
-	// 按时间差补充令牌
-	l.refillLocked(now)
+	// 清理过期的时间戳（窗口外）
+	l.cleanOldTimestampsLocked(now)
 
-	if l.tokens >= 1 {
-		l.tokens--
+	if len(l.timestamps) < l.maxRequests {
+		// 窗口未满，允许请求
+		l.timestamps = append(l.timestamps, now)
 		l.mu.Unlock()
 		return nil
 	}
 
-	// 计算等待到下一个令牌的时间
-	waitDuration := time.Duration((1 - l.tokens) / l.rate * float64(time.Second))
+	// 窗口已满，计算最早的请求何时过期
+	oldest := l.timestamps[0]
+	waitDuration := l.window - now.Sub(oldest)
 	l.mu.Unlock()
 
 	if waitDuration > maxWait {
-		return ErrBucketEmpty
+		return ErrWindowFull
 	}
 
+	// 等待窗口滚动
 	deadline := time.After(maxWait)
 	ticker := time.NewTicker(waitDuration)
 	defer ticker.Stop()
@@ -221,41 +209,40 @@ func (l *ChannelLimiter) acquireToken(ctx context.Context, maxWait time.Duration
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-deadline:
-			return ErrBucketEmpty
+			return ErrWindowFull
 		case <-ticker.C:
 			l.mu.Lock()
-			l.refillLocked(time.Now())
-			if l.tokens >= 1 {
-				l.tokens--
+			currentNow := time.Now()
+			l.cleanOldTimestampsLocked(currentNow)
+			if len(l.timestamps) < l.maxRequests {
+				l.timestamps = append(l.timestamps, currentNow)
 				l.mu.Unlock()
 				return nil
 			}
-			// 还不够，缩小等待间隔
-			nextWait := time.Duration((1 - l.tokens) / l.rate * float64(time.Second))
-			if nextWait < 10*time.Millisecond {
-				nextWait = 10 * time.Millisecond
+			// 还是满的，缩小等待间隔
+			if len(l.timestamps) > 0 {
+				oldest := l.timestamps[0]
+				nextWait := l.window - currentNow.Sub(oldest)
+				if nextWait < 10*time.Millisecond {
+					nextWait = 10 * time.Millisecond
+				}
+				ticker.Reset(nextWait)
 			}
-			ticker.Reset(nextWait)
 			l.mu.Unlock()
 		}
 	}
 }
 
-// refillLocked 按时间差补充令牌（需持有锁）。
-func (l *ChannelLimiter) refillLocked(now time.Time) {
-	if l.lastRefill.IsZero() {
-		l.lastRefill = now
-		return
+// cleanOldTimestampsLocked 清理窗口外的旧时间戳（需持有锁）。
+func (l *ChannelLimiter) cleanOldTimestampsLocked(now time.Time) {
+	cutoff := now.Add(-l.window)
+	validIdx := 0
+	for validIdx < len(l.timestamps) && l.timestamps[validIdx].Before(cutoff) {
+		validIdx++
 	}
-	elapsed := now.Sub(l.lastRefill).Seconds()
-	if elapsed <= 0 {
-		return
+	if validIdx > 0 {
+		l.timestamps = l.timestamps[validIdx:]
 	}
-	l.tokens += elapsed * l.rate
-	if l.tokens > l.burst {
-		l.tokens = l.burst
-	}
-	l.lastRefill = now
 }
 
 // Status 返回当前 limiter 状态快照（用于调试/日志）。
@@ -265,7 +252,7 @@ func (l *ChannelLimiter) Status(now time.Time) LimiterStatus {
 	}
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	l.refillLocked(now)
+	l.cleanOldTimestampsLocked(now)
 
 	inCooldown := !l.cooldownUntil.IsZero() && now.Before(l.cooldownUntil)
 	semUsed := 0
@@ -273,9 +260,8 @@ func (l *ChannelLimiter) Status(now time.Time) LimiterStatus {
 		semUsed = len(l.sem)
 	}
 	return LimiterStatus{
-		Tokens:          l.tokens,
-		Burst:           l.burst,
-		RatePerSec:      l.rate,
+		WindowSize:      len(l.timestamps),
+		MaxRequests:     l.maxRequests,
 		MaxConcurrent:   cap(l.sem),
 		ActiveRequests:  semUsed,
 		InCooldown:      inCooldown,
@@ -286,9 +272,8 @@ func (l *ChannelLimiter) Status(now time.Time) LimiterStatus {
 
 // LimiterStatus 是 limiter 的只读快照。
 type LimiterStatus struct {
-	Tokens         float64
-	Burst          float64
-	RatePerSec     float64
+	WindowSize     int       // 当前窗口内请求数
+	MaxRequests    int       // 窗口最大请求数（RPM）
 	MaxConcurrent  int
 	ActiveRequests int
 	InCooldown     bool

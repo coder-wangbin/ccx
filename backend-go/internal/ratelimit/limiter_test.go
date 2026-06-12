@@ -22,40 +22,42 @@ func TestLimiter_Acquire_ZeroConfig_NoLimit(t *testing.T) {
 }
 
 func TestLimiter_Acquire_TokenBucket_AllowsBurstThenBlocks(t *testing.T) {
+	// 滑动窗口：RPM=3 表示 60 秒内最多 3 次请求
 	now := time.Now()
-	l := NewChannelLimiter(Config{RPM: 60, Burst: 3}, now) // 1/s, burst=3
+	l := NewChannelLimiter(Config{RPM: 3}, now)
 
-	// 前 3 次立即成功（初始 burst=3）
+	// 前 3 次立即成功（窗口未满）
 	for i := 0; i < 3; i++ {
 		release, err := l.Acquire(context.Background(), 100*time.Millisecond, now)
 		if err != nil {
-			t.Fatalf("burst %d: unexpected error: %v", i, err)
+			t.Fatalf("request %d: unexpected error: %v", i, err)
 		}
 		release()
 	}
 
-	// 第 4 次应在 100ms 内失败（桶空，下一个令牌需要 ~1s，远超 100ms）
+	// 第 4 次应失败（窗口已满，需要等待最早的请求过期）
 	_, err := l.Acquire(context.Background(), 100*time.Millisecond, now)
-	if err != ErrBucketEmpty {
-		t.Fatalf("expected ErrBucketEmpty, got %v", err)
+	if err != ErrWindowFull {
+		t.Fatalf("expected ErrWindowFull, got %v", err)
 	}
 }
 
 func TestLimiter_Acquire_TokenBucket_Refill(t *testing.T) {
+	// 滑动窗口：RPM=2 表示 60 秒内最多 2 次请求
 	base := time.Now()
-	l := NewChannelLimiter(Config{RPM: 120, Burst: 2}, base) // 2/s, burst=2
+	l := NewChannelLimiter(Config{RPM: 2}, base)
 
-	// 消耗 burst
+	// 消耗窗口配额
 	for i := 0; i < 2; i++ {
 		release, _ := l.Acquire(context.Background(), time.Millisecond, base)
 		release()
 	}
 
-	// 1 秒后应恢复 ~2 个令牌
-	later := base.Add(time.Second)
+	// 60 秒后窗口滚动，应可以再次请求
+	later := base.Add(61 * time.Second)
 	release, err := l.Acquire(context.Background(), time.Millisecond, later)
 	if err != nil {
-		t.Fatalf("after 1s refill: unexpected error: %v", err)
+		t.Fatalf("after window roll: unexpected error: %v", err)
 	}
 	release()
 }
@@ -170,7 +172,7 @@ func TestLimiter_Acquire_ConcurrentSafety(t *testing.T) {
 	close(errs)
 
 	for err := range errs {
-		if err != ErrBucketEmpty && err != ErrAcquireBusy {
+		if err != ErrWindowFull && err != ErrAcquireBusy {
 			t.Fatalf("unexpected error type: %v", err)
 		}
 	}
@@ -201,40 +203,40 @@ func TestLimiter_UpdateConfig_PreservesTokens(t *testing.T) {
 	}
 }
 
-// ── 令牌等待不占信号量 ──
+// ── 窗口等待不占信号量 ──
 
 func TestLimiter_Acquire_TokenWaitDoesNotBlockSemaphore(t *testing.T) {
-	// 验证：当令牌桶耗尽在等待时，信号量槽位不被占用，
-	// 新的请求仍能获取信号量（如果它们的令牌可用）。
+	// 验证：当滑动窗口满时在等待，信号量槽位不被占用，
+	// 新的请求仍能获取信号量（如果它们的窗口配额可用）。
 	base := time.Now()
-	// RPM=60 burst=1，MaxConcurrent=1
-	// 令牌桶只有 1 个令牌，信号量只有 1 个槽
-	l := NewChannelLimiter(Config{RPM: 60, Burst: 1, MaxConcurrent: 1}, base)
+	// RPM=1, MaxConcurrent=1
+	// 窗口只允许 1 个请求，信号量只有 1 个槽
+	l := NewChannelLimiter(Config{RPM: 1, MaxConcurrent: 1}, base)
 
-	// 第 1 个请求获取令牌 + 信号量，成功
+	// 第 1 个请求获取窗口配额 + 信号量，成功
 	release1, err := l.Acquire(context.Background(), 10*time.Millisecond, base)
 	if err != nil {
 		t.Fatalf("first acquire: %v", err)
 	}
 	defer release1()
 
-	// 第 2 个请求：令牌桶空（burst=1 已消耗）→ acquireToken 应快速失败（maxWait 10ms < 等待 ~1s）
+	// 第 2 个请求：窗口已满 → acquireToken 应快速失败（maxWait 10ms < 窗口滚动需要 60s）
 	_, err = l.Acquire(context.Background(), 10*time.Millisecond, base)
-	if err != ErrBucketEmpty {
-		t.Fatalf("second acquire expected ErrBucketEmpty, got %v", err)
+	if err != ErrWindowFull {
+		t.Fatalf("second acquire expected ErrWindowFull, got %v", err)
 	}
 
 	// 关键：信号量槽位只被第 1 个请求占用。
 	// 如果 acquireToken 在 acquireSemaphore 之前（当前实现），
-	// 第 2 个请求在 token 层就退出了，不会尝试信号量。
-	// 验证方式：释放第 1 个请求后，新的请求应能成功（信号量未被第 2 个阻塞）
+	// 第 2 个请求在窗口层就退出了，不会尝试信号量。
+	// 验证方式：释放第 1 个请求后，窗口滚动后新请求应能成功（信号量未被第 2 个阻塞）
 	release1()
 
-	// 等 1 秒让令牌桶恢复
-	later := base.Add(time.Second)
+	// 等 61 秒让窗口滚动
+	later := base.Add(61 * time.Second)
 	release3, err := l.Acquire(context.Background(), 10*time.Millisecond, later)
 	if err != nil {
-		t.Fatalf("third acquire after release: %v", err)
+		t.Fatalf("third acquire after window roll: %v", err)
 	}
 	release3()
 }
@@ -364,14 +366,14 @@ func TestLimiter_NilSafety(t *testing.T) {
 
 func TestLimiter_Status(t *testing.T) {
 	now := time.Now()
-	l := NewChannelLimiter(Config{RPM: 120, Burst: 10, MaxConcurrent: 3}, now)
+	l := NewChannelLimiter(Config{RPM: 120, MaxConcurrent: 3}, now)
 
 	s := l.Status(now)
-	if s.Burst != 10 {
-		t.Fatalf("burst = %v, want 10", s.Burst)
+	if s.MaxRequests != 120 {
+		t.Fatalf("maxRequests = %v, want 120", s.MaxRequests)
 	}
-	if s.RatePerSec != 2.0 {
-		t.Fatalf("rate = %v, want 2.0", s.RatePerSec)
+	if s.WindowSize != 0 {
+		t.Fatalf("windowSize = %v, want 0", s.WindowSize)
 	}
 	if s.MaxConcurrent != 3 {
 		t.Fatalf("maxConcurrent = %v, want 3", s.MaxConcurrent)
