@@ -1437,10 +1437,13 @@ function buildCurrentPayload() {
                         </div>
                         <div class="min-w-0 space-y-1">
                           <div class="text-[9px] font-bold uppercase tracking-[0.16em] text-muted-foreground">TARGET</div>
-                          <Input v-model="row.target" class="h-8 rounded-lg border-border/70 bg-background/65 font-mono text-xs focus-visible:border-primary/50 focus-visible:ring-primary/20" placeholder="target-model" :list="`target-models-${index}`" @focus="handleTargetFocus" />
-                          <datalist :id="`target-models-${index}`">
-                            <option v-for="m in targetModelDatalist" :key="m" :value="m" />
-                          </datalist>
+                          <Input 
+                            v-model="row.target" 
+                            class="h-8 rounded-lg border-border/70 bg-background/65 font-mono text-xs focus-visible:border-primary/50 focus-visible:ring-primary/20" 
+                            placeholder="target-model" 
+                            @focus="handleTargetFocus"
+                            autocomplete="off"
+                          />
                         </div>
                         <Select v-if="supportsOpenAIAdvanced" :model-value="toSelectValue(row.reasoning)" @update:model-value="row.reasoning = fromSelectValue($event) as ReasoningEffort | ''">
                           <SelectTrigger class="h-8 rounded-lg border-border/70 bg-background/55 text-xs"><SelectValue :placeholder="tf('console.form.reasoningEffort', '思考强度')" /></SelectTrigger>
@@ -1475,10 +1478,14 @@ function buildCurrentPayload() {
                       </div>
                       <div class="min-w-0 space-y-1">
                         <div class="text-[9px] font-bold uppercase tracking-[0.16em] text-muted-foreground">TARGET</div>
-                        <Input v-model="newModelMapping.target" class="h-8 rounded-lg border-primary/25 bg-background/65 font-mono text-xs focus-visible:border-primary/60 focus-visible:ring-primary/20" placeholder="target-model" list="target-models-new" @focus="handleTargetFocus" @keydown.enter.prevent="addModelMappingRow" />
-                        <datalist id="target-models-new">
-                          <option v-for="m in targetModelDatalist" :key="m" :value="m" />
-                        </datalist>
+                        <Input 
+                          v-model="newModelMapping.target" 
+                          class="h-8 rounded-lg border-primary/25 bg-background/65 font-mono text-xs focus-visible:border-primary/60 focus-visible:ring-primary/20" 
+                          placeholder="target-model" 
+                          @focus="handleTargetFocus" 
+                          @keydown.enter.prevent="addModelMappingRow"
+                          autocomplete="off"
+                        />
                       </div>
                       <Select v-if="supportsOpenAIAdvanced" :model-value="toSelectValue(newModelMapping.reasoning)" @update:model-value="newModelMapping.reasoning = fromSelectValue($event) as ReasoningEffort | ''">
                         <SelectTrigger class="h-8 rounded-lg border-primary/25 bg-background/55 text-xs"><SelectValue :placeholder="tf('console.form.reasoningEffort', '思考强度')" /></SelectTrigger>
