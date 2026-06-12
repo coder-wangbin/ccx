@@ -1501,7 +1501,7 @@ function buildCurrentPayload() {
                           <div class="text-[9px] font-bold uppercase tracking-[0.16em] text-muted-foreground">TARGET</div>
                           <Input 
                             v-model="row.target" 
-                            class="h-8 rounded-lg border border-border/70 bg-background/65 font-mono text-xs ring-[3px] ring-transparent focus-visible:border-primary/50 focus-visible:ring-primary/20" 
+                            class="h-8 rounded-lg border border-border/70 bg-background/65 font-mono text-xs shadow-[0_0_0_3px_transparent] focus-visible:border-primary/50 focus-visible:shadow-[0_0_0_3px_hsl(var(--primary)/0.2)]" 
                             placeholder="target-model" 
                             autocomplete="off"
                             @focus="handleTargetFocus(); showTargetDropdown(`row-${index}`, row.target)"
@@ -1548,7 +1548,7 @@ function buildCurrentPayload() {
                     <div class="grid grid-cols-[minmax(110px,0.58fr)_auto_minmax(0,1.42fr)_auto_auto] items-end gap-2">
                       <div class="min-w-0 space-y-1">
                         <div class="text-[9px] font-bold uppercase tracking-[0.16em] text-muted-foreground">SOURCE</div>
-                        <Input v-model="newModelMapping.source" class="h-8 rounded-lg border border-primary/25 bg-background/65 font-mono text-xs ring-[3px] ring-transparent focus-visible:border-primary/60 focus-visible:ring-primary/20" placeholder="source-model" list="source-models-new" @keydown.enter.prevent="addModelMappingRow" />
+                        <Input v-model="newModelMapping.source" class="h-8 rounded-lg border border-primary/25 bg-background/65 font-mono text-xs shadow-[0_0_0_3px_transparent] focus-visible:border-primary/60 focus-visible:shadow-[0_0_0_3px_hsl(var(--primary)/0.2)]" placeholder="source-model" list="source-models-new" @keydown.enter.prevent="addModelMappingRow" />
                         <datalist id="source-models-new"><option v-for="m in sourceModelOptions" :key="m" :value="m" /></datalist>
                       </div>
                       <div class="flex h-8 items-center text-primary">
@@ -1558,7 +1558,7 @@ function buildCurrentPayload() {
                         <div class="text-[9px] font-bold uppercase tracking-[0.16em] text-muted-foreground">TARGET</div>
                         <Input 
                           v-model="newModelMapping.target" 
-                          class="h-8 rounded-lg border border-primary/25 bg-background/65 font-mono text-xs ring-[3px] ring-transparent focus-visible:border-primary/60 focus-visible:ring-primary/20" 
+                          class="h-8 rounded-lg border border-primary/25 bg-background/65 font-mono text-xs shadow-[0_0_0_3px_transparent] focus-visible:border-primary/60 focus-visible:shadow-[0_0_0_3px_hsl(var(--primary)/0.2)]" 
                           placeholder="target-model" 
                           autocomplete="off"
                           @focus="handleTargetFocus(); showTargetDropdown('new', newModelMapping.target)"
