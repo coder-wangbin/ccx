@@ -195,6 +195,18 @@
               />
             </div>
 
+            <!-- Fast Mode -->
+            <div v-if="supportsOpenAIAdvancedOptions" class="d-flex align-center justify-space-between">
+              <div class="d-flex align-center ga-2">
+                <v-icon color="primary">mdi-fast-forward</v-icon>
+                <div>
+                  <div class="section-title section-title--soft">{{ t('addChannel.fastModeLabel') }}</div>
+                  <div class="text-caption text-medium-emphasis">{{ t('addChannel.fastModeHint') }}</div>
+                </div>
+              </div>
+              <v-switch :model-value="form.fastMode" inset color="primary" hide-details @update:model-value="updateField('fastMode', $event)" />
+            </div>
+
             <!-- Inject Dummy Thought Signature (Gemini) -->
             <div v-if="(channelType === 'gemini' || channelType === 'messages') && form.serviceType === 'gemini'" class="d-flex align-center justify-space-between">
               <div class="d-flex align-center ga-2">
@@ -253,6 +265,27 @@
                 </div>
               </div>
               <v-switch :model-value="form.stripEmptyTextBlocks" inset color="warning" hide-details @update:model-value="updateField('stripEmptyTextBlocks', $event)" />
+            </div>
+
+            <!-- Historical Image Turn Limit -->
+            <div v-if="channelType === 'messages' || channelType === 'chat'" class="d-flex align-center justify-space-between">
+              <div class="d-flex align-center ga-2 flex-1">
+                <v-icon color="primary">mdi-image-multiple</v-icon>
+                <div class="flex-1">
+                  <div class="section-title section-title--soft">{{ t('addChannel.historicalImageTurnLimitLabel') }}</div>
+                  <div class="text-caption text-medium-emphasis">{{ t('addChannel.historicalImageTurnLimitHint') }}</div>
+                </div>
+              </div>
+              <v-text-field
+                :model-value="form.historicalImageTurnLimit"
+                type="number"
+                min="0"
+                variant="outlined"
+                density="comfortable"
+                hide-details
+                style="max-width: 120px;"
+                @update:model-value="updateField('historicalImageTurnLimit', Number($event))"
+              />
             </div>
           </div>
         </v-card>
@@ -400,12 +433,14 @@ interface FormData {
   stripBillingHeader?: boolean
   normalizeNonstandardChatRoles?: boolean
   reasoningParamStyle?: string
+  fastMode?: boolean
   injectDummyThoughtSignature?: boolean
   stripThoughtSignature?: boolean
   passbackReasoningContent?: boolean
   passbackThinkingBlocks?: boolean
   stripEmptyTextBlocks?: boolean
   normalizeSystemRoleToTopLevel?: boolean
+  historicalImageTurnLimit?: number
   proxyUrl: string
   requestTimeoutMs: string | number | null
   rateLimitRpm: string | number | null

@@ -201,6 +201,8 @@ import {
   mdiUpdate,
   mdiCached,
   mdiPlusCircleOutline,
+  mdiFastForward,
+  mdiImageMultiple,
 } from '@mdi/js'
 
 // 图标名称到 SVG path 的映射 (使用 kebab-case)
@@ -313,12 +315,14 @@ const iconMap: Record<string, string> = {
   'text': mdiText,
   'tune': mdiTune,
   'image-sync': mdiImageSync,
+  'image-multiple': mdiImageMultiple,
   'dice-6': mdiDice6,
   'heart-pulse': mdiHeartPulse,
   'server-network': mdiServerNetwork,
   'pin': mdiPin,
   'pin-outline': mdiPinOutline,
   'lightning-bolt': mdiLightningBolt,
+  'fast-forward': mdiFastForward,
   'form-textbox': mdiFormTextbox,
   'identifier': mdiIdentifier,
   'clock-outline': mdiClockOutline,
