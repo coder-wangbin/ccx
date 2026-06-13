@@ -45,6 +45,12 @@ import { VDivider } from 'vuetify/components/VDivider'
 // 表格组件
 import { VTable } from 'vuetify/components/VTable'
 
+// 标签页组件
+import { VTabs, VTab } from 'vuetify/components/VTabs'
+
+// 窗口组件
+import { VWindow, VWindowItem } from 'vuetify/components/VWindow'
+
 // 过渡动画
 import { VExpandTransition } from 'vuetify/components/transitions'
 
@@ -536,6 +542,12 @@ export default createVuetify({
     VDivider,
     // 表格
     VTable,
+    // 标签页
+    VTabs,
+    VTab,
+    // 窗口
+    VWindow,
+    VWindowItem,
     // 过渡
     VExpandTransition,
   },

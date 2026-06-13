@@ -52,14 +52,13 @@
         </div>
 
         <!-- 编辑模式：左侧导航 + 右侧面板 -->
-        <div v-else class="d-flex" style="height: 100%;">
+        <div v-else class="content-row" style="height: 100%;">
           <!-- 左侧垂直导航 -->
           <div class="nav-sidebar">
             <v-tabs
               v-model="activeTab"
               direction="vertical"
               color="primary"
-              class="nav-tabs"
             >
               <v-tab value="basic">
                 <v-icon start>mdi-information</v-icon>
@@ -2777,45 +2776,49 @@ onUnmounted(() => {
   font-family: 'SF Mono', 'Fira Code', Monaco, Consolas, monospace !important;
 }
 
-/* 垂直导航样式 */
-.add-channel-dialog {
+/* 垂直导航布局 */
+.content-row {
   display: flex;
-  flex-direction: column;
+  height: 100%;
+  min-height: 0;
 }
 
 .nav-sidebar {
   width: 220px;
   min-width: 220px;
+  flex-shrink: 0;
   border-right: 1px solid rgba(var(--v-border-color), 0.12);
   background: rgba(var(--v-theme-surface-variant), 0.3);
   overflow-y: auto;
 }
 
-.nav-tabs {
+.nav-sidebar :deep(.v-tabs) {
   height: 100%;
 }
 
-.nav-tabs :deep(.v-tab) {
+.nav-sidebar :deep(.v-tab) {
   justify-content: flex-start;
   text-transform: none;
   letter-spacing: normal;
   font-size: 0.875rem;
   min-height: 48px;
-  padding: 0 16px;
 }
 
-.nav-tabs :deep(.v-tab .v-icon) {
+.nav-sidebar :deep(.v-tab .v-icon) {
   margin-right: 8px;
 }
 
 .content-area {
   flex: 1;
+  min-width: 0;
   overflow-y: auto;
-  background: rgba(var(--v-theme-surface), 0.5);
 }
 
 .content-area :deep(.v-window-item) {
   overflow-y: auto;
 }
 
+.content-area :deep(.v-window) {
+  height: 100%;
+}
 </style>
