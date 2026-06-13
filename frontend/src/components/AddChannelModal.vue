@@ -2,47 +2,23 @@
   <v-dialog :model-value="show" max-width="1200" persistent @update:model-value="$emit('update:show', $event)">
     <v-card rounded="lg" class="add-channel-dialog">
       <!-- 头部 -->
-      <v-card-title class="d-flex align-center ga-3 pa-6" :class="headerClasses">
-        <v-avatar :color="avatarColor" variant="flat" size="40">
-          <v-icon :style="headerIconStyle" size="20">{{ isEditing ? 'mdi-pencil' : 'mdi-plus' }}</v-icon>
-        </v-avatar>
-        <div class="flex-grow-1 modal-header-text">
-          <div class="modal-title">
-            {{ isEditing ? t('addChannel.editTitle') : t('addChannel.createTitle') }}
-          </div>
-          <div class="modal-subtitle" :class="subtitleClasses">
-            {{ isEditing ? t('addChannel.editSubtitle') : t('addChannel.quickSubtitle') }}
-          </div>
-        </div>
-        <div v-if="isEditing && props.channelType !== 'images'" class="header-capability-actions">
-          <v-tooltip location="bottom" :text="form.noVision ? t('channelCard.noVision') : t('channelCard.hasVision')" :open-delay="150" content-class="key-tooltip">
-            <template #activator="{ props: tip }">
-              <v-btn
-                v-bind="tip"
-                :color="form.noVision ? 'warning' : undefined"
-                :variant="form.noVision ? 'tonal' : 'text'"
-                size="small"
-                icon
-                rounded="lg"
-                class="mr-2"
-                @click="form.noVision = !form.noVision"
-              >
-                <v-icon size="18">{{ form.noVision ? 'mdi-eye-off' : 'mdi-eye' }}</v-icon>
-              </v-btn>
-            </template>
-          </v-tooltip>
-          <v-btn
-            color="success"
-            variant="flat"
-            size="small"
-            prepend-icon="mdi-test-tube"
-            class="capability-test-btn"
-            @click="handleTestCapability"
-          >
-            {{ t('addChannel.testCapability') }}
-          </v-btn>
-        </div>
-      </v-card-title>
+      <AddChannelHeader
+        :is-editing="isEditing"
+        :channel-type="props.channelType"
+        :no-vision="form.noVision"
+        :header-classes="headerClasses"
+        :avatar-color="avatarColor"
+        :header-icon-style="headerIconStyle"
+        :subtitle-classes="subtitleClasses"
+        :edit-title="t('addChannel.editTitle')"
+        :create-title="t('addChannel.createTitle')"
+        :edit-subtitle="t('addChannel.editSubtitle')"
+        :create-subtitle="t('addChannel.quickSubtitle')"
+        :test-capability-label="t('addChannel.testCapability')"
+        :vision-tooltip="form.noVision ? t('channelCard.noVision') : t('channelCard.hasVision')"
+        @toggle-no-vision="form.noVision = !form.noVision"
+        @test-capability="handleTestCapability"
+      />
 
       <!-- 主体内容 -->
       <v-card-text class="pa-0" style="height: 600px;">
@@ -54,19 +30,11 @@
         <!-- 编辑模式：左侧导航 + 右侧面板 -->
         <div v-else class="content-row" style="height: 100%;">
           <!-- 左侧垂直导航 -->
-          <nav class="nav-sidebar">
-            <div class="nav-sidebar-title">配置大纲</div>
-            <button
-              v-for="s in sections"
-              :key="s.id"
-              class="nav-item"
-              :class="{ 'nav-item--active': activeSection === s.id }"
-              @click="scrollToSection(s.id)"
-            >
-              <v-icon size="20" class="nav-item-icon">{{ s.icon }}</v-icon>
-              {{ s.label }}
-            </button>
-          </nav>
+          <AddChannelSidebarNav
+            :sections="sections"
+            :active-section="activeSection"
+            @navigate="scrollToSection"
+          />
 
           <!-- 右侧内容面板 -->
           <v-form ref="formRef" class="content-area" @submit.prevent="handleSubmit">
@@ -239,6 +207,8 @@ import { streamTimeoutPresets } from '../utils/streamTimeoutPresets'
 import { useI18n } from '../i18n'
 
 // 子组件导入
+import AddChannelHeader from './add-channel/AddChannelHeader.vue'
+import AddChannelSidebarNav from './add-channel/AddChannelSidebarNav.vue'
 import QuickInputSection from './add-channel/QuickInputSection.vue'
 import BasicInfoSection from './add-channel/BasicInfoSection.vue'
 import ApiKeyManagementSection from './add-channel/ApiKeyManagementSection.vue'
