@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/BenedictKing/ccx/internal/config"
 	"github.com/BenedictKing/ccx/internal/conversation"
 	"github.com/BenedictKing/ccx/internal/scheduler"
 	"github.com/gin-gonic/gin"
@@ -13,6 +14,7 @@ type ConversationHandlerDeps struct {
 	Tracker          *conversation.ConversationTracker
 	OverrideManager  *conversation.OverrideManager
 	ChannelScheduler *scheduler.ChannelScheduler
+	ConfigManager    *config.ConfigManager
 }
 
 func GetConversations(deps *ConversationHandlerDeps) gin.HandlerFunc {
@@ -128,6 +130,62 @@ func RemoveConversationOverride(deps *ConversationHandlerDeps) gin.HandlerFunc {
 		c.JSON(http.StatusOK, gin.H{
 			"message":        "override removed",
 			"conversationId": convID,
+		})
+	}
+}
+
+// GetConversationSettings 获取驾驶舱设置
+func GetConversationSettings(deps *ConversationHandlerDeps) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		cfg := deps.ConfigManager.GetConfig()
+
+		// 获取有效的 override TTL（优先使用配置文件中的值，否则返回 0 表示使用环境变量默认值）
+		overrideTTLMinutes := cfg.OverrideTTLMinutes
+
+		c.JSON(http.StatusOK, gin.H{
+			"overrideTtlMinutes": overrideTTLMinutes,
+		})
+	}
+}
+
+type UpdateConversationSettingsRequest struct {
+	OverrideTTLMinutes *int `json:"overrideTtlMinutes"` // 1-1440；nil 表示不修改
+}
+
+// UpdateConversationSettings 更新驾驶舱设置
+func UpdateConversationSettings(deps *ConversationHandlerDeps) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var req UpdateConversationSettingsRequest
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request: " + err.Error()})
+			return
+		}
+
+		if req.OverrideTTLMinutes != nil {
+			ttl := *req.OverrideTTLMinutes
+			// 范围：1-1440 分钟，或 -1 表示永不恢复
+			if ttl != -1 && (ttl < 1 || ttl > 1440) {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "overrideTtlMinutes must be -1 (never) or between 1 and 1440"})
+				return
+			}
+
+			// 更新配置文件
+			if err := deps.ConfigManager.SetOverrideTTLMinutes(ttl); err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update config: " + err.Error()})
+				return
+			}
+
+			// 动态更新 OverrideManager 的默认 TTL
+			if ttl == -1 {
+				// -1 表示永不过期
+				deps.OverrideManager.SetDefaultTTL(-1)
+			} else {
+				deps.OverrideManager.SetDefaultTTL(time.Duration(ttl) * time.Minute)
+			}
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"message": "settings updated successfully",
 		})
 	}
 }

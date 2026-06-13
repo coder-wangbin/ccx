@@ -27,7 +27,7 @@ const {
 
 const kindFilter = ref('')
 const searchQuery = ref('')
-const overrideDuration = ref('1800') // 默认 30min（对齐 OVERRIDE_TTL_MINUTES=30）
+const overrideDuration = ref('1800') // 默认 30min，启动后从后端加载
 const nowMs = ref(Date.now())
 const expandedCards = ref(new Set<string>())
 const masonryEl = ref<HTMLElement | null>(null)
@@ -94,6 +94,29 @@ const durationOptions = computed(() => [
 
 function overrideDurationAsNumber(): number {
   return Number(overrideDuration.value)
+}
+
+async function loadSettings() {
+  try {
+    const data = await api.get<{ overrideTtlMinutes: number }>('/api/conversations/settings')
+    if (data.overrideTtlMinutes !== 0) {
+      // 将分钟转为秒（-1 保持为 -1）
+      overrideDuration.value = data.overrideTtlMinutes === -1 ? '-1' : String(data.overrideTtlMinutes * 60)
+    }
+  } catch (e) {
+    console.error('[ConversationDashboard] 加载设置失败:', e)
+  }
+}
+
+async function saveSettings(newDurationSeconds: number) {
+  try {
+    // 将秒转为分钟（-1 保持为 -1）
+    const minutes = newDurationSeconds === -1 ? -1 : Math.round(newDurationSeconds / 60)
+    await api.put('/api/conversations/settings', { overrideTtlMinutes: minutes })
+  } catch (e) {
+    showNotice('destructive', e instanceof Error ? e.message : String(e))
+    throw e
+  }
 }
 
 function showNotice(variant: 'success' | 'destructive', message: string) {
@@ -247,6 +270,7 @@ const { pause: pauseClockTick, resume: resumeClockTick } = useIntervalFn(() => {
 onMounted(() => {
   resumeDataTick()
   resumeClockTick()
+  loadSettings().catch(() => {})
   refreshConversations().catch(() => {})
 })
 
@@ -285,6 +309,18 @@ watch(visibleConversations, async () => {
 watch(masonryColumnCount, () => scheduleMasonryLayout())
 watch(shouldRefresh, running => {
   if (running) refreshConversations().catch(() => {})
+})
+
+// 监听 overrideDuration 变化并保存到后端（包括 -1 永不恢复）
+watch(overrideDuration, async (newDuration) => {
+  const seconds = Number(newDuration)
+  if (!isNaN(seconds) && seconds !== 0) {
+    try {
+      await saveSettings(seconds)
+    } catch (e) {
+      // 错误已在 saveSettings 中显示
+    }
+  }
 })
 </script>
 

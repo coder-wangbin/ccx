@@ -406,10 +406,25 @@ func main() {
 
 	// 初始化对话追踪器和覆盖管理器
 	conversationTracker := conversation.NewConversationTracker(1*time.Hour, 24*time.Hour, paths.ConversationStatePath)
-	overrideTTL := time.Duration(envCfg.OverrideTTLMinutes) * time.Minute
+
+	// 获取 override TTL：优先使用配置文件中的值，否则使用环境变量
+	cfg := cfgManager.GetConfig()
+	overrideTTLMinutes := cfg.OverrideTTLMinutes
+	if overrideTTLMinutes == 0 {
+		overrideTTLMinutes = envCfg.OverrideTTLMinutes
+	}
+
+	var overrideTTL time.Duration
+	if overrideTTLMinutes == -1 {
+		overrideTTL = -1 // 永不过期
+		log.Printf("[Conversation-Init] 对话追踪器和覆盖管理器已初始化 (idle: 1h, expire: 2h, override TTL: 永不恢复)")
+	} else {
+		overrideTTL = time.Duration(overrideTTLMinutes) * time.Minute
+		log.Printf("[Conversation-Init] 对话追踪器和覆盖管理器已初始化 (idle: 1h, expire: 2h, override TTL: %dm)", overrideTTLMinutes)
+	}
+
 	overrideManager := conversation.NewOverrideManager(overrideTTL)
 	channelScheduler.SetConversationComponents(conversationTracker, overrideManager)
-	log.Printf("[Conversation-Init] 对话追踪器和覆盖管理器已初始化 (idle: 1h, expire: 2h, override TTL: %dm)", envCfg.OverrideTTLMinutes)
 
 	scheduledRecoveryStop := make(chan struct{})
 	go func() {
@@ -724,10 +739,13 @@ func main() {
 			Tracker:          conversationTracker,
 			OverrideManager:  overrideManager,
 			ChannelScheduler: channelScheduler,
+			ConfigManager:    cfgManager,
 		}
 		apiGroup.GET("/conversations", handlers.GetConversations(convDeps))
 		apiGroup.POST("/conversations/:id/override", handlers.SetConversationOverride(convDeps))
 		apiGroup.DELETE("/conversations/:id/override", handlers.RemoveConversationOverride(convDeps))
+		apiGroup.GET("/conversations/settings", handlers.GetConversationSettings(convDeps))
+		apiGroup.PUT("/conversations/settings", handlers.UpdateConversationSettings(convDeps))
 	}
 
 	// 代理端点 - Messages API
