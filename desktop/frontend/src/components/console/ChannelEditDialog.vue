@@ -1514,7 +1514,7 @@ void fromSelectValue
 
           <!-- 底部按钮栏 -->
           <div class="flex shrink-0 flex-wrap items-center justify-end gap-3 border-t border-border bg-card/80 p-4 backdrop-blur-md">
-            <Button variant="outline" @click="emit('close')">
+            <Button variant="secondary" @click="emit('close')">
               {{ tf('common.cancel', '取消') }}
               <span class="ml-1.5 hidden sm:inline-flex h-4 select-none items-center gap-1 rounded border bg-transparent px-1.5 font-mono text-[9px] font-medium text-muted-foreground/80">Esc</span>
             </Button>
