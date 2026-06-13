@@ -113,10 +113,14 @@ cat .claude/skills/upstream-check/scripts/upstream-state.json
 
 ## Codex
 - 本地版本: 0.137.0
-- 远程版本: 0.137.0
-- 状态: ✅ 已是最新
+- 远程版本: 0.138.0
+- 状态: ⬆️ 有新版本可用
 - 协议/工具变更: 发现变更 - multi-agent, skills, plugins, web search
 ```
+
+**重要**：协议/工具变更字段的逻辑：
+- **仅当 `up_to_date: false` 且 `protocol_changes: true` 时**，显示"发现变更 - [关键词]"
+- **其他情况（版本一致或无关键词匹配）**，显示"无"
 
 ### 8. 输出功能与体验变更报告
 
