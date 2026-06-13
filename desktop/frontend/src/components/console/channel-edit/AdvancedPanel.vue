@@ -29,6 +29,8 @@ interface FormData {
   codexToolCompat: boolean
   stripCodexClientTools: boolean
   stripImageGenerationTool: boolean
+  reasoningParamStyle: string
+  serviceType: string
   proxyUrl: string
   routePrefix: string
   rateLimitRpm: string | number
@@ -49,6 +51,8 @@ const props = defineProps<{
   channelType: string
   textVerbosityOptions: Array<{ label: string; value: string }>
   supportsOpenAIAdvanced: boolean
+  supportsOpenAIAdvancedOptions: boolean
+  supportsChatRoleNormalization: boolean
   DEFAULT_SELECT_VALUE: string
 }>()
 
@@ -151,7 +155,19 @@ function fromSelectValue(value: string): string {
           Compatibility 协议规范化
         </div>
         <div class="space-y-2">
-          <div class="flex items-center justify-between">
+          <div v-if="channelType === 'responses'" class="flex items-center justify-between">
+            <Label class="text-xs font-medium">{{ tf('console.form.codexNativeToolPassthrough', 'Codex 原生工具透传') }}</Label>
+            <Switch :model-value="form.codexNativeToolPassthrough" @update:model-value="updateField('codexNativeToolPassthrough', $event)" />
+          </div>
+          <div v-if="channelType === 'responses'" class="flex items-center justify-between">
+            <Label class="text-xs font-medium">{{ tf('console.form.codexToolCompat', 'Codex 工具兼容模式') }}</Label>
+            <Switch :model-value="form.codexToolCompat" @update:model-value="updateField('codexToolCompat', $event)" />
+          </div>
+          <div v-if="channelType === 'responses' || channelType === 'chat'" class="flex items-center justify-between">
+            <Label class="text-xs font-medium">{{ tf('console.form.stripImageGenerationTool', '过滤图像生成工具') }}</Label>
+            <Switch :model-value="form.stripImageGenerationTool" @update:model-value="updateField('stripImageGenerationTool', $event)" />
+          </div>
+          <div v-if="channelType === 'messages'" class="flex items-center justify-between">
             <Label class="text-xs font-medium">{{ tf('console.form.normalizeSystemRole', '规范化 System 角色域') }}</Label>
             <Switch :model-value="form.normalizeSystemRoleToTopLevel" @update:model-value="updateField('normalizeSystemRoleToTopLevel', $event)" />
           </div>
@@ -162,6 +178,48 @@ function fromSelectValue(value: string): string {
           <div v-if="channelType === 'messages'" class="flex items-center justify-between">
             <Label class="text-xs font-medium">{{ tf('console.form.stripBillingHeader', '抽离并剔除 CCH 计费尾缀') }}</Label>
             <Switch :model-value="form.stripBillingHeader" @update:model-value="updateField('stripBillingHeader', $event)" />
+          </div>
+          <div v-if="supportsChatRoleNormalization" class="flex items-center justify-between">
+            <Label class="text-xs font-medium">{{ tf('console.form.normalizeNonstandardChatRoles', '规范化非标准聊天角色') }}</Label>
+            <Switch :model-value="form.normalizeNonstandardChatRoles" @update:model-value="updateField('normalizeNonstandardChatRoles', $event)" />
+          </div>
+          <div v-if="supportsOpenAIAdvancedOptions" class="flex items-center justify-between">
+            <div class="flex-1">
+              <Label class="text-xs font-medium">{{ tf('console.form.reasoningParamStyle', 'Reasoning 参数样式') }}</Label>
+            </div>
+            <Select
+              :model-value="form.reasoningParamStyle || 'default'"
+              @update:model-value="(val) => updateField('reasoningParamStyle', val === 'default' ? '' : String(val))"
+            >
+              <SelectTrigger class="h-8 w-[140px] text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="default">默认</SelectItem>
+                <SelectItem value="reasoning_effort">reasoning_effort</SelectItem>
+                <SelectItem value="developer_message">developer_message</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div v-if="(channelType === 'gemini' || channelType === 'messages') && form.serviceType === 'gemini'" class="flex items-center justify-between">
+            <Label class="text-xs font-medium">{{ tf('console.form.injectDummyThoughtSignature', '注入 Gemini 思考标记') }}</Label>
+            <Switch :model-value="form.injectDummyThoughtSignature" @update:model-value="updateField('injectDummyThoughtSignature', $event)" />
+          </div>
+          <div v-if="form.serviceType === 'gemini'" class="flex items-center justify-between">
+            <Label class="text-xs font-medium">{{ tf('console.form.stripThoughtSignature', '剥离 Gemini 思考标记') }}</Label>
+            <Switch :model-value="form.stripThoughtSignature" @update:model-value="updateField('stripThoughtSignature', $event)" />
+          </div>
+          <div v-if="(channelType === 'messages' || channelType === 'chat' || channelType === 'responses') && form.serviceType === 'claude'" class="flex items-center justify-between">
+            <Label class="text-xs font-medium">{{ tf('console.form.passbackReasoningContent', '回传 Claude 推理内容') }}</Label>
+            <Switch :model-value="form.passbackReasoningContent" @update:model-value="updateField('passbackReasoningContent', $event)" />
+          </div>
+          <div v-if="(channelType === 'messages' || channelType === 'chat' || channelType === 'responses') && form.serviceType === 'claude'" class="flex items-center justify-between">
+            <Label class="text-xs font-medium">{{ tf('console.form.passbackThinkingBlocks', '回传 Claude 思考块') }}</Label>
+            <Switch :model-value="form.passbackThinkingBlocks" @update:model-value="updateField('passbackThinkingBlocks', $event)" />
+          </div>
+          <div v-if="channelType === 'messages' && form.serviceType === 'claude'" class="flex items-center justify-between">
+            <Label class="text-xs font-medium">{{ tf('console.form.stripEmptyTextBlocks', '剥离空文本块') }}</Label>
+            <Switch :model-value="form.stripEmptyTextBlocks" @update:model-value="updateField('stripEmptyTextBlocks', $event)" />
           </div>
         </div>
       </div>

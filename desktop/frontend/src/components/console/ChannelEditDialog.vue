@@ -989,6 +989,10 @@ const serviceTypeOptions = computed(() => {
 })
 
 const supportsOpenAIAdvanced = computed(() => form.serviceType === 'openai' || form.serviceType === 'responses')
+const supportsOpenAIAdvancedOptions = computed(() => form.serviceType === 'openai' || form.serviceType === 'responses')
+const supportsChatRoleNormalization = computed(() => {
+  return props.channelType === 'chat' || (props.channelType === 'responses' && form.serviceType === 'openai')
+})
 const showModelMappingPresets = computed(() => props.channelType === 'messages' && supportsOpenAIAdvanced.value)
 const showClaudeChannelPresets = computed(() => form.serviceType === 'claude' && ['messages', 'chat', 'responses'].includes(props.channelType))
 const showCodexResponsesPresets = computed(() => props.channelType === 'responses' && supportsOpenAIAdvanced.value)
@@ -1485,6 +1489,8 @@ void fromSelectValue
                         :channel-type="channelType"
                         :text-verbosity-options="textVerbosityOptions"
                         :supports-open-a-i-advanced="supportsOpenAIAdvanced"
+                        :supports-open-a-i-advanced-options="supportsOpenAIAdvancedOptions"
+                        :supports-chat-role-normalization="supportsChatRoleNormalization"
                         :DEFAULT_SELECT_VALUE="DEFAULT_SELECT_VALUE"
                         @update:form="(updates) => Object.assign(form, updates)"
                       />
