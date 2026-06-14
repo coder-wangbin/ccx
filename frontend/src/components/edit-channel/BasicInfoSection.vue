@@ -5,8 +5,8 @@
       <v-col cols="12" md="6">
         <v-text-field
           :model-value="form.name"
-          :label="t('addChannel.nameLabel')"
-          :placeholder="t('addChannel.namePlaceholder')"
+          :label="t('channelEditor.basic.name.label')"
+          :placeholder="t('channelEditor.basic.name.placeholder')"
           prepend-inner-icon="mdi-tag"
           variant="outlined"
           density="comfortable"
@@ -21,7 +21,7 @@
       <v-col cols="12" md="6">
         <v-select
           :model-value="form.serviceType"
-          :label="t('addChannel.serviceTypeLabel')"
+          :label="t('channelEditor.basic.serviceType.label')"
           :items="serviceTypeOptions"
           prepend-inner-icon="mdi-cog"
           variant="outlined"
@@ -39,8 +39,8 @@
       <v-col cols="12">
         <v-textarea
           :model-value="baseUrlsText"
-          :label="t('addChannel.baseUrlLabel')"
-          :placeholder="t('addChannel.baseUrlPlaceholder')"
+          :label="t('channelEditor.basic.baseUrl.label')"
+          :placeholder="t('channelEditor.basic.baseUrl.placeholder')"
           prepend-inner-icon="mdi-web"
           variant="outlined"
           density="comfortable"
@@ -66,8 +66,8 @@
       <v-col cols="12">
         <v-text-field
           :model-value="form.website"
-          :label="t('addChannel.websiteLabel')"
-          :placeholder="t('addChannel.websitePlaceholder')"
+          :label="t('channelEditor.basic.website.label')"
+          :placeholder="t('channelEditor.basic.website.placeholder')"
           prepend-inner-icon="mdi-open-in-new"
           variant="outlined"
           density="comfortable"

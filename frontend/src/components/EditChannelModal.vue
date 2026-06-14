@@ -268,11 +268,11 @@ function detachScrollListener() {
 
 // 导航 section 定义（与桌面端保持一致）
 const sections = [
-  { id: 'basic', label: t('addChannel.basicInfo') },
-  { id: 'auth', label: t('addChannel.authentication') },
-  { id: 'redirect', label: t('addChannel.modelRedirect') },
-  { id: 'advanced', label: t('addChannel.advancedOptions') },
-  { id: 'custom', label: t('addChannel.customParams') },
+  { id: 'basic', label: t('channelEditor.nav.basic') },
+  { id: 'auth', label: t('channelEditor.nav.auth') },
+  { id: 'redirect', label: t('channelEditor.nav.redirect') },
+  { id: 'advanced', label: t('channelEditor.nav.advanced') },
+  { id: 'custom', label: t('channelEditor.nav.custom') },
 ]
 
 function scrollToSection(id: string) {

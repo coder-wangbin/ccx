@@ -804,6 +804,40 @@ export type MessageKey =
   | 'chart.outputTokens'
   | 'chart.cacheRw'
   | 'chart.noData'
+  | 'channelEditor.title.create'
+  | 'channelEditor.title.edit'
+  | 'channelEditor.title.editSubtitle'
+  | 'channelEditor.nav.basic'
+  | 'channelEditor.nav.auth'
+  | 'channelEditor.nav.redirect'
+  | 'channelEditor.nav.advanced'
+  | 'channelEditor.nav.custom'
+  | 'channelEditor.basic.name.label'
+  | 'channelEditor.basic.name.placeholder'
+  | 'channelEditor.basic.name.required'
+  | 'channelEditor.basic.serviceType.label'
+  | 'channelEditor.basic.serviceType.required'
+  | 'channelEditor.basic.baseUrl.label'
+  | 'channelEditor.basic.baseUrl.placeholder'
+  | 'channelEditor.basic.baseUrl.required'
+  | 'channelEditor.basic.website.label'
+  | 'channelEditor.basic.website.placeholder'
+  | 'channelEditor.basic.description.label'
+  | 'channelEditor.basic.description.placeholder'
+  | 'channelEditor.auth.keys.label'
+  | 'channelEditor.auth.apiKeyRequired'
+  | 'channelEditor.auth.duplicateKey'
+  | 'channelEditor.auth.addNewApiKey.placeholder'
+  | 'channelEditor.mapping.redirect.title'
+  | 'channelEditor.mapping.configured.label'
+  | 'channelEditor.mapping.source.label'
+  | 'channelEditor.mapping.source.placeholder'
+  | 'channelEditor.mapping.target.label'
+  | 'channelEditor.mapping.target.placeholder'
+  | 'channelEditor.mapping.reasoningEffort.label'
+  | 'channelEditor.actions.create'
+  | 'channelEditor.actions.save'
+  | 'channelEditor.actions.cancel'
 
 export type Messages = Record<MessageKey, string>
 
@@ -1610,6 +1644,40 @@ export const messages: Record<SupportedLocale, Messages> = {
     'chart.outputTokens': 'Output tokens',
     'chart.cacheRw': 'Cache R/W',
     'chart.noData': 'No request data',
+    'channelEditor.title.create': 'Add new channel',
+    'channelEditor.title.edit': 'Edit channel',
+    'channelEditor.title.editSubtitle': 'Modify channel configuration',
+    'channelEditor.nav.basic': 'Basic Info',
+    'channelEditor.nav.auth': 'Authentication',
+    'channelEditor.nav.redirect': 'Model Redirect',
+    'channelEditor.nav.advanced': 'Advanced Options',
+    'channelEditor.nav.custom': 'Custom Parameters',
+    'channelEditor.basic.name.label': 'Channel name',
+    'channelEditor.basic.name.placeholder': 'e.g. OpenAI Production',
+    'channelEditor.basic.name.required': 'Channel name is required',
+    'channelEditor.basic.serviceType.label': 'Service type',
+    'channelEditor.basic.serviceType.required': 'Service type is required',
+    'channelEditor.basic.baseUrl.label': 'Base URL',
+    'channelEditor.basic.baseUrl.placeholder': 'https://api.openai.com/v1',
+    'channelEditor.basic.baseUrl.required': 'At least one Base URL is required',
+    'channelEditor.basic.website.label': 'Website',
+    'channelEditor.basic.website.placeholder': 'https://openai.com',
+    'channelEditor.basic.description.label': 'Description',
+    'channelEditor.basic.description.placeholder': 'Optional: note about this provider...',
+    'channelEditor.auth.keys.label': 'API Keys',
+    'channelEditor.auth.apiKeyRequired': 'At least one API key is required',
+    'channelEditor.auth.duplicateKey': 'Duplicate API key',
+    'channelEditor.auth.addNewApiKey.placeholder': 'Enter new API key',
+    'channelEditor.mapping.redirect.title': 'Model Redirect',
+    'channelEditor.mapping.configured.label': 'Configured',
+    'channelEditor.mapping.source.label': 'Source model',
+    'channelEditor.mapping.source.placeholder': 'gpt-4o',
+    'channelEditor.mapping.target.label': 'Target model',
+    'channelEditor.mapping.target.placeholder': 'claude-sonnet-4-6',
+    'channelEditor.mapping.reasoningEffort.label': 'Reasoning effort',
+    'channelEditor.actions.create': 'Create channel',
+    'channelEditor.actions.save': 'Save',
+    'channelEditor.actions.cancel': 'Cancel',
   },
   'zh-CN': {
     'common.gatewayLabel': 'CCX CORE',
@@ -2413,5 +2481,39 @@ export const messages: Record<SupportedLocale, Messages> = {
     'chart.outputTokens': '输出 Token',
     'chart.cacheRw': 'Cache R/W',
     'chart.noData': '暂无请求数据',
+    'channelEditor.title.create': '添加新渠道',
+    'channelEditor.title.edit': '编辑渠道',
+    'channelEditor.title.editSubtitle': '修改渠道配置',
+    'channelEditor.nav.basic': '基础信息',
+    'channelEditor.nav.auth': '认证管理',
+    'channelEditor.nav.redirect': '模型重定向',
+    'channelEditor.nav.advanced': '高级选项',
+    'channelEditor.nav.custom': '自定义参数',
+    'channelEditor.basic.name.label': '渠道名称',
+    'channelEditor.basic.name.placeholder': '例如 OpenAI 生产环境',
+    'channelEditor.basic.name.required': '渠道名称不能为空',
+    'channelEditor.basic.serviceType.label': '服务类型',
+    'channelEditor.basic.serviceType.required': '请选择服务类型',
+    'channelEditor.basic.baseUrl.label': 'Base URL',
+    'channelEditor.basic.baseUrl.placeholder': 'https://api.openai.com/v1',
+    'channelEditor.basic.baseUrl.required': '至少需要一个 Base URL',
+    'channelEditor.basic.website.label': '官方网站',
+    'channelEditor.basic.website.placeholder': 'https://openai.com',
+    'channelEditor.basic.description.label': '描述',
+    'channelEditor.basic.description.placeholder': '可选填，用于备注此节点供应商...',
+    'channelEditor.auth.keys.label': 'API Keys',
+    'channelEditor.auth.apiKeyRequired': '至少需要一个 API Key',
+    'channelEditor.auth.duplicateKey': '重复的 API Key',
+    'channelEditor.auth.addNewApiKey.placeholder': '输入新的 API Key',
+    'channelEditor.mapping.redirect.title': '模型重定向',
+    'channelEditor.mapping.configured.label': '已配置',
+    'channelEditor.mapping.source.label': '源模型',
+    'channelEditor.mapping.source.placeholder': 'gpt-4o',
+    'channelEditor.mapping.target.label': '目标模型',
+    'channelEditor.mapping.target.placeholder': 'claude-sonnet-4-6',
+    'channelEditor.mapping.reasoningEffort.label': '推理强度',
+    'channelEditor.actions.create': '创建渠道',
+    'channelEditor.actions.save': '保存',
+    'channelEditor.actions.cancel': '取消',
   },
 }

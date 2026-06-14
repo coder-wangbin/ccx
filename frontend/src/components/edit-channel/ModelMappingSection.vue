@@ -4,7 +4,7 @@
       <v-card-title class="d-flex align-center justify-space-between pa-4 pb-2">
         <div class="d-flex align-center ga-2">
           <v-icon color="primary">mdi-swap-horizontal</v-icon>
-          <span class="section-title">{{ t('addChannel.modelRedirect') }}</span>
+          <span class="section-title">{{ t('channelEditor.mapping.redirect.title') }}</span>
         </div>
         <v-chip size="small" color="secondary" variant="tonal">
           {{ t('addChannel.autoConvertModelNames') }}
@@ -128,7 +128,7 @@
           <!-- 已配置映射列表 -->
           <div v-if="mappingRows.length">
             <div class="text-caption text-medium-emphasis mb-3 d-flex align-center justify-space-between px-1">
-              <span class="uppercase-label">{{ t('addChannel.configuredMappings') }}</span>
+              <span class="uppercase-label">{{ t('channelEditor.mapping.configured.label') }}</span>
               <v-chip size="x-small" variant="flat" color="primary" class="font-weight-bold px-2 font-mono">
                 {{ mappingRows.length }}
               </v-chip>
@@ -235,13 +235,13 @@
           <div class="add-mapping-row d-flex align-center ga-3 pa-3 mt-3 rounded-lg">
             <v-combobox
               v-model="newMapping.source"
-              :label="t('addChannel.sourceModelLabel')"
+              :label="t('channelEditor.mapping.source.label')"
               :items="sourceModelOptions"
               variant="outlined"
               density="compact"
               hide-details
               class="flex-grow-1 font-mono"
-              :placeholder="t('addChannel.sourceModelPlaceholder')"
+              :placeholder="t('channelEditor.mapping.source.placeholder')"
               clearable
               :error="!!sourceMappingError"
               eager
@@ -254,7 +254,7 @@
 
             <v-combobox
               v-model="newMapping.target"
-              :label="t('addChannel.targetModelLabel')"
+              :label="t('channelEditor.mapping.target.label')"
               :placeholder="targetModelPlaceholder"
               :items="targetModelOptions"
               :loading="fetchingModels"

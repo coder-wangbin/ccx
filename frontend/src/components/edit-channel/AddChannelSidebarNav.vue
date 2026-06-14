@@ -40,8 +40,8 @@ defineEmits<{
 
 <style scoped>
 .sidebar-nav {
-  width: 160px;
-  min-width: 160px;
+  width: 190px;
+  min-width: 190px;
   flex-shrink: 0;
   border-right: 1px solid rgba(var(--v-border-color), 0.12);
   background: rgba(var(--v-theme-surface), 1);

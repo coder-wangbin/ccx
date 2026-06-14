@@ -1384,7 +1384,7 @@ void fromSelectValue
           <!-- 主内容区域：滚动定位导航 -->
           <div class="min-h-0 flex-1 flex">
             <!-- 左侧导航 -->
-            <nav class="hidden md:flex w-40 shrink-0 flex-col items-stretch gap-1 rounded-none border-r border-border/50 bg-card/20 p-4">
+            <nav class="hidden md:flex w-[180px] shrink-0 flex-col items-stretch gap-1 rounded-none border-r border-border/50 bg-card/20 p-4">
               <div class="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60 px-3 mb-2">{{ tf('console.form.outline', '配置大纲') }}</div>
               <button
                 v-for="s in sections"
