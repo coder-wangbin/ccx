@@ -3,6 +3,7 @@ import { ref, computed } from 'vue'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ArrowRight, Eye, EyeOff, Plus, RotateCcw, Trash2, Zap } from 'lucide-vue-next'
 import { useLanguage } from '@/composables/useLanguage'
@@ -28,11 +29,13 @@ const props = defineProps<{
   targetInputFilter: string
   DEFAULT_SELECT_VALUE: string
   visionFallbackModel: string
+  supportedModelsText: string
 }>()
 
 const emit = defineEmits<{
   'update:newModelMapping': [value: Partial<ModelMappingRow>]
   'update:visionFallbackModel': [value: string]
+  'update:supportedModelsText': [value: string]
   'addModelMappingRow': []
   'removeModelMappingRow': [id: number]
   'updateMappingRow': [id: number, field: keyof ModelMappingRow, value: any]
@@ -212,6 +215,19 @@ function fromSelectValue(value: string): ReasoningEffort | '' {
         />
         <p class="text-[10px] text-muted-foreground">已通过模型重定向行的视觉开关标记禁用视觉模型；这些模型遇到图像输入时会自动切换到此模型处理</p>
       </div>
+    </div>
+
+    <!-- 限定可支持模型范围 -->
+    <div class="rounded-xl border border-border/60 bg-card/30 p-4 space-y-3">
+      <Label class="text-xs font-semibold text-muted-foreground">
+        {{ tf('console.form.supportedModelsLabel', '限定可支持模型范围（白名单模式，留空表示不限制）') }}
+      </Label>
+      <Textarea
+        :model-value="supportedModelsText"
+        placeholder="gpt-4*&#10;claude-3*"
+        class="w-full font-mono text-xs min-h-[64px]"
+        @update:model-value="(val) => emit('update:supportedModelsText', val as string)"
+      />
     </div>
 
     <!-- 添加新映射 -->

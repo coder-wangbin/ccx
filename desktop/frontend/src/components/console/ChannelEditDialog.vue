@@ -22,6 +22,7 @@ import AuthPanel from './channel-edit/AuthPanel.vue'
 import ModelMappingPanel from './channel-edit/ModelMappingPanel.vue'
 import AdvancedPanel from './channel-edit/AdvancedPanel.vue'
 import CustomHeadersPanel from './channel-edit/CustomHeadersPanel.vue'
+import StreamTimeoutPanel from './channel-edit/StreamTimeoutPanel.vue'
 
 interface Props {
   channel?: Channel | null
@@ -73,8 +74,8 @@ let scrollHandler: (() => void) | null = null
 // 导航 section 定义（使用 computed 保证语言切换后更新）
 const sections = computed(() => [
   { id: 'basic', label: tf('console.form.sectionBasic', '基础配置') },
-  { id: 'auth', label: tf('console.form.sectionAuth', '认证管理') },
   { id: 'redirect', label: tf('console.form.sectionRedirect', '模型重定向') },
+  { id: 'auth', label: tf('console.form.sectionAuth', '认证管理') },
   { id: 'advanced', label: tf('console.form.sectionAdvanced', '高级选项') },
   { id: 'headers', label: tf('console.form.sectionHeaders', '自定义参数') },
 ])
@@ -1423,6 +1424,35 @@ void fromSelectValue
                       />
                     </section>
 
+                    <!-- Section: 模型重定向 -->
+                    <section :ref="(el: any) => setSectionRef('redirect', el)" data-section-id="redirect" class="scroll-mt-4">
+                      <ModelMappingPanel
+                        :model-mapping-rows="modelMappingRows"
+                        :new-model-mapping="newModelMapping"
+                        :reasoning-effort-options="reasoningEffortOptions"
+                        :target-model-datalist="targetModelDatalist"
+                        :channel-type="channelType"
+                        :show-target-suggestions="showTargetSuggestions"
+                        :active-target-input-id="activeTargetInputId"
+                        :target-input-filter="targetInputFilter"
+                        :DEFAULT_SELECT_VALUE="DEFAULT_SELECT_VALUE"
+                        :vision-fallback-model="form.visionFallbackModel"
+                        :supported-models-text="form.supportedModelsText"
+                        @update:new-model-mapping="(updates) => Object.assign(newModelMapping, updates)"
+                        @update:vision-fallback-model="form.visionFallbackModel = $event"
+                        @update:supported-models-text="form.supportedModelsText = $event"
+                        @add-model-mapping-row="addModelMappingRow"
+                        @remove-model-mapping-row="removeModelMappingRow"
+                        @update-mapping-row="updateMappingRow"
+                        @sync-upstream-models="syncUpstreamModels"
+                        @apply-preset="applyPreset"
+                        @show-target-dropdown="showTargetDropdown"
+                        @hide-target-dropdown="hideTargetDropdown"
+                        @select-target-model="selectTargetModel"
+                        @handle-target-focus="handleTargetFocus"
+                      />
+                    </section>
+
                     <!-- Section: 认证管理 -->
                     <section :ref="(el: any) => setSectionRef('auth', el)" data-section-id="auth" class="scroll-mt-4">
                       <AuthPanel
@@ -1441,33 +1471,6 @@ void fromSelectValue
                         @move-api-key-to-bottom="moveApiKeyToBottom"
                         @copy-api-key="copyApiKey"
                         @handle-disabled-key-restore="handleDisabledKeyRestore"
-                      />
-                    </section>
-
-                    <!-- Section: 模型重定向 -->
-                    <section :ref="(el: any) => setSectionRef('redirect', el)" data-section-id="redirect" class="scroll-mt-4">
-                      <ModelMappingPanel
-                        :model-mapping-rows="modelMappingRows"
-                        :new-model-mapping="newModelMapping"
-                        :reasoning-effort-options="reasoningEffortOptions"
-                        :target-model-datalist="targetModelDatalist"
-                        :channel-type="channelType"
-                        :show-target-suggestions="showTargetSuggestions"
-                        :active-target-input-id="activeTargetInputId"
-                        :target-input-filter="targetInputFilter"
-                        :DEFAULT_SELECT_VALUE="DEFAULT_SELECT_VALUE"
-                        :vision-fallback-model="form.visionFallbackModel"
-                        @update:new-model-mapping="(updates) => Object.assign(newModelMapping, updates)"
-                        @update:vision-fallback-model="form.visionFallbackModel = $event"
-                        @add-model-mapping-row="addModelMappingRow"
-                        @remove-model-mapping-row="removeModelMappingRow"
-                        @update-mapping-row="updateMappingRow"
-                        @sync-upstream-models="syncUpstreamModels"
-                        @apply-preset="applyPreset"
-                        @show-target-dropdown="showTargetDropdown"
-                        @hide-target-dropdown="hideTargetDropdown"
-                        @select-target-model="selectTargetModel"
-                        @handle-target-focus="handleTargetFocus"
                       />
                     </section>
 
@@ -1495,6 +1498,12 @@ void fromSelectValue
                         @remove-header-row="removeHeaderRow"
                         @update-header-row="updateHeaderRow"
                       />
+                      <div class="mt-4">
+                        <StreamTimeoutPanel
+                          :form="form"
+                          @update:form="(updates) => Object.assign(form, updates)"
+                        />
+                      </div>
                     </section>
                   </form>
                 </ScrollArea>
