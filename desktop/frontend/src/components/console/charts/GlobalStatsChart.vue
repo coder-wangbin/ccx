@@ -388,8 +388,8 @@ const chartOptions = computed<ApexOptions>(() => {
     ? sortedModels.value.map((_, i) => modelColors[i % modelColors.length])
     : [chartColors.traffic.primary]
 
-  const textColor = isDark.value ? '#94a3b8' : '#64748b'
-  const gridBorder = isDark.value ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'
+  const textColor = isDark.value ? '#9ca3af' : '#6b7280'
+  const gridBorder = isDark.value ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'
   const xLabelFormat = selectedDuration.value === '7d' || selectedDuration.value === '30d' ? 'MM-dd HH:mm' : 'HH:mm'
 
   return {

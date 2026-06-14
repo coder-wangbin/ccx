@@ -120,8 +120,8 @@ const isDark = computed(() => {
   return false
 })
 
-const textColor = computed(() => (isDark.value ? '#94a3b8' : '#64748b'))
-const gridBorder = computed(() => (isDark.value ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'))
+const textColor = computed(() => (isDark.value ? '#9ca3af' : '#6b7280'))
+const gridBorder = computed(() => (isDark.value ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'))
 
 // Key color palette - supports up to 10 keys
 const KEY_COLORS = [
