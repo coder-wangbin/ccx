@@ -60,7 +60,7 @@
       <span v-for="(m, i) in topModels" :key="m.name" class="flex items-center gap-1">
         <span class="w-2 h-2 rounded-full" :style="{ backgroundColor: MODEL_COLORS[i % MODEL_COLORS.length] }" />
         <span class="font-medium">{{ m.name }}</span>
-        <span class="text-muted-foreground">{{ formatNumber(m.count) }} 次</span>
+        <span class="text-muted-foreground">{{ formatNumber(m.count) }} {{ t('chart.requestUnit') }}</span>
       </span>
     </div>
 
@@ -76,7 +76,7 @@
       style="height: 200px"
     >
       <div class="text-2xl mb-2 opacity-40">&#x1F4CA;</div>
-      <div class="text-xs">暂无模型统计数据</div>
+      <div class="text-xs">{{ t('chart.noModelData') }}</div>
     </div>
 
     <!-- Chart -->
@@ -97,6 +97,7 @@ import { computed, ref, watch, onMounted } from 'vue'
 import VueApexCharts from 'vue3-apexcharts'
 import type { ApexOptions } from 'apexcharts'
 import { useTheme } from '@/composables/useTheme'
+import { useI18n } from '@/i18n'
 import type { ModelHistoryDataPoint } from '@/services/admin-api'
 
 const props = withDefaults(
@@ -121,6 +122,7 @@ const loadPref = (apiType: string) => ({
 })
 
 const { theme } = useTheme()
+const { t } = useI18n()
 
 const isDark = computed(() => {
   if (theme.value === 'dark') return true
@@ -142,20 +144,20 @@ const MODEL_COLORS = [
   '#06b6d4', '#ec4899', '#84cc16', '#f59e0b', '#6366f1',
 ]
 
-const durationOptions = [
-  { label: '1h', value: '1h' as Duration },
-  { label: '6h', value: '6h' as Duration },
-  { label: '24h', value: '24h' as Duration },
-  { label: '今日', value: 'today' as Duration },
-  { label: '7d', value: '7d' as Duration },
-  { label: '30d', value: '30d' as Duration },
-]
+const durationOptions = computed(() => [
+  { label: t('chart.1h'), value: '1h' as Duration },
+  { label: t('chart.6h'), value: '6h' as Duration },
+  { label: t('chart.24h'), value: '24h' as Duration },
+  { label: t('chart.today'), value: 'today' as Duration },
+  { label: t('chart.7d'), value: '7d' as Duration },
+  { label: t('chart.30d'), value: '30d' as Duration },
+])
 
-const viewOptions = [
-  { label: '流量', value: 'requests' as ViewMode },
-  { label: 'Token', value: 'tokens' as ViewMode },
+const viewOptions = computed(() => [
+  { label: t('chart.traffic'), value: 'requests' as ViewMode },
+  { label: t('chart.tokens'), value: 'tokens' as ViewMode },
   { label: 'Cache', value: 'cache' as ViewMode },
-]
+])
 
 const sortedModels = computed(() => {
   if (!historyData.value?.models) return []
@@ -217,8 +219,8 @@ const chartOptions = computed<ApexOptions>(() => ({
     x: { format: 'MM-dd HH:mm' },
     y: {
       formatter: (val: number) => selectedView.value === 'requests'
-        ? `${Math.round(val)} 次`
-        : formatNumber(val)
+        ? `${Math.round(val)} ${t('chart.requestUnit')}`
+        : `${formatNumber(val)} ${t('chart.tokenUnit')}`
     }
   },
   legend: {

@@ -779,6 +779,7 @@
   "chart.total": "Total",
   "chart.collapse": "Collapse",
   "chart.noData": "No request data",
+  "chart.noModelData": "No model statistics",
   "chart.noModelRequestsInRange": "No model request records in the selected time range",
   "chart.historyLoadFailed": "Failed to load history data",
   "chart.modelStatsLoadFailed": "Failed to load model statistics",

@@ -776,6 +776,7 @@
   "chart.total": "合计",
   "chart.collapse": "收起",
   "chart.noData": "暂无请求数据",
+  "chart.noModelData": "暂无模型统计数据",
   "chart.noModelRequestsInRange": "选定时间范围内没有模型请求记录",
   "chart.historyLoadFailed": "加载历史数据失败",
   "chart.modelStatsLoadFailed": "加载模型统计失败",

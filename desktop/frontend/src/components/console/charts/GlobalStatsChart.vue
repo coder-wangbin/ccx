@@ -57,11 +57,11 @@
     <!-- Summary cards -->
     <div v-if="summary && !compact" class="flex flex-wrap gap-2 mb-3">
       <div class="flex-1 min-w-[80px] p-2 rounded-lg text-center bg-secondary/30 dark:bg-secondary/20">
-        <div class="text-xs text-muted-foreground font-medium mb-1">总请求数</div>
+        <div class="text-xs text-muted-foreground font-medium mb-1">{{ t('chart.totalRequests') }}</div>
         <div class="text-sm font-semibold">{{ formatNumber(summary.totalRequests) }}</div>
       </div>
       <div class="flex-1 min-w-[80px] p-2 rounded-lg text-center bg-secondary/30 dark:bg-secondary/20">
-        <div class="text-xs text-muted-foreground font-medium mb-1">成功率</div>
+        <div class="text-xs text-muted-foreground font-medium mb-1">{{ t('chart.successRate') }}</div>
         <div
           class="text-sm font-semibold"
           :class="{
@@ -74,11 +74,11 @@
         </div>
       </div>
       <div class="flex-1 min-w-[80px] p-2 rounded-lg text-center bg-secondary/30 dark:bg-secondary/20">
-        <div class="text-xs text-muted-foreground font-medium mb-1">输入 Token</div>
+        <div class="text-xs text-muted-foreground font-medium mb-1">{{ t('chart.inputTokens') }}</div>
         <div class="text-sm font-semibold">{{ formatNumber(summary.totalInputTokens) }}</div>
       </div>
       <div class="flex-1 min-w-[80px] p-2 rounded-lg text-center bg-secondary/30 dark:bg-secondary/20">
-        <div class="text-xs text-muted-foreground font-medium mb-1">输出 Token</div>
+        <div class="text-xs text-muted-foreground font-medium mb-1">{{ t('chart.outputTokens') }}</div>
         <div class="text-sm font-semibold">{{ formatNumber(summary.totalOutputTokens) }}</div>
       </div>
       <div
@@ -94,7 +94,7 @@
 
     <!-- Compact summary (single line) -->
     <div v-if="summary && compact" class="flex items-center gap-3 mb-2 text-xs">
-      <span><strong>{{ formatNumber(summary.totalRequests) }}</strong> 请求</span>
+      <span><strong>{{ formatNumber(summary.totalRequests) }}</strong> {{ t('chart.requestUnit') }}</span>
       <span
         :class="{
           'text-accent': summary.avgSuccessRate >= 95,
@@ -102,10 +102,10 @@
           'text-destructive': summary.avgSuccessRate < 80,
         }"
       >
-        <strong>{{ summary.avgSuccessRate.toFixed(1) }}%</strong> 成功率
+        <strong>{{ summary.avgSuccessRate.toFixed(1) }}%</strong> {{ t('chart.successRate') }}
       </span>
-      <span><strong>{{ formatNumber(summary.totalInputTokens) }}</strong> 输入</span>
-      <span><strong>{{ formatNumber(summary.totalOutputTokens) }}</strong> 输出</span>
+      <span><strong>{{ formatNumber(summary.totalInputTokens) }}</strong> {{ t('chart.input') }}</span>
+      <span><strong>{{ formatNumber(summary.totalOutputTokens) }}</strong> {{ t('chart.output') }}</span>
       <span v-if="summary.totalCacheReadTokens > 0 || summary.totalCacheCreationTokens > 0">
         <strong>{{ formatNumber(summary.totalCacheReadTokens) }}/{{ formatNumber(summary.totalCacheCreationTokens) }}</strong> Cache R/W
       </span>
@@ -127,7 +127,7 @@
       :style="{ height: chartHeight + 'px' }"
     >
       <div class="text-2xl mb-2 opacity-40">&#x1F4C8;</div>
-      <div class="text-xs">暂无请求数据</div>
+      <div class="text-xs">{{ t('chart.noData') }}</div>
     </div>
 
     <!-- Chart -->
@@ -148,6 +148,7 @@ import { computed, ref, watch, onMounted } from 'vue'
 import VueApexCharts from 'vue3-apexcharts'
 import type { ApexOptions } from 'apexcharts'
 import { useTheme } from '@/composables/useTheme'
+import { useI18n } from '@/i18n'
 import type { GlobalHistoryDataPoint, GlobalStatsSummary, ModelHistoryDataPoint } from '@/services/admin-api'
 
 const props = withDefaults(
@@ -186,6 +187,7 @@ const savePreference = (apiType: string, key: string, value: string) => {
 }
 
 const { theme } = useTheme()
+const { t } = useI18n()
 
 const isDark = computed(() => {
   if (theme.value === 'dark') return true
@@ -204,19 +206,19 @@ const historyData = ref<{ dataPoints: GlobalHistoryDataPoint[], summary: GlobalS
 
 const chartHeight = computed(() => (props.compact ? 180 : 260))
 
-const durationOptions = [
-  { label: '1h', value: '1h' as Duration },
-  { label: '6h', value: '6h' as Duration },
-  { label: '24h', value: '24h' as Duration },
-  { label: '今日', value: 'today' as Duration },
-  { label: '7d', value: '7d' as Duration },
-  { label: '30d', value: '30d' as Duration },
-]
+const durationOptions = computed(() => [
+  { label: t('chart.1h'), value: '1h' as Duration },
+  { label: t('chart.6h'), value: '6h' as Duration },
+  { label: t('chart.24h'), value: '24h' as Duration },
+  { label: t('chart.today'), value: 'today' as Duration },
+  { label: t('chart.7d'), value: '7d' as Duration },
+  { label: t('chart.30d'), value: '30d' as Duration },
+])
 
-const viewOptions = [
-  { label: '流量', value: 'traffic' as ViewMode },
-  { label: 'Token', value: 'tokens' as ViewMode },
-]
+const viewOptions = computed(() => [
+  { label: t('chart.traffic'), value: 'traffic' as ViewMode },
+  { label: t('chart.tokens'), value: 'tokens' as ViewMode },
+])
 
 // Expose data for parent to update
 const updateData = (data: GlobalHistoryDataPoint[], summary: GlobalStatsSummary | null, modelDataPoints?: Record<string, ModelHistoryDataPoint[]>) => {
@@ -444,7 +446,7 @@ const chartOptions = computed<ApexOptions>(() => {
     yaxis: mode === 'tokens' ? (() => {
       const axes: any[] = [
         {
-          seriesName: '输入 Token',
+          seriesName: t('chart.inputTokens'),
           labels: {
             formatter: (val: number) => formatNumber(val),
             style: { fontSize: '11px', colors: textColor }
@@ -452,7 +454,7 @@ const chartOptions = computed<ApexOptions>(() => {
           min: 0
         },
         {
-          seriesName: '输出 Token',
+          seriesName: t('chart.outputTokens'),
           opposite: true,
           labels: {
             formatter: (val: number) => formatNumber(val),
@@ -481,8 +483,8 @@ const chartOptions = computed<ApexOptions>(() => {
       },
       y: {
         formatter: (val: number) => mode === 'traffic'
-          ? `${Math.round(val)} 次`
-          : formatNumber(val)
+          ? `${Math.round(val)} ${t('chart.requestUnit')}`
+          : `${formatNumber(val)} ${t('chart.tokenUnit')}`
       },
       custom: mode === 'traffic' ? buildTrafficTooltip : undefined
     },
@@ -532,16 +534,16 @@ const buildTrafficTooltip = ({ dataPointIndex }: any): string => {
       html += `<span style="flex: 1;">${escapeHtml(model.name)}</span>`
       html += `<span style="margin-left: 12px; font-weight: 500;">${mdp.requestCount}</span>`
       if (hasModelFailure) {
-        html += `<span style="margin-left: 6px; color: #ef4444; font-size: 12px;">(${mdp.failureCount} 失败, ${failRate}%)</span>`
+        html += `<span style="margin-left: 6px; color: #ef4444; font-size: 12px;">(${mdp.failureCount} ${t('chart.issueCount')}, ${failRate}%)</span>`
       }
       html += `</div>`
     })
     // Totals row
     const grandFailureRate = dp.requestCount > 0 ? (dp.failureCount / dp.requestCount * 100).toFixed(1) : '0'
     html += `<div style="border-top: 1px solid rgba(128,128,128,0.3); margin-top: 6px; padding-top: 6px; font-weight: 600;">`
-    html += `<span>总计: ${dp.requestCount} 次</span>`
+    html += `<span>${t('chart.total')}: ${dp.requestCount} ${t('chart.requestUnit')}</span>`
     if (hasFailure) {
-      html += `<span style="color: #ef4444; margin-left: 8px;">${dp.failureCount} 失败 (${grandFailureRate}%)</span>`
+      html += `<span style="color: #ef4444; margin-left: 8px;">${dp.failureCount} ${t('chart.issueCount')} (${grandFailureRate}%)</span>`
     }
     html += `</div>`
   } else {
@@ -549,11 +551,11 @@ const buildTrafficTooltip = ({ dataPointIndex }: any): string => {
     const failureRate = dp.requestCount > 0 ? (dp.failureCount / dp.requestCount * 100).toFixed(1) : '0'
     html += `<div style="display: flex; align-items: center; margin: 4px 0;">`
     html += `<span style="width: 10px; height: 10px; border-radius: 50%; background: #3b82f6; margin-right: 6px;"></span>`
-    html += `<span style="flex: 1;">总请求数</span>`
+    html += `<span style="flex: 1;">${t('chart.totalRequests')}</span>`
     html += `<span style="margin-left: 12px; font-weight: 500;">${dp.requestCount}</span>`
     html += `</div>`
     if (hasFailure) {
-      html += `<div style="color: #ef4444; font-size: 12px; margin-top: 4px;">${dp.failureCount} 失败 (${failureRate}%)</div>`
+      html += `<div style="color: #ef4444; font-size: 12px; margin-top: 4px;">${dp.failureCount} ${t('chart.issueCount')} (${failureRate}%)</div>`
     }
   }
 
@@ -582,7 +584,7 @@ const chartSeries = computed(() => {
     }
     return [
       {
-        name: '请求数',
+        name: t('chart.totalRequests'),
         data: dataPoints.map(dp => ({
           x: new Date(dp.timestamp).getTime(),
           y: dp.requestCount
@@ -592,14 +594,14 @@ const chartSeries = computed(() => {
   } else {
     const series = [
       {
-        name: '输入 Token',
+        name: t('chart.inputTokens'),
         data: dataPoints.map(dp => ({
           x: new Date(dp.timestamp).getTime(),
           y: dp.inputTokens
         }))
       },
       {
-        name: '输出 Token',
+        name: t('chart.outputTokens'),
         data: dataPoints.map(dp => ({
           x: new Date(dp.timestamp).getTime(),
           y: dp.outputTokens
