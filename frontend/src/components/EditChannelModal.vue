@@ -72,26 +72,27 @@
                 @sync-upstream="syncUpstreamModels"
                 @apply-preset="applyPreset"
                 @menu-update="onMenuUpdate"
-              />
-
-              <!-- Vision 回退模型（仅当有模型级 noVision 标记时显示） -->
-              <div v-if="hasNoVisionRows" class="mt-6">
-                <v-combobox
-                  v-model="form.visionFallbackModel"
-                  :label="t('addChannel.visionFallbackLabel')"
-                  :placeholder="t('addChannel.visionFallbackPlaceholder')"
-                  :hint="t('addChannel.visionFallbackHint')"
-                  :items="targetModelOptions"
-                  prepend-inner-icon="mdi-eye"
-                  persistent-hint
-                  clearable
-                  variant="outlined"
-                  density="comfortable"
-                  eager
-                  @focus="ensureTargetModelsLoaded"
-                  @update:menu="onMenuUpdate"
-                />
-              </div>
+              >
+                <template #vision-fallback>
+                  <div v-if="hasNoVisionRows" class="mt-6">
+                    <v-combobox
+                      v-model="form.visionFallbackModel"
+                      :label="t('addChannel.visionFallbackLabel')"
+                      :placeholder="t('addChannel.visionFallbackPlaceholder')"
+                      :hint="t('addChannel.visionFallbackHint')"
+                      :items="targetModelOptions"
+                      prepend-inner-icon="mdi-eye"
+                      persistent-hint
+                      clearable
+                      variant="outlined"
+                      density="comfortable"
+                      eager
+                      @focus="ensureTargetModelsLoaded"
+                      @update:menu="onMenuUpdate"
+                    />
+                  </div>
+                </template>
+              </ModelMappingSection>
 
               <!-- 模型过滤 -->
               <div class="mt-4">

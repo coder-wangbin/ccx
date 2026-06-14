@@ -228,6 +228,9 @@
             </div>
           </div>
 
+          <!-- Vision 回退模型（由父组件通过 slot 注入） -->
+          <slot name="vision-fallback" />
+
           <!-- 添加新映射 -->
           <div class="add-mapping-row d-flex align-center ga-3 pa-3 mt-3 rounded-lg">
             <v-combobox
