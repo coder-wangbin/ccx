@@ -142,7 +142,15 @@ const viewOptions = computed(() => [
 
 const hasData = computed(() => {
   if (!props.data?.length) return false
-  return props.data.some(k => k.dataPoints && k.dataPoints.length > 0)
+  const mode = selectedView.value
+  return props.data.some(keyData => {
+    if (!keyData.dataPoints?.length) return false
+    return keyData.dataPoints.some(dp => {
+      if (mode === 'traffic') return dp.requestCount > 0
+      if (mode === 'tokens') return dp.inputTokens > 0 || dp.outputTokens > 0
+      return dp.cacheReadTokens > 0 || dp.cacheCreationTokens > 0
+    })
+  })
 })
 
 const xLabelFormat = computed(() =>
@@ -486,13 +494,15 @@ const chartSeries = computed(() => {
   const mode = selectedView.value
 
   if (mode === 'traffic') {
-    return props.data.map(keyData => ({
-      name: getDisplayName(keyData),
-      data: keyData.dataPoints.map(dp => ({
-        x: new Date(dp.timestamp).getTime(),
-        y: dp.requestCount,
-      })),
-    }))
+    return props.data
+      .filter(keyData => keyData.dataPoints.reduce((sum, dp) => sum + dp.requestCount, 0) > 0)
+      .map(keyData => ({
+        name: getDisplayName(keyData),
+        data: keyData.dataPoints.map(dp => ({
+          x: new Date(dp.timestamp).getTime(),
+          y: dp.requestCount,
+        })),
+      }))
   }
 
   // Bidirectional mode: two series per key (Input/Output or Read/Write)
@@ -502,22 +512,28 @@ const chartSeries = computed(() => {
 
   props.data.forEach(keyData => {
     const displayName = getDisplayName(keyData)
+    const inTotal = keyData.dataPoints.reduce((sum, dp) => sum + (mode === 'tokens' ? dp.inputTokens : dp.cacheReadTokens), 0)
+    const outTotal = keyData.dataPoints.reduce((sum, dp) => sum + (mode === 'tokens' ? dp.outputTokens : dp.cacheCreationTokens), 0)
 
-    result.push({
-      name: `${displayName} ${inLabel}`,
-      data: keyData.dataPoints.map(dp => ({
-        x: new Date(dp.timestamp).getTime(),
-        y: mode === 'tokens' ? dp.inputTokens : dp.cacheReadTokens,
-      })),
-    })
+    if (inTotal > 0) {
+      result.push({
+        name: `${displayName} ${inLabel}`,
+        data: keyData.dataPoints.map(dp => ({
+          x: new Date(dp.timestamp).getTime(),
+          y: mode === 'tokens' ? dp.inputTokens : dp.cacheReadTokens,
+        })),
+      })
+    }
 
-    result.push({
-      name: `${displayName} ${outLabel}`,
-      data: keyData.dataPoints.map(dp => ({
-        x: new Date(dp.timestamp).getTime(),
-        y: mode === 'tokens' ? dp.outputTokens : dp.cacheCreationTokens,
-      })),
-    })
+    if (outTotal > 0) {
+      result.push({
+        name: `${displayName} ${outLabel}`,
+        data: keyData.dataPoints.map(dp => ({
+          x: new Date(dp.timestamp).getTime(),
+          y: mode === 'tokens' ? dp.outputTokens : dp.cacheCreationTokens,
+        })),
+      })
+    }
   })
 
   return result

@@ -234,10 +234,16 @@ const alignToBucket = (timestamp: number, interval: number): number => {
 
 // Computed: check if has data
 const hasData = computed(() => {
-  if (!historyData.value) return false
-  return historyData.value.keys &&
-    historyData.value.keys.length > 0 &&
-    historyData.value.keys.some(k => k.dataPoints && k.dataPoints.length > 0)
+  if (!historyData.value?.keys?.length) return false
+  const mode = selectedView.value
+  return historyData.value.keys.some(keyData => {
+    if (!keyData.dataPoints?.length) return false
+    return keyData.dataPoints.some(dp => {
+      if (mode === 'traffic') return dp.requestCount > 0
+      if (mode === 'tokens') return dp.inputTokens > 0 || dp.outputTokens > 0
+      return dp.cacheReadTokens > 0 || dp.cacheCreationTokens > 0
+    })
+  })
 })
 
 // Summary data from server response (or fallback from dataPoints)
@@ -519,6 +525,9 @@ const buildChartSeries = (data: ChannelKeyMetricsHistoryResponse | null) => {
     const displayName = keyData.model ? `${keyData.keyMask}/${keyData.model}` : keyData.keyMask
 
     if (mode === 'traffic') {
+      const totalRequests = keyData.dataPoints.reduce((sum, dp) => sum + dp.requestCount, 0)
+      if (totalRequests === 0) return
+
       // One-way mode: show request count only
       result.push({
         name: displayName,
@@ -531,24 +540,30 @@ const buildChartSeries = (data: ChannelKeyMetricsHistoryResponse | null) => {
       // Bidirectional mode: create two series per key (Input/Output or Read/Write)
       const inLabel = mode === 'tokens' ? 'Input' : 'Cache Read'
       const outLabel = mode === 'tokens' ? 'Output' : 'Cache Write'
+      const inTotal = keyData.dataPoints.reduce((sum, dp) => sum + (mode === 'tokens' ? dp.inputTokens : dp.cacheReadTokens), 0)
+      const outTotal = keyData.dataPoints.reduce((sum, dp) => sum + (mode === 'tokens' ? dp.outputTokens : dp.cacheCreationTokens), 0)
 
       // Forward direction (Input/Read)
-      result.push({
-        name: `${displayName} ${inLabel}`,
-        data: keyData.dataPoints.map(dp => ({
-          x: new Date(dp.timestamp).getTime(),
-          y: mode === 'tokens' ? dp.inputTokens : dp.cacheReadTokens
-        }))
-      })
+      if (inTotal > 0) {
+        result.push({
+          name: `${displayName} ${inLabel}`,
+          data: keyData.dataPoints.map(dp => ({
+            x: new Date(dp.timestamp).getTime(),
+            y: mode === 'tokens' ? dp.inputTokens : dp.cacheReadTokens
+          }))
+        })
+      }
 
       // Output/Write - distinguish with a dashed line
-      result.push({
-        name: `${displayName} ${outLabel}`,
-        data: keyData.dataPoints.map(dp => ({
-          x: new Date(dp.timestamp).getTime(),
-          y: mode === 'tokens' ? dp.outputTokens : dp.cacheCreationTokens
-        }))
-      })
+      if (outTotal > 0) {
+        result.push({
+          name: `${displayName} ${outLabel}`,
+          data: keyData.dataPoints.map(dp => ({
+            x: new Date(dp.timestamp).getTime(),
+            y: mode === 'tokens' ? dp.outputTokens : dp.cacheCreationTokens
+          }))
+        })
+      }
     }
   })
 
