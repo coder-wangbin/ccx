@@ -292,6 +292,36 @@ describe('URL 识别', () => {
 })
 
 describe('综合解析场景', () => {
+  it('应根据 Claude Messages 协议路径推断上游类型并移除端点路径', () => {
+    const result = parseQuickInput('https://api.example.com/v1/messages sk-key1234567890')
+    expect(result.detectedServiceType).toBe('claude')
+    expect(result.detectedBaseUrl).toBe('https://api.example.com')
+  })
+
+  it('应根据 OpenAI Chat 协议路径推断上游类型并移除端点路径', () => {
+    const result = parseQuickInput('https://api.example.com/v1/chat/completions sk-key1234567890')
+    expect(result.detectedServiceType).toBe('openai')
+    expect(result.detectedBaseUrl).toBe('https://api.example.com')
+  })
+
+  it('应根据 Responses 协议路径推断上游类型并移除端点路径', () => {
+    const result = parseQuickInput('https://api.example.com/v1/responses sk-key1234567890')
+    expect(result.detectedServiceType).toBe('responses')
+    expect(result.detectedBaseUrl).toBe('https://api.example.com')
+  })
+
+  it('应根据 Gemini generateContent 协议路径推断上游类型并移除端点路径', () => {
+    const result = parseQuickInput('https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro:generateContent AIza1234567890abcdefghijklmnopqrstuv')
+    expect(result.detectedServiceType).toBe('gemini')
+    expect(result.detectedBaseUrl).toBe('https://generativelanguage.googleapis.com')
+  })
+
+  it('应根据常见 Anthropic/Claude 路径线索推断 Claude 上游且保留非协议路径', () => {
+    const result = parseQuickInput('https://relay.example.com/anthropic sk-key1234567890')
+    expect(result.detectedServiceType).toBe('claude')
+    expect(result.detectedBaseUrl).toBe('https://relay.example.com/anthropic')
+  })
+
   it('应正确解析 URL + 多个 API Key', () => {
     const input = `
       https://api.openai.com/v1

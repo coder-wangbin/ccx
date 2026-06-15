@@ -1,16 +1,22 @@
 <script setup lang="ts">
 import { Textarea } from '@/components/ui/textarea'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { AlertCircle, CheckCircle2, ClipboardPaste } from 'lucide-vue-next'
 import { useLanguage } from '@/composables/useLanguage'
 
 defineProps<{
   quickInput: string
+  serviceType: string
+  serviceTypeOptions: Array<{ label: string; value: string }>
+  detectedServiceType: string | null
   detectedBaseUrls: string[]
   detectedApiKeys: string[]
+  userSelectedServiceType: boolean
 }>()
 
 const emit = defineEmits<{
   (e: 'update:quick-input', value: string): void
+  (e: 'update:service-type', value: string): void
   (e: 'quick-paste', text: string): void
 }>()
 
@@ -27,6 +33,35 @@ const { tf } = useLanguage()
       <p class="mt-1 text-xs text-muted-foreground">
         {{ tf('addChannel.quickHint', '粘贴 Base URL、API Key 或完整配置片段，自动识别并填入表单。') }}
       </p>
+    </div>
+
+    <div class="grid gap-2 rounded-lg border border-border bg-background/70 p-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
+      <div class="space-y-1.5">
+        <div class="text-xs font-semibold text-muted-foreground">
+          {{ tf('channelEditor.basic.serviceType.label', '上游类型') }}
+        </div>
+        <Select :model-value="serviceType" @update:model-value="(val) => emit('update:service-type', String(val))">
+          <SelectTrigger class="h-9 bg-background">
+            <SelectValue :placeholder="tf('channelEditor.basic.serviceType.placeholder', '选择服务类型')" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem v-for="opt in serviceTypeOptions" :key="opt.value" :value="opt.value">
+              {{ opt.label }}
+            </SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      <div class="rounded-md border border-border/60 bg-muted/40 px-2 py-1.5 text-[10px] text-muted-foreground">
+        <span v-if="userSelectedServiceType">
+          {{ tf('addChannel.serviceTypeManual', '手动选择') }}
+        </span>
+        <span v-else-if="detectedServiceType">
+          {{ tf('addChannel.serviceTypeDetected', '已自动识别') }}
+        </span>
+        <span v-else>
+          {{ tf('addChannel.serviceTypeDefault', '使用默认类型') }}
+        </span>
+      </div>
     </div>
 
     <Textarea

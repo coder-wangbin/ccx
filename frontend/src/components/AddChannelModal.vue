@@ -46,6 +46,32 @@
       <v-card-text class="pa-6">
         <!-- 快速添加模式 -->
         <div v-if="!isEditing">
+          <v-select
+            v-model="quickServiceType"
+            :items="serviceTypeOptions"
+            item-title="title"
+            item-value="value"
+            :label="t('channelEditor.basic.serviceType.label')"
+            variant="outlined"
+            density="compact"
+            class="mb-4"
+            hide-details
+            @update:model-value="quickServiceTypeTouched = true"
+            @update:menu="onMenuUpdate"
+          >
+            <template #append-inner>
+              <v-chip size="x-small" :color="quickServiceTypeTouched ? 'primary' : (detectedServiceType ? 'success' : 'default')" variant="tonal">
+                {{
+                  quickServiceTypeTouched
+                    ? t('addChannel.serviceTypeManual')
+                    : detectedServiceType
+                      ? t('addChannel.serviceTypeDetected')
+                      : t('addChannel.serviceTypeDefault')
+                }}
+              </v-chip>
+            </template>
+          </v-select>
+
           <v-textarea
             v-model="quickInput"
             :label="t('addChannel.quickInputLabel')"
@@ -123,7 +149,7 @@
                     <div class="text-body-2 font-weight-medium">{{ t('addChannel.channelType') }}</div>
                     <div class="text-caption text-medium-emphasis">
                       {{ props.channelType === 'chat' ? 'OpenAI Chat' : props.channelType === 'gemini' ? 'Gemini' : props.channelType === 'responses' ? 'Responses (Codex)' : props.channelType === 'images' ? 'Images' : 'Claude (Messages)' }} -
-                      {{ getDefaultServiceType() }}
+                      {{ quickServiceTypeLabel }}
                     </div>
                   </div>
                 </div>
@@ -1440,6 +1466,8 @@ const detectedBaseUrls = ref<string[]>([])
 const detectedRawBaseUrls = ref<string[]>([])
 const detectedApiKeys = ref<string[]>([])
 const detectedServiceType = ref<'openai' | 'gemini' | 'claude' | 'responses' | null>(null)
+const quickServiceType = ref<'openai' | 'gemini' | 'claude' | 'responses'>('claude')
+const quickServiceTypeTouched = ref(false)
 
 const getImagesServiceType = (_serviceType: 'openai' | 'gemini' | 'claude' | 'responses' | null | ''): 'openai' => {
   return 'openai'
@@ -1453,13 +1481,16 @@ let formBaseUrlPreviewTimer: number | null = null
 const parseQuickInput = () => {
   const fallbackServiceType = props.channelType === 'images'
     ? getImagesServiceType(form.serviceType)
-    : (form.serviceType || getDefaultServiceTypeValue())
+    : quickServiceType.value
   const result = parseQuickInputUtil(quickInput.value, fallbackServiceType)
   detectedBaseUrl.value = result.detectedBaseUrl
   detectedBaseUrls.value = result.detectedBaseUrls
   detectedRawBaseUrls.value = result.rawBaseUrls
   detectedApiKeys.value = result.detectedApiKeys
   detectedServiceType.value = props.channelType === 'images' ? 'openai' : result.detectedServiceType
+  if (!quickServiceTypeTouched.value && detectedServiceType.value) {
+    quickServiceType.value = detectedServiceType.value
+  }
 }
 
 // 获取默认服务类型
@@ -1516,6 +1547,10 @@ const _getDefaultBaseUrl = (): string => {
 // 快速模式表单验证
 const isQuickFormValid = computed(() => {
   return detectedBaseUrls.value.length > 0 && detectedApiKeys.value.length > 0
+})
+
+const quickServiceTypeLabel = computed(() => {
+  return serviceTypeOptions.value.find(option => option.value === quickServiceType.value)?.title || getDefaultServiceType()
 })
 
 // 生成随机字符串
@@ -1579,7 +1614,7 @@ const _expectedRequestUrl = computed(() => {
   // 根据渠道类型和服务类型确定端点（与后端逻辑一致）
   const serviceType = props.channelType === 'images'
     ? 'openai'
-    : (detectedServiceType.value || getDefaultServiceTypeValue())
+    : quickServiceType.value
   const endpoint =
     props.channelType === 'images'
       ? '/images/generations'
@@ -1609,7 +1644,7 @@ const getExpectedRequestUrl = (inputBaseUrl: string): string => {
 
   const serviceType = props.channelType === 'images'
     ? 'openai'
-    : (detectedServiceType.value || getDefaultServiceTypeValue())
+    : quickServiceType.value
   const endpoint =
     props.channelType === 'images'
       ? '/images/generations'
@@ -1664,7 +1699,7 @@ const handleQuickSubmit = () => {
 
   const channelData = {
     name: generatedChannelName.value,
-    serviceType: props.channelType === 'images' ? 'openai' : (detectedServiceType.value || getDefaultServiceTypeValue()),
+    serviceType: props.channelType === 'images' ? 'openai' : quickServiceType.value,
     baseUrl: detectedBaseUrl.value,
     baseUrls: detectedBaseUrls.value,
     apiKeys: detectedApiKeys.value,
@@ -2734,6 +2769,8 @@ const resetForm = () => {
   resetTransientUiState()
   form.name = ''
   form.serviceType = props.channelType === 'images' ? 'openai' : ''
+  quickServiceType.value = getDefaultServiceTypeValue()
+  quickServiceTypeTouched.value = false
   form.baseUrl = ''
   form.baseUrls = []
   form.website = ''

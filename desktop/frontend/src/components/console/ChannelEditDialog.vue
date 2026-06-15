@@ -43,6 +43,7 @@ const saving = ref(false)
 const restoringKey = ref('')
 const error = ref('')
 const quickInput = ref('')
+const quickServiceTypeTouched = ref(false)
 const existingApiKeys = ref<string[]>([])
 const newApiKeysText = ref('')
 const copiedKeyIndex = ref<number | null>(null)
@@ -251,6 +252,12 @@ const historicalApiKeys = computed(() => props.channel?.historicalApiKeys ?? [])
 const quickDetection = computed(() => parseQuickInput(quickInput.value, form.serviceType || undefined))
 const detectedBaseUrls = computed(() => quickDetection.value.detectedBaseUrls)
 const detectedApiKeys = computed(() => quickDetection.value.detectedApiKeys)
+const detectedServiceType = computed(() => quickDetection.value.detectedServiceType)
+
+watch(detectedServiceType, (serviceType) => {
+  if (isEditMode.value || quickServiceTypeTouched.value || !serviceType) return
+  form.serviceType = serviceType
+})
 
 function resetForm() {
   form.name = ''
@@ -300,6 +307,7 @@ function resetForm() {
   form.stripCodexClientTools = false
   form.stripImageGenerationTool = false
   quickInput.value = ''
+  quickServiceTypeTouched.value = false
   existingApiKeys.value = []
   newApiKeysText.value = ''
   copiedKeyIndex.value = null
@@ -467,12 +475,17 @@ function handleQuickPaste(text: string) {
   if (result.detectedApiKeys.length) {
     existingApiKeys.value = [...new Set([...existingApiKeys.value, ...result.detectedApiKeys])]
   }
-  if (result.detectedServiceType && !form.serviceType) form.serviceType = result.detectedServiceType
+  if (result.detectedServiceType && !quickServiceTypeTouched.value) form.serviceType = result.detectedServiceType
   if (!form.serviceType) form.serviceType = defaultServiceTypeForChannel()
   if (!form.name.trim()) {
     const st = form.serviceType || 'channel'
     form.name = `${props.channelType}-${st}-${Date.now().toString(36)}`
   }
+}
+
+function updateQuickServiceType(value: string) {
+  form.serviceType = value as typeof form.serviceType
+  quickServiceTypeTouched.value = true
 }
 
 function buildSubmitPayload() {
@@ -1370,9 +1383,14 @@ void fromSelectValue
 
                 <QuickCreatePanel
                   :quick-input="quickInput"
+                  :service-type="form.serviceType"
+                  :service-type-options="serviceTypeOptions"
+                  :detected-service-type="detectedServiceType"
                   :detected-base-urls="detectedBaseUrls"
                   :detected-api-keys="detectedApiKeys"
+                  :user-selected-service-type="quickServiceTypeTouched"
                   @update:quick-input="quickInput = $event"
+                  @update:service-type="updateQuickServiceType"
                   @quick-paste="handleQuickPaste"
                 />
               </form>

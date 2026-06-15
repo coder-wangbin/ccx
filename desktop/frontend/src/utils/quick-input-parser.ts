@@ -205,25 +205,39 @@ const detectServiceTypeAndCleanUrl = (
     const parsed = new URL(cleanUrl)
     const path = parsed.pathname.toLowerCase()
 
-    // 检测端点并移除
-    const endpoints = ['/messages', '/chat/completions', '/responses', '/generatecontent']
-    for (const ep of endpoints) {
-      if (path.includes(ep)) {
-        // 移除端点路径，保留 /v1 等版本前缀
-        const idx = path.indexOf(ep)
-        parsed.pathname = path.slice(0, idx) || '/'
-        const serviceType =
-          ep === '/messages'
-            ? 'claude'
-            : ep === '/chat/completions'
-              ? 'openai'
-              : ep === '/responses'
-                ? 'responses'
-                : 'gemini'
-        let result = parsed.toString().replace(/\/$/, '')
-        if (url.endsWith('#')) result += '#'
-        return { serviceType, cleanedUrl: result }
-      }
+    const endpointRules: Array<{ pattern: RegExp; serviceType: 'openai' | 'gemini' | 'claude' | 'responses' }> = [
+      { pattern: /\/v\d+[a-z]*\/messages(?:\/|$)/, serviceType: 'claude' },
+      { pattern: /\/messages(?:\/|$)/, serviceType: 'claude' },
+      { pattern: /\/v\d+[a-z]*\/chat\/completions(?:\/|$)/, serviceType: 'openai' },
+      { pattern: /\/chat\/completions(?:\/|$)/, serviceType: 'openai' },
+      { pattern: /\/v\d+[a-z]*\/responses(?:\/|$)/, serviceType: 'responses' },
+      { pattern: /\/responses(?:\/|$)/, serviceType: 'responses' },
+      { pattern: /\/v\d+[a-z]*\/models\/[^/]+:generatecontent(?:\/|$)/, serviceType: 'gemini' },
+      { pattern: /\/models\/[^/]+:generatecontent(?:\/|$)/, serviceType: 'gemini' },
+      { pattern: /\/generatecontent(?:\/|$)/, serviceType: 'gemini' },
+    ]
+    for (const rule of endpointRules) {
+      const match = path.match(rule.pattern)
+      if (!match || match.index === undefined) continue
+      // 移除协议端点路径，保留 /v1 或 /v1beta 等版本前缀。
+      parsed.pathname = path.slice(0, match.index) || '/'
+      let result = parsed.toString().replace(/\/$/, '')
+      if (url.endsWith('#')) result += '#'
+      return { serviceType: rule.serviceType, cleanedUrl: result }
+    }
+
+    const hintText = `${parsed.hostname.toLowerCase()} ${path}`
+    if (/\b(anthropic|claude)\b/.test(hintText) || /(^|\/)(anthropic|claude)(?:\/|$)/.test(path)) {
+      return { serviceType: 'claude', cleanedUrl: url }
+    }
+    if (/\bgemini\b/.test(hintText) || /generativelanguage\.googleapis\.com$/i.test(parsed.hostname)) {
+      return { serviceType: 'gemini', cleanedUrl: url }
+    }
+    if (/\bresponses\b/.test(hintText)) {
+      return { serviceType: 'responses', cleanedUrl: url }
+    }
+    if (/\b(openai|chatgpt)\b/.test(hintText)) {
+      return { serviceType: 'openai', cleanedUrl: url }
     }
 
     // 剔除常见第三方面板路径，仅保留 origin 作为 baseUrl
