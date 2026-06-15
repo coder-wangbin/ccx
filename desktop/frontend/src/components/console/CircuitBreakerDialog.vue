@@ -3,7 +3,7 @@ import { reactive, ref, watch } from 'vue'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Alert } from '@/components/ui/alert'
-import { X, Save, Zap } from 'lucide-vue-next'
+import { Save, Zap } from 'lucide-vue-next'
 import { useStatus } from '@/composables/useStatus'
 import { useLanguage } from '@/composables/useLanguage'
 import { GetAdminAccessKey } from '@bindings/github.com/BenedictKing/ccx/desktop/desktopservice'
@@ -219,11 +219,6 @@ watch(() => props.open, (isOpen) => {
             <div class="flex items-center gap-2">
               <Zap class="h-4 w-4 text-primary" />
               <h3 class="text-sm font-semibold">{{ t('env.runtimeCbTitle') }}</h3>
-            </div>
-            <div class="flex items-center gap-2">
-              <Button variant="ghost" size="icon-sm" @click="emit('close')">
-                <X class="h-4 w-4" />
-              </Button>
             </div>
           </div>
 
