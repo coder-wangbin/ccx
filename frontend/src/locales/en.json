@@ -262,7 +262,7 @@
   "addChannel.supportedModelsInvalidPattern": "Invalid rule ignored. Only exact, prefix*, *suffix, *contains*, and ! exclusion are allowed.",
   "addChannel.commonFilters": "Common filters",
   "addChannel.apiKeyRequired": "At least one key is required",
-  "addChannel.apiKeyLoadBalance": "Multiple keys can be added for load balancing",
+  "addChannel.apiKeyLoadBalance": "Multiple keys can be added as failover candidates",
   "addChannel.checking": "Checking...",
   "addChannel.modelsCount": "models {statusCode} ({count})",
   "addChannel.duplicateKey": "Duplicate key",

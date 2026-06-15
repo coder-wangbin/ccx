@@ -559,7 +559,7 @@
   "addChannel.oneClickSetup": "One-click setup",
   "addChannel.commonFilters": "Common filters",
   "addChannel.expectedRequest": "Expected request",
-  "addChannel.apiKeyLoadBalance": "Multiple keys can be added for load balancing",
+  "addChannel.apiKeyLoadBalance": "Multiple keys can be added as failover candidates",
   "addChannel.checking": "Checking...",
   "addChannel.modelsCount": "models {statusCode} ({count})",
   "channelEditor.auth.apiKeyRequired": "At least one API Key required",

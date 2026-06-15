@@ -92,7 +92,7 @@ const visibleDisabledKeys = computed(() => {
         {{ tf('channelCard.apiKeyManagement', 'API key management') }} *
       </h4>
       <span class="text-[10px] bg-primary/10 border border-primary/20 text-primary font-semibold px-2 py-0.5 rounded-full">
-        {{ tf('addChannel.apiKeyLoadBalance', 'Multiple keys can be added for load balancing') }}
+        {{ tf('addChannel.apiKeyLoadBalance', 'Multiple keys can be added as failover candidates') }}
       </span>
     </div>
 

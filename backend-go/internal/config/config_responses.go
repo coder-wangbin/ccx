@@ -453,7 +453,7 @@ func (cm *ConfigManager) RemoveResponsesAPIKey(index int, apiKey string) error {
 	return nil
 }
 
-// GetNextResponsesAPIKey 获取下一个 API 密钥（Responses 负载均衡 - 纯 failover 模式）
+// GetNextResponsesAPIKey 获取下一个 API 密钥（Responses 纯 failover 模式）
 func (cm *ConfigManager) GetNextResponsesAPIKey(upstream *UpstreamConfig, failedKeys map[string]bool) (string, error) {
 	return cm.GetNextAPIKey(upstream, failedKeys, "Responses")
 }

@@ -262,7 +262,7 @@
   "addChannel.supportedModelsInvalidPattern": "Rule tidak valid dan diabaikan. Hanya exact, prefix*, *suffix, *contains*, serta exclusion ! yang didukung.",
   "addChannel.commonFilters": "Filter umum",
   "addChannel.apiKeyRequired": "Minimal satu key diperlukan",
-  "addChannel.apiKeyLoadBalance": "Beberapa key bisa ditambahkan untuk load balancing",
+  "addChannel.apiKeyLoadBalance": "Beberapa key bisa ditambahkan sebagai cadangan failover",
   "addChannel.checking": "Sedang memeriksa...",
   "addChannel.modelsCount": "models {statusCode} ({count})",
   "addChannel.duplicateKey": "Key duplikat",

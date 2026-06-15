@@ -559,7 +559,7 @@
   "addChannel.oneClickSetup": "一键配置",
   "addChannel.commonFilters": "常用过滤器",
   "addChannel.expectedRequest": "预期请求",
-  "addChannel.apiKeyLoadBalance": "可添加多个密钥用于负载均衡",
+  "addChannel.apiKeyLoadBalance": "可添加多个密钥作为故障转移备用",
   "addChannel.checking": "检测中...",
   "addChannel.modelsCount": "models {statusCode} ({count} 个)",
   "addChannel.supportedModelsLabel": "支持的模型 (可选)",

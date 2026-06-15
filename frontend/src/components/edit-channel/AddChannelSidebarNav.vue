@@ -4,6 +4,7 @@
     <button
       v-for="item in sections"
       :key="item.id"
+      type="button"
       :class="[
         'sidebar-nav-item',
         activeSection === item.id && 'sidebar-nav-item--active',

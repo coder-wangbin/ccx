@@ -262,7 +262,7 @@
   "addChannel.supportedModelsInvalidPattern": "已忽略非法规则。仅支持精确匹配、prefix*、*suffix、*contains* 和 ! 排除规则。",
   "addChannel.commonFilters": "常用过滤器",
   "addChannel.apiKeyRequired": "至少需要一个密钥",
-  "addChannel.apiKeyLoadBalance": "可添加多个密钥用于负载均衡",
+  "addChannel.apiKeyLoadBalance": "可添加多个密钥作为故障转移备用",
   "addChannel.checking": "检测中...",
   "addChannel.modelsCount": "models {statusCode} ({count} 个)",
   "addChannel.duplicateKey": "重复密钥",
