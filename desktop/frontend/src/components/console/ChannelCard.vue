@@ -22,20 +22,18 @@ import {
   ArrowDown,
   ArrowUp,
   Ban,
-  CheckCircle2,
   Copy,
   Edit3,
   ExternalLink,
   GripVertical,
+  History,
   Key,
   MoreVertical,
   Pause,
   Play,
   RotateCcw,
   Sparkles,
-  Terminal,
   Trash2,
-  XCircle,
   Zap,
 } from 'lucide-vue-next'
 import ActivityChart from './ActivityChart.vue'
@@ -80,6 +78,7 @@ const { tf } = useLanguage()
 
 const isSuspended = computed(() => props.channel.status === 'suspended')
 const isDisabled = computed(() => props.channel.status === 'disabled')
+const isTripped = computed(() => isSuspended.value || props.metrics?.circuitState === 'open')
 
 const serviceTypeClass = computed(() => {
   const map: Record<string, string> = {
@@ -94,24 +93,18 @@ const serviceTypeClass = computed(() => {
 const statusConfig = computed(() => {
   if (isDisabled.value) {
     return {
-      label: tf('orchestration.moveToPool', 'Standby'),
-      icon: XCircle,
-      class: 'border-rose-500/25 bg-rose-500/10 text-rose-700 dark:text-rose-300',
-      dot: 'bg-rose-500',
+      label: tf('status.disabled', 'Disabled'),
+      dot: 'bg-muted-foreground',
     }
   }
-  if (isSuspended.value) {
+  if (isTripped.value) {
     return {
-      label: tf('channelCard.suspended', 'Suspended'),
-      icon: Pause,
-      class: 'border-amber-500/25 bg-amber-500/10 text-amber-700 dark:text-amber-300',
-      dot: 'bg-amber-500',
+      label: tf('status.tripped', 'Tripped'),
+      dot: 'bg-rose-500 animate-pulse',
     }
   }
   return {
-    label: tf('orchestration.enable', 'Active'),
-    icon: CheckCircle2,
-    class: 'border-emerald-500/25 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300',
+    label: tf('status.normal', 'Normal'),
     dot: 'bg-emerald-500',
   }
 })
@@ -120,7 +113,7 @@ const circuitDisplay = computed(() => {
   const state = props.metrics?.circuitState
   if (state === 'open') {
     return {
-      label: tf('status.tripped', 'Circuit Open'),
+      label: tf('status.tripped', 'Tripped'),
       class: 'border-rose-500/25 bg-rose-500/10 text-rose-700 dark:text-rose-300',
     }
   }
@@ -205,7 +198,7 @@ async function copyChannelInfo() {
 <template>
   <div
     :class="[
-      'group relative grid grid-cols-[24px_minmax(150px,1fr)_88px_74px_86px] items-center gap-1 border px-2 py-2 transition-all duration-200 lg:grid-cols-[36px_minmax(170px,1fr)_110px_82px_74px_128px] lg:gap-1.5 xl:grid-cols-[42px_minmax(220px,1fr)_120px_96px_88px_150px] xl:gap-3 xl:px-3 xl:py-2.5',
+      'group relative grid grid-cols-[24px_minmax(150px,1fr)_28px_84px_104px] items-center gap-1 border px-2 py-2 transition-all duration-200 lg:grid-cols-[36px_minmax(170px,1fr)_32px_92px_56px_104px] lg:gap-1.5 xl:grid-cols-[42px_minmax(220px,1fr)_32px_108px_64px_104px] xl:gap-3 xl:px-3 xl:py-2.5',
       'bg-card/75 hover:bg-card dark:bg-card/55 dark:hover:bg-card/80',
       'overflow-hidden',
       inactive ? 'border-dashed border-border/80 opacity-80' : 'border-border',
@@ -228,6 +221,7 @@ async function copyChannelInfo() {
         <span
           class="h-2 w-2 shrink-0 rounded-full shadow-[0_0_8px_currentColor]"
           :class="statusConfig.dot"
+          :title="statusConfig.label"
         />
         <button
           type="button"
@@ -297,10 +291,6 @@ async function copyChannelInfo() {
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
         </svg>
       </button>
-      <div class="inline-flex items-center justify-center gap-1.5 border px-2 py-1 text-[11px] font-semibold" :class="statusConfig.class">
-        <component :is="statusConfig.icon" class="h-3.5 w-3.5" />
-        {{ statusConfig.label }}
-      </div>
     </div>
 
     <div class="relative z-10 space-y-0.5 text-right font-mono">
@@ -313,18 +303,46 @@ async function copyChannelInfo() {
       <div class="text-[10px] text-muted-foreground">{{ successRateDisplay }}</div>
     </div>
 
-    <div class="relative z-10 flex items-center justify-end gap-1">
-      <Button v-if="isDisabled" variant="outline" size="sm" class="px-2 text-xs lg:px-2 xl:px-3" @click="emit('enable')">
+    <div class="relative z-10 flex items-center justify-end gap-0.5">
+      <Button
+        v-if="isDisabled"
+        variant="outline"
+        size="icon-sm"
+        class="border-0 bg-transparent shadow-none dark:bg-transparent"
+        :title="tf('orchestration.enable', 'Enable')"
+        @click="emit('enable')"
+      >
         <Play class="h-3.5 w-3.5" />
-        <span class="hidden lg:inline">{{ tf('orchestration.enable', 'Enable') }}</span>
       </Button>
-      <Button v-else-if="isSuspended" variant="outline" size="sm" class="px-2 text-xs lg:px-2 xl:px-3" @click="emit('status')">
-        <Play class="h-3.5 w-3.5" />
-        <span class="hidden lg:inline">{{ tf('orchestration.resume', 'Resume') }}</span>
+      <Button
+        v-else-if="isTripped"
+        variant="outline"
+        size="icon-sm"
+        class="border-0 bg-transparent shadow-none dark:bg-transparent"
+        :title="tf('orchestration.resume', 'Resume')"
+        @click="emit('resume')"
+      >
+        <RotateCcw class="h-3.5 w-3.5" />
       </Button>
-      <Button v-else variant="outline" size="sm" class="px-2 text-xs lg:px-2 xl:px-3" @click="emit('status')">
+      <Button
+        v-else
+        variant="outline"
+        size="icon-sm"
+        class="border-0 bg-transparent shadow-none dark:bg-transparent"
+        :title="tf('orchestration.pause', 'Suspend')"
+        @click="emit('status')"
+      >
         <Pause class="h-3.5 w-3.5" />
-        <span class="hidden lg:inline">{{ tf('orchestration.pause', 'Suspend') }}</span>
+      </Button>
+
+      <Button
+        variant="outline"
+        size="icon-sm"
+        class="border-0 bg-transparent shadow-none dark:bg-transparent"
+        :title="tf('orchestration.logs', 'View Logs')"
+        @click="emit('logs')"
+      >
+        <History class="h-3.5 w-3.5" />
       </Button>
 
       <DropdownMenu>
@@ -344,10 +362,6 @@ async function copyChannelInfo() {
             <DropdownMenuItem v-if="supportsCapability" @click="emit('capability')">
               <Zap class="h-4 w-4" />
               {{ tf('capability.startTest', 'Capability Test') }}
-            </DropdownMenuItem>
-            <DropdownMenuItem @click="emit('logs')">
-              <Terminal class="h-4 w-4" />
-              {{ tf('orchestration.logs', 'View Logs') }}
             </DropdownMenuItem>
             <DropdownMenuItem @click="copyChannelInfo">
               <Copy class="h-4 w-4" />
