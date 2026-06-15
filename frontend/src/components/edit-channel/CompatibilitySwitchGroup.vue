@@ -214,9 +214,9 @@
 
       <!-- Historical Image Turn Limit -->
       <div v-if="channelType === 'messages' || channelType === 'chat'" class="d-flex align-center justify-space-between">
-        <div class="d-flex align-center ga-2 flex-1">
+        <div class="d-flex align-center ga-2">
           <v-icon color="primary">mdi-image-multiple</v-icon>
-          <div class="flex-1">
+          <div>
             <div class="section-title section-title--soft">{{ t('channelEditor.compat.historicalImageLimit.label') }}</div>
             <div class="text-caption text-medium-emphasis">{{ t('channelEditor.compat.historicalImageLimit.hint') }}</div>
           </div>
