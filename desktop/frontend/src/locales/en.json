@@ -835,5 +835,6 @@
   "capability.noApiKeyError": "This channel has no API key configured and cannot run capability tests.",
   "capability.genericJobError": "Capability test failed: {message}",
   "capability.redirectTests": "Model Redirect Tests",
-  "capability.redirectTestsDesc": "Cross-protocol model mapping verification"
+  "capability.redirectTestsDesc": "Cross-protocol model mapping verification",
+  "addChannel.quickInputPlaceholder": "Paste config snippet to auto-detect Base URL and API Key (multi-line supported)\nhttps://api.example.com\nhttps://api-backup.example.com\nsk-ant-api03-xxxxxxxxxxxxxxxx\nsk-ant-api03-yyyyyyyyyyyyyyyy"
 }

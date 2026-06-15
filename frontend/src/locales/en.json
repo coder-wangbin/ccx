@@ -189,7 +189,7 @@
   "addChannel.advancedOptions": "Advanced Options",
   "addChannel.quickInputHint": "Paste configuration text containing Base URL and API Key, the system will parse automatically",
   "addChannel.quickInputLabel": "Quick configuration input",
-  "addChannel.quickInputPlaceholder": "Paste configuration...",
+  "addChannel.quickInputPlaceholder": "Paste config snippet to auto-detect Base URL and API Key (multi-line supported)\nhttps://api.example.com\nhttps://api-backup.example.com\nsk-ant-api03-xxxxxxxxxxxxxxxx\nsk-ant-api03-yyyyyyyyyyyyyyyy",
   "addChannel.quickSubmitButton": "Create channel",
   "addChannel.detectedType": "Detected type: {type}",
   "addChannel.detectedName": "Name",

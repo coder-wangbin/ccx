@@ -189,7 +189,7 @@
   "addChannel.advancedOptions": "高级选项",
   "addChannel.quickInputHint": "粘贴包含 Base URL 和 API Key 的配置文本，系统将自动解析",
   "addChannel.quickInputLabel": "快速配置输入",
-  "addChannel.quickInputPlaceholder": "粘贴配置...",
+  "addChannel.quickInputPlaceholder": "粘贴配置片段，自动识别 Base URL 和 API Key（支持多行）\nhttps://api.example.com\nhttps://api-backup.example.com\nsk-ant-api03-xxxxxxxxxxxxxxxx\nsk-ant-api03-yyyyyyyyyyyyyyyy",
   "addChannel.quickSubmitButton": "创建渠道",
   "addChannel.detectedType": "检测到类型: {type}",
   "addChannel.detectedName": "名称",

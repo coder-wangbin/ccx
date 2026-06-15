@@ -835,5 +835,6 @@
   "capability.noApiKeyError": "该渠道未配置 API Key，无法执行能力测试。",
   "capability.genericJobError": "能力测试失败：{message}",
   "capability.redirectTests": "模型重定向测试",
-  "capability.redirectTestsDesc": "跨协议模型映射验证"
+  "capability.redirectTestsDesc": "跨协议模型映射验证",
+  "addChannel.quickInputPlaceholder": "粘贴配置片段，自动识别 Base URL 和 API Key（支持多行）\nhttps://api.example.com\nhttps://api-backup.example.com\nsk-ant-api03-xxxxxxxxxxxxxxxx\nsk-ant-api03-yyyyyyyyyyyyyyyy"
 }

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { AlertCircle, CheckCircle2, ClipboardPaste } from 'lucide-vue-next'
+import { AlertCircle, CheckCircle2 } from 'lucide-vue-next'
 import { useLanguage } from '@/composables/useLanguage'
 
 defineProps<{
@@ -12,6 +12,7 @@ defineProps<{
   detectedBaseUrls: string[]
   detectedApiKeys: string[]
   userSelectedServiceType: boolean
+  expectedRequestUrls: Array<{ baseUrl: string; expectedUrl: string }>
 }>()
 
 const emit = defineEmits<{
@@ -25,16 +26,6 @@ const { tf } = useLanguage()
 
 <template>
   <section class="space-y-3 rounded-xl border border-primary/20 bg-primary/5 p-4">
-    <div>
-      <h4 class="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-primary">
-        <ClipboardPaste class="h-3.5 w-3.5" />
-        {{ tf('addChannel.quickMode', '快速粘贴') }}
-      </h4>
-      <p class="mt-1 text-xs text-muted-foreground">
-        {{ tf('addChannel.quickHint', '粘贴 Base URL、API Key 或完整配置片段，自动识别并填入表单。') }}
-      </p>
-    </div>
-
     <div class="grid gap-2 rounded-lg border border-border bg-background/70 p-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
       <div class="space-y-1.5">
         <div class="text-xs font-semibold text-muted-foreground">
@@ -68,7 +59,7 @@ const { tf } = useLanguage()
       :model-value="quickInput"
       rows="10"
       class="!field-sizing-none min-h-[14rem] font-mono text-xs"
-      placeholder="https://api.example.com/v1&#10;sk-..."
+      :placeholder="tf('addChannel.quickInputPlaceholder', '粘贴配置片段，自动识别 Base URL 和 API Key（支持多行）')"
       @update:model-value="(val) => emit('update:quick-input', val as string)"
       @paste="emit('quick-paste', $event.clipboardData?.getData('text/plain') || '')"
     />
@@ -80,8 +71,16 @@ const { tf } = useLanguage()
           <AlertCircle v-else class="h-3.5 w-3.5 text-muted-foreground" />
           Base URLs
         </div>
-        <p class="truncate text-muted-foreground">
-          {{ detectedBaseUrls.length ? detectedBaseUrls.join(' · ') : tf('addChannel.noneDetected', '未识别') }}
+        <template v-if="detectedBaseUrls.length">
+          <div v-for="item in expectedRequestUrls" :key="item.baseUrl" class="mb-1">
+            <p class="truncate text-[11px] text-emerald-600">{{ item.baseUrl }}</p>
+            <p class="truncate text-[10px] text-muted-foreground/70">
+              {{ tf('addChannel.expectedRequest', '预期请求') }} {{ item.expectedUrl }}
+            </p>
+          </div>
+        </template>
+        <p v-else class="truncate text-muted-foreground">
+          {{ tf('addChannel.noneDetected', '未识别') }}
         </p>
       </div>
 

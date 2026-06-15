@@ -1120,6 +1120,16 @@ const expectedRequestUrls = computed(() => {
   )
 })
 
+// 快速添加模式：基于 detectedBaseUrls 计算预期请求预览
+const quickExpectedRequestUrls = computed(() => {
+  return buildExpectedRequestUrls(
+    props.channelType as any,
+    (form.serviceType || detectedServiceType.value) as any,
+    detectedBaseUrls.value[0] || '',
+    detectedBaseUrls.value,
+  )
+})
+
 async function fetchTargetModels() {
   console.log('[fetchTargetModels] 开始执行', { 
     hasChannel: !!props.channel, 
@@ -1385,6 +1395,7 @@ void fromSelectValue
                   :detected-base-urls="detectedBaseUrls"
                   :detected-api-keys="detectedApiKeys"
                   :user-selected-service-type="quickServiceTypeTouched"
+                  :expected-request-urls="quickExpectedRequestUrls"
                   @update:quick-input="quickInput = $event"
                   @update:service-type="updateQuickServiceType"
                   @quick-paste="handleQuickPaste"
