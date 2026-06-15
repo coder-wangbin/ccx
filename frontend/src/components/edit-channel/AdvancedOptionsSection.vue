@@ -58,6 +58,7 @@
           :supports-chat-role-normalization="supportsChatRoleNormalization"
           :supports-open-a-i-advanced-options="supportsOpenAIAdvancedOptions"
           :reasoning-param-style-options="reasoningParamStyleOptions"
+          :text-verbosity-options="textVerbosityOptions"
           @update:field="updateField"
           @menu-update="$emit('menu-update', $event)"
         />
@@ -102,6 +103,7 @@ interface FormData {
   stripBillingHeader?: boolean
   normalizeNonstandardChatRoles?: boolean
   reasoningParamStyle?: string
+  textVerbosity?: string
   fastMode?: boolean
   injectDummyThoughtSignature?: boolean
   stripThoughtSignature?: boolean
@@ -126,6 +128,7 @@ interface Props {
   supportsChatRoleNormalization: boolean
   supportsOpenAIAdvancedOptions: boolean
   reasoningParamStyleOptions: Array<{ title: string; value: string }>
+  textVerbosityOptions: Array<{ title: string; value: string }>
   rules: Record<string, (v: any) => boolean | string>
 }
 

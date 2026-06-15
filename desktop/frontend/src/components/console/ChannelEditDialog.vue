@@ -181,6 +181,12 @@ const reasoningParamStyleOptions = [
   { label: 'thinking (JD/GLM)', value: 'thinking' },
 ]
 
+const textVerbosityOptions = [
+  { label: 'Low', value: 'low' },
+  { label: 'Medium', value: 'medium' },
+  { label: 'High', value: 'high' },
+]
+
 // 思考强度（effort）—— 模型映射第三列使用
 // 注意：reka-ui 的 SelectItem 不允许空字符串 value，用 DEFAULT_SELECT_VALUE 哨兵代表"默认/不设置"
 const DEFAULT_SELECT_VALUE = 'default'
@@ -1609,6 +1615,7 @@ void getFilteredTargetModels
                         :supports-open-a-i-advanced-options="supportsOpenAIAdvancedOptions"
                         :supports-chat-role-normalization="supportsChatRoleNormalization"
                         :reasoning-param-style-options="reasoningParamStyleOptions"
+                        :text-verbosity-options="textVerbosityOptions"
                         @update:form="(updates) => Object.assign(form, updates)"
                       />
                     </section>

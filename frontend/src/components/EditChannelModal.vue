@@ -129,6 +129,7 @@
                 :supportsChatRoleNormalization="supportsChatRoleNormalization"
                 :supportsOpenAIAdvancedOptions="supportsOpenAIAdvancedOptions"
                 :reasoningParamStyleOptions="reasoningParamStyleOptions"
+                :textVerbosityOptions="textVerbosityOptions"
                 :rules="rules"
                 @update:form="updateForm"
                 @menu-update="onMenuUpdate"

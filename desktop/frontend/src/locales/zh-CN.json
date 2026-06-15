@@ -594,7 +594,7 @@
   "addChannel.allApiKeysModelsFailed": "所有 API Key 都无法获取模型列表，请检查 API 密钥列表中的错误信息",
   "channelEditor.compat.title": "协议规范化",
   "channelEditor.compat.reasoningStyle.label": "Reasoning 参数样式",
-  "channelEditor.compat.textVerbosity.label": "Text verbosity",
+  "channelEditor.compat.textVerbosity.label": "输出冗长度",
   "channelEditor.compat.flags": "高级选项",
   "channelEditor.compat.noVision.label": "跳过含图请求",
   "channelEditor.compat.passbackReasoning.label": "回传 Claude 推理内容",

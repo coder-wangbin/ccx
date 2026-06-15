@@ -41,7 +41,7 @@ function updateField<K extends keyof FormData>(key: K, value: FormData[K]) {
   <section class="space-y-4 rounded-xl border border-border/60 bg-card/40 p-5 shadow-xs">
     <h4 class="text-xs font-bold uppercase tracking-wider text-primary">{{ t('channelEditor.nav.basic') }}</h4>
 
-    <div class="grid gap-3 md:grid-cols-2">
+    <div class="grid gap-3 md:grid-cols-[minmax(0,8fr)_minmax(0,4fr)]">
       <div class="space-y-1.5">
         <Label class="text-xs font-semibold text-muted-foreground">
           {{ t('channelEditor.basic.name.label') }} <span class="text-destructive">*</span>
@@ -60,7 +60,7 @@ function updateField<K extends keyof FormData>(key: K, value: FormData[K]) {
           {{ t('channelEditor.basic.serviceType.label') }} <span class="text-destructive">*</span>
         </Label>
         <Select :model-value="form.serviceType" @update:model-value="updateField('serviceType', $event as any)">
-          <SelectTrigger class="h-9" :class="{ 'border-destructive': errors.serviceType }">
+          <SelectTrigger class="h-9 w-full" :class="{ 'border-destructive': errors.serviceType }">
             <SelectValue :placeholder="tf('channelEditor.basic.serviceType.placeholder', '选择服务类型')" />
           </SelectTrigger>
           <SelectContent>

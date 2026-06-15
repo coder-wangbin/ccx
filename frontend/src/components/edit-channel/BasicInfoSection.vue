@@ -2,7 +2,7 @@
   <div class="basic-info-section">
     <v-row>
       <!-- 渠道名称 -->
-      <v-col cols="12" md="6">
+      <v-col cols="12" sm="8">
         <v-text-field
           :model-value="form.name"
           :label="t('channelEditor.basic.name.label')"
@@ -18,7 +18,7 @@
       </v-col>
 
       <!-- 服务类型 -->
-      <v-col cols="12" md="6">
+      <v-col cols="12" sm="4">
         <v-select
           :model-value="form.serviceType"
           :label="t('channelEditor.basic.serviceType.label')"

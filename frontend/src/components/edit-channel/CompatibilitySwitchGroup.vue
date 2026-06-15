@@ -125,16 +125,31 @@
         />
       </div>
 
-      <!-- Fast Mode -->
-      <div v-if="supportsOpenAIAdvancedOptions" class="d-flex align-center justify-space-between">
-        <div class="d-flex align-center ga-2">
-          <v-icon color="primary">mdi-fast-forward</v-icon>
-          <div>
-            <div class="section-title section-title--soft">{{ t('channelEditor.compat.fastMode.label') }}</div>
-            <div class="text-caption text-medium-emphasis">{{ t('channelEditor.compat.fastMode.hint') }}</div>
+      <!-- Fast Mode / Text Verbosity -->
+      <div v-if="supportsOpenAIAdvancedOptions" class="d-flex flex-column flex-sm-row align-sm-center ga-3">
+        <div class="d-flex align-center justify-space-between flex-grow-1">
+          <div class="d-flex align-center ga-2">
+            <v-icon color="primary">mdi-fast-forward</v-icon>
+            <div>
+              <div class="section-title section-title--soft">{{ t('channelEditor.compat.fastMode.label') }}</div>
+              <div class="text-caption text-medium-emphasis">{{ t('channelEditor.compat.fastMode.hint') }}</div>
+            </div>
           </div>
+          <v-switch :model-value="form.fastMode" inset color="primary" hide-details @update:model-value="updateField('fastMode', $event)" />
         </div>
-        <v-switch :model-value="form.fastMode" inset color="primary" hide-details @update:model-value="updateField('fastMode', $event)" />
+        <v-select
+          :model-value="form.textVerbosity || ''"
+          :label="t('addChannel.textVerbosityLabel')"
+          :items="textVerbosityOptions"
+          variant="outlined"
+          density="comfortable"
+          hide-details
+          clearable
+          class="text-verbosity-select"
+          eager
+          @update:model-value="updateField('textVerbosity', $event || '')"
+          @update:menu="$emit('menu-update', $event)"
+        />
       </div>
 
       <!-- Inject Dummy Thought Signature (Gemini) -->
@@ -235,6 +250,7 @@ interface FormData {
   stripBillingHeader?: boolean
   normalizeNonstandardChatRoles?: boolean
   reasoningParamStyle?: string
+  textVerbosity?: string
   fastMode?: boolean
   injectDummyThoughtSignature?: boolean
   stripThoughtSignature?: boolean
@@ -250,6 +266,7 @@ interface Props {
   supportsChatRoleNormalization: boolean
   supportsOpenAIAdvancedOptions: boolean
   reasoningParamStyleOptions: Array<{ title: string; value: string }>
+  textVerbosityOptions: Array<{ title: string; value: string }>
 }
 
 defineProps<Props>()
@@ -274,5 +291,17 @@ const updateField = (field: keyof FormData, value: unknown) => {
 
 .channel-config-select {
   max-width: 200px;
+}
+
+.text-verbosity-select {
+  flex: 0 0 240px;
+  max-width: 240px;
+}
+
+@media (max-width: 599px) {
+  .text-verbosity-select {
+    flex: 1 1 auto;
+    max-width: none;
+  }
 }
 </style>
