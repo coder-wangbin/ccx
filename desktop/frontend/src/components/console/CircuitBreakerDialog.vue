@@ -417,55 +417,89 @@ watch(() => props.open, (isOpen) => {
 .cb-slider {
   -webkit-appearance: none;
   appearance: none;
-  height: 8px;
-  border-radius: 4px;
-  background: linear-gradient(90deg, hsl(var(--primary)/0.2) 0%, hsl(var(--muted)) 50%, hsl(var(--muted)/0.5) 100%);
+  height: 10px;
+  border-radius: 5px;
+  background: linear-gradient(90deg,
+    hsl(var(--primary)/0.25) 0%,
+    hsl(var(--border)) 30%,
+    hsl(var(--border)) 70%,
+    hsl(var(--muted)) 100%
+  );
   outline: none;
   cursor: pointer;
-  transition: background 0.15s;
-  box-shadow: inset 0 1px 3px rgba(0,0,0,0.15);
+  transition: all 0.2s;
+  border: 1px solid hsl(var(--border));
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
 }
 .cb-slider:hover {
-  background: linear-gradient(90deg, hsl(var(--primary)/0.3) 0%, hsl(var(--muted)) 50%, hsl(var(--muted)/0.6) 100%);
-  box-shadow: inset 0 1px 3px rgba(0,0,0,0.2);
+  background: linear-gradient(90deg,
+    hsl(var(--primary)/0.35) 0%,
+    hsl(var(--border)) 30%,
+    hsl(var(--border)) 70%,
+    hsl(var(--muted)) 100%
+  );
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.15);
 }
 .cb-slider::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 20px;
-  height: 20px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
-  background: linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--primary)/0.9) 100%);
+  background: linear-gradient(135deg,
+    hsl(var(--primary)) 0%,
+    hsl(var(--primary)/0.85) 100%
+  );
   cursor: pointer;
-  border: 3px solid hsl(var(--background));
-  box-shadow: 0 2px 6px rgba(0,0,0,0.3), 0 0 0 0 hsl(var(--primary)/0.4);
+  border: 4px solid hsl(var(--card));
+  box-shadow:
+    0 0 0 1px hsl(var(--primary)/0.3),
+    0 3px 8px rgba(0,0,0,0.35),
+    inset 0 -2px 4px rgba(0,0,0,0.2);
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 .cb-slider::-webkit-slider-thumb:hover {
-  transform: scale(1.2);
-  box-shadow: 0 3px 10px rgba(0,0,0,0.35), 0 0 0 5px hsl(var(--primary)/0.2);
+  transform: scale(1.25);
+  box-shadow:
+    0 0 0 2px hsl(var(--primary)/0.4),
+    0 4px 12px rgba(0,0,0,0.4),
+    0 0 0 6px hsl(var(--primary)/0.15),
+    inset 0 -2px 4px rgba(0,0,0,0.2);
 }
 .cb-slider::-webkit-slider-thumb:active {
-  transform: scale(1.1);
-  box-shadow: 0 2px 4px rgba(0,0,0,0.3), 0 0 0 7px hsl(var(--primary)/0.25);
+  transform: scale(1.15);
+  box-shadow:
+    0 0 0 2px hsl(var(--primary)/0.5),
+    0 2px 6px rgba(0,0,0,0.3),
+    0 0 0 8px hsl(var(--primary)/0.2),
+    inset 0 -2px 4px rgba(0,0,0,0.2);
 }
 .cb-slider::-moz-range-thumb {
-  width: 20px;
-  height: 20px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
-  background: linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--primary)/0.9) 100%);
+  background: linear-gradient(135deg,
+    hsl(var(--primary)) 0%,
+    hsl(var(--primary)/0.85) 100%
+  );
   cursor: pointer;
-  border: 3px solid hsl(var(--background));
-  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+  border: 4px solid hsl(var(--card));
+  box-shadow:
+    0 0 0 1px hsl(var(--primary)/0.3),
+    0 3px 8px rgba(0,0,0,0.35);
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 .cb-slider::-moz-range-thumb:hover {
-  transform: scale(1.2);
-  box-shadow: 0 3px 10px rgba(0,0,0,0.35);
+  transform: scale(1.25);
+  box-shadow:
+    0 0 0 2px hsl(var(--primary)/0.4),
+    0 4px 12px rgba(0,0,0,0.4);
 }
 .cb-slider::-moz-range-thumb:active {
-  transform: scale(1.1);
-  box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+  transform: scale(1.15);
+  box-shadow:
+    0 0 0 2px hsl(var(--primary)/0.5),
+    0 2px 6px rgba(0,0,0,0.3);
 }
 .cb-slider:disabled {
   opacity: 0.5;
