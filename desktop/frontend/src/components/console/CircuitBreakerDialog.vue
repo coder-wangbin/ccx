@@ -213,7 +213,7 @@ watch(() => props.open, (isOpen) => {
       >
         <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" @click="emit('close')" />
 
-        <div class="relative z-10 flex max-h-[85vh] w-[560px] max-w-[90vw] flex-col rounded-2xl border border-border/80 bg-gradient-to-br from-card/95 to-card/85 shadow-2xl backdrop-blur-md">
+        <div class="relative z-10 flex max-h-[85vh] w-[560px] max-w-[90vw] flex-col overflow-hidden rounded-2xl border border-border/80 bg-gradient-to-br from-card/95 to-card/85 shadow-2xl backdrop-blur-md">
           <!-- Header -->
           <div class="flex shrink-0 items-center justify-between border-b border-border/60 bg-gradient-to-r from-card/60 to-card/40 p-5 backdrop-blur-sm">
             <div class="flex items-center gap-2.5">
