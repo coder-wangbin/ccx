@@ -1,7 +1,6 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { Button } from '@/components/ui/button'
-import { Label } from '@/components/ui/label'
-import { Switch } from '@/components/ui/switch'
 import { useLanguage } from '@/composables/useLanguage'
 
 interface FormData {
@@ -44,17 +43,65 @@ function applyStreamTimeoutPreset(presetKey: 'gentle' | 'balanced' | 'aggressive
     streamToolCallIdleTimeoutMs: preset.toolCallIdleMs,
   } as Partial<FormData>)
 }
+
+function applyInheritStrategy() {
+  emit('update:form', {
+    streamFirstContentTimeoutEnabled: false,
+    streamInactivityTimeoutEnabled: false,
+    streamToolCallIdleTimeoutEnabled: false,
+  } as Partial<FormData>)
+}
+
+const selectedStrategy = computed(() => {
+  if (
+    !props.form.streamFirstContentTimeoutEnabled &&
+    !props.form.streamInactivityTimeoutEnabled &&
+    !props.form.streamToolCallIdleTimeoutEnabled
+  ) {
+    return 'inherit'
+  }
+  for (const [key, preset] of Object.entries(streamTimeoutPresets)) {
+    if (
+      props.form.streamFirstContentTimeoutEnabled &&
+      props.form.streamInactivityTimeoutEnabled &&
+      props.form.streamToolCallIdleTimeoutEnabled &&
+      props.form.streamFirstContentTimeoutMs === preset.firstContentMs &&
+      props.form.streamInactivityTimeoutMs === preset.inactivityMs &&
+      props.form.streamToolCallIdleTimeoutMs === preset.toolCallIdleMs
+    ) {
+      return key
+    }
+  }
+  return 'custom'
+})
 </script>
 
 <template>
-  <div class="rounded-xl border border-border/60 bg-card/40 p-4 shadow-xs space-y-3">
-    <div class="flex items-center justify-between">
-      <div class="text-[10px] font-bold uppercase tracking-wider text-primary">{{ t('channelEditor.streamTimeout.title') }}</div>
-      <div class="flex gap-1">
+  <div class="rounded-xl border border-border/60 bg-card/40 p-4 shadow-xs space-y-4">
+    <div class="flex items-start justify-between gap-3 flex-wrap">
+      <div>
+        <div class="text-[10px] font-bold uppercase tracking-wider text-primary">
+          {{ t('addChannel.streamTimeoutStrategyLabel') }}
+        </div>
+        <div class="text-[10px] leading-4 text-muted-foreground">
+          {{ selectedStrategy === 'inherit' ? t('addChannel.streamTimeoutInheritHint') : t('addChannel.streamTimeoutOverrideHint') }}
+        </div>
+      </div>
+      <div class="flex gap-1 flex-wrap">
         <Button
           size="sm"
           variant="outline"
           class="h-6 px-2 text-[10px]"
+          :class="selectedStrategy === 'inherit' ? 'border-primary/40 text-primary' : ''"
+          @click="applyInheritStrategy"
+        >
+          {{ t('addChannel.streamTimeoutStrategyInherit') }}
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          class="h-6 px-2 text-[10px]"
+          :class="selectedStrategy === 'gentle' ? 'border-primary/40 text-primary' : ''"
           @click="applyStreamTimeoutPreset('gentle')"
         >
           {{ t('channelEditor.streamTimeout.preset.gentle') }}
@@ -63,6 +110,7 @@ function applyStreamTimeoutPreset(presetKey: 'gentle' | 'balanced' | 'aggressive
           size="sm"
           variant="outline"
           class="h-6 px-2 text-[10px]"
+          :class="selectedStrategy === 'balanced' ? 'border-primary/40 text-primary' : ''"
           @click="applyStreamTimeoutPreset('balanced')"
         >
           {{ t('channelEditor.streamTimeout.preset.balanced') }}
@@ -71,29 +119,24 @@ function applyStreamTimeoutPreset(presetKey: 'gentle' | 'balanced' | 'aggressive
           size="sm"
           variant="outline"
           class="h-6 px-2 text-[10px]"
+          :class="selectedStrategy === 'aggressive' ? 'border-primary/40 text-primary' : ''"
           @click="applyStreamTimeoutPreset('aggressive')"
         >
           {{ t('channelEditor.streamTimeout.preset.aggressive') }}
         </Button>
       </div>
     </div>
-    <div class="grid gap-3">
-      <!-- 首字等待 -->
-      <div class="border border-border/60 bg-background/60 p-3 rounded-xl space-y-2.5">
-        <div class="flex items-start justify-between gap-2">
-          <div class="min-w-0">
-            <Label class="text-xs font-semibold block">{{ t('channelEditor.streamTimeout.firstContent.label') }}</Label>
-            <span class="text-[9px] text-muted-foreground leading-none">{{ t('channelEditor.streamTimeout.firstContent.hint') }}</span>
-          </div>
-          <Switch
-            :model-value="form.streamFirstContentTimeoutEnabled"
-            @update:model-value="updateField('streamFirstContentTimeoutEnabled', $event)"
-          />
-        </div>
-        <div class="space-y-1" :class="{ 'opacity-50 pointer-events-none': !form.streamFirstContentTimeoutEnabled }">
-          <div class="flex items-center justify-between text-[10px] font-mono font-medium text-muted-foreground">
-            <span>{{ t('channelEditor.streamTimeout.timeoutThreshold') }}</span>
-            <span class="text-primary font-bold">{{ (form.streamFirstContentTimeoutMs / 1000) }}s</span>
+
+    <div class="overflow-hidden rounded-xl border border-border/60 bg-background/60">
+      <div class="grid gap-0 md:grid-cols-3">
+        <div class="space-y-2.5 p-4" :class="{ 'opacity-50': !form.streamFirstContentTimeoutEnabled }">
+          <div class="flex items-center justify-between gap-2">
+            <span class="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">
+              {{ t('addChannel.streamFirstContentTimeoutLabel') }}
+            </span>
+            <span class="font-mono text-xs font-semibold text-primary">
+              {{ form.streamFirstContentTimeoutMs / 1000 }}s
+            </span>
           </div>
           <input
             :value="form.streamFirstContentTimeoutMs"
@@ -101,29 +144,24 @@ function applyStreamTimeoutPreset(presetKey: 'gentle' | 'balanced' | 'aggressive
             min="5000"
             max="300000"
             step="1000"
-            class="w-full accent-primary h-1 bg-muted rounded-lg appearance-none cursor-pointer"
+            class="h-1 w-full cursor-pointer appearance-none rounded-lg bg-muted accent-primary"
             :disabled="!form.streamFirstContentTimeoutEnabled"
             @input="updateField('streamFirstContentTimeoutMs', Number(($event.target as HTMLInputElement).value))"
           />
-        </div>
-      </div>
-
-      <!-- 首字后断流 -->
-      <div class="border border-border/60 bg-background/60 p-3 rounded-xl space-y-2.5">
-        <div class="flex items-start justify-between gap-2">
-          <div class="min-w-0">
-            <Label class="text-xs font-semibold block">{{ t('channelEditor.streamTimeout.inactivity.label') }}</Label>
-            <span class="text-[9px] text-muted-foreground leading-none">{{ t('channelEditor.streamTimeout.inactivity.hint') }}</span>
+          <div class="flex justify-between text-[10px] text-muted-foreground/70">
+            <span>5s</span>
+            <span>300s</span>
           </div>
-          <Switch
-            :model-value="form.streamInactivityTimeoutEnabled"
-            @update:model-value="updateField('streamInactivityTimeoutEnabled', $event)"
-          />
         </div>
-        <div class="space-y-1" :class="{ 'opacity-50 pointer-events-none': !form.streamInactivityTimeoutEnabled }">
-          <div class="flex items-center justify-between text-[10px] font-mono font-medium text-muted-foreground">
-            <span>{{ t('channelEditor.streamTimeout.timeoutThreshold') }}</span>
-            <span class="text-primary font-bold">{{ (form.streamInactivityTimeoutMs / 1000) }}s</span>
+
+        <div class="space-y-2.5 border-t border-border/60 p-4 md:border-l md:border-t-0" :class="{ 'opacity-50': !form.streamInactivityTimeoutEnabled }">
+          <div class="flex items-center justify-between gap-2">
+            <span class="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">
+              {{ t('addChannel.streamInactivityTimeoutLabel') }}
+            </span>
+            <span class="font-mono text-xs font-semibold text-primary">
+              {{ form.streamInactivityTimeoutMs / 1000 }}s
+            </span>
           </div>
           <input
             :value="form.streamInactivityTimeoutMs"
@@ -131,40 +169,39 @@ function applyStreamTimeoutPreset(presetKey: 'gentle' | 'balanced' | 'aggressive
             min="1000"
             max="180000"
             step="1000"
-            class="w-full accent-primary h-1 bg-muted rounded-lg appearance-none cursor-pointer"
+            class="h-1 w-full cursor-pointer appearance-none rounded-lg bg-muted accent-primary"
             :disabled="!form.streamInactivityTimeoutEnabled"
             @input="updateField('streamInactivityTimeoutMs', Number(($event.target as HTMLInputElement).value))"
           />
-        </div>
-      </div>
-
-      <!-- 工具调用空闲 -->
-      <div class="border border-border/60 bg-background/60 p-3 rounded-xl space-y-2.5">
-        <div class="flex items-start justify-between gap-2">
-          <div class="min-w-0">
-            <Label class="text-xs font-semibold block">{{ t('channelEditor.streamTimeout.toolCallIdle.label') }}</Label>
-            <span class="text-[9px] text-muted-foreground leading-none">{{ t('channelEditor.streamTimeout.toolCallIdle.hint') }}</span>
+          <div class="flex justify-between text-[10px] text-muted-foreground/70">
+            <span>1s</span>
+            <span>180s</span>
           </div>
-          <Switch
-            :model-value="form.streamToolCallIdleTimeoutEnabled"
-            @update:model-value="updateField('streamToolCallIdleTimeoutEnabled', $event)"
-          />
         </div>
-        <div class="space-y-1" :class="{ 'opacity-50 pointer-events-none': !form.streamToolCallIdleTimeoutEnabled }">
-          <div class="flex items-center justify-between text-[10px] font-mono font-medium text-muted-foreground">
-            <span>{{ t('channelEditor.streamTimeout.timeoutThreshold') }}</span>
-            <span class="text-primary font-bold">{{ (form.streamToolCallIdleTimeoutMs / 1000) }}s</span>
+
+        <div class="space-y-2.5 border-t border-border/60 p-4 md:border-l md:border-t-0" :class="{ 'opacity-50': !form.streamToolCallIdleTimeoutEnabled }">
+          <div class="flex items-center justify-between gap-2">
+            <span class="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">
+              {{ t('addChannel.streamToolCallIdleTimeoutLabel') }}
+            </span>
+            <span class="font-mono text-xs font-semibold text-primary">
+              {{ form.streamToolCallIdleTimeoutMs / 1000 }}s
+            </span>
           </div>
           <input
             :value="form.streamToolCallIdleTimeoutMs"
             type="range"
-            min="1000"
-            max="180000"
+            min="30000"
+            max="300000"
             step="1000"
-            class="w-full accent-primary h-1 bg-muted rounded-lg appearance-none cursor-pointer"
+            class="h-1 w-full cursor-pointer appearance-none rounded-lg bg-muted accent-primary"
             :disabled="!form.streamToolCallIdleTimeoutEnabled"
             @input="updateField('streamToolCallIdleTimeoutMs', Number(($event.target as HTMLInputElement).value))"
           />
+          <div class="flex justify-between text-[10px] text-muted-foreground/70">
+            <span>30s</span>
+            <span>300s</span>
+          </div>
         </div>
       </div>
     </div>

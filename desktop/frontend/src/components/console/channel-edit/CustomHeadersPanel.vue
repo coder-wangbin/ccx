@@ -37,35 +37,22 @@ const { tf } = useLanguage()
       </p>
     </div>
 
-    <!-- 已有 Headers 列表 -->
     <div v-if="headerRows.length" class="space-y-2">
-      <div class="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60 px-1">
-        {{ tf('console.form.existingHeaders', '已配置标头') }}
-      </div>
       <div
         v-for="row in headerRows"
         :key="row.id"
-        class="flex items-start gap-2 p-2 rounded-lg border border-border/60 bg-background/60 hover:bg-background transition-colors"
+        class="flex items-center justify-between gap-3 rounded-lg border border-border/60 bg-background/60 px-3 py-2 text-xs shadow-2xs transition-colors hover:bg-background"
       >
-        <div class="grid flex-1 gap-2 md:grid-cols-[1fr_2fr]">
-          <Input
-            :model-value="row.key"
-            class="h-9 font-mono text-xs"
-            :placeholder="tf('addChannel.headerNameLabel', 'Header 名称')"
-            @update:model-value="(val) => emit('updateHeaderRow', row.id, 'key', val as string)"
-          />
-          <Input
-            :model-value="row.value"
-            class="h-9 font-mono text-xs"
-            :placeholder="tf('addChannel.headerValueLabel', '请求头值')"
-            @update:model-value="(val) => emit('updateHeaderRow', row.id, 'value', val as string)"
-          />
+        <div class="min-w-0 flex-1 truncate">
+          <code class="font-mono text-foreground">{{ row.key }}</code>
+          <span class="mx-1 text-muted-foreground">:</span>
+          <span class="text-muted-foreground break-all">{{ row.value }}</span>
         </div>
         <Button
           type="button"
           size="icon-sm"
           variant="ghost"
-          class="h-9 w-9 shrink-0 text-destructive hover:bg-destructive/10"
+          class="h-8 w-8 shrink-0 text-destructive hover:bg-destructive/10"
           @click="emit('removeHeaderRow', row.id)"
         >
           <Trash2 class="h-4 w-4" />
@@ -73,12 +60,11 @@ const { tf } = useLanguage()
       </div>
     </div>
 
-    <!-- 添加新 Header -->
-    <div>
-      <Label class="text-xs font-semibold text-muted-foreground mb-2 block">
-        {{ tf('console.form.addNewHeader', '添加新标头') }}
-      </Label>
-      <div class="grid gap-2 md:grid-cols-[1fr_2fr_auto] md:items-end">
+    <div class="grid gap-2 md:grid-cols-[1fr_2fr_auto] md:items-end">
+      <div class="space-y-1">
+        <Label class="text-xs font-semibold text-muted-foreground">
+          {{ tf('addChannel.headerNameLabel', 'Header 名称') }}
+        </Label>
         <Input
           :model-value="newHeader.key"
           class="h-9 w-full font-mono text-xs"
@@ -86,6 +72,11 @@ const { tf } = useLanguage()
           @update:model-value="(val) => emit('update:newHeader', { key: val as string })"
           @keydown.enter.prevent="emit('addHeaderRow')"
         />
+      </div>
+      <div class="space-y-1">
+        <Label class="text-xs font-semibold text-muted-foreground">
+          {{ tf('addChannel.headerValueLabel', '请求头值') }}
+        </Label>
         <Input
           :model-value="newHeader.value"
           class="h-9 w-full font-mono text-xs"
@@ -93,27 +84,17 @@ const { tf } = useLanguage()
           @update:model-value="(val) => emit('update:newHeader', { value: val as string })"
           @keydown.enter.prevent="emit('addHeaderRow')"
         />
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          class="h-9 justify-self-start px-3.5 shadow-3xs md:justify-self-auto"
-          :disabled="!newHeader.key.trim() || !newHeader.value.trim()"
-          @click="emit('addHeaderRow')"
-        >
-          <Plus class="h-4 w-4" />
-        </Button>
       </div>
-    </div>
-
-    <!-- 说明 -->
-    <div class="text-xs text-muted-foreground bg-muted/30 p-3 rounded-lg border border-border/30">
-      <p class="font-semibold mb-1">{{ tf('console.form.headersNote', '说明') }}</p>
-      <ul class="space-y-1 text-[11px] leading-relaxed">
-        <li>• {{ tf('console.form.headersNoteInject', '自定义 Headers 将在每个请求中注入到上游') }}</li>
-        <li>• {{ tf('console.form.headersNoteOverride', '支持覆盖默认 Headers（如 User-Agent、Authorization 等）') }}</li>
-        <li>• {{ tf('console.form.headersNoteTemplate', '键名和值都支持模板变量（如果后端实现了变量替换）') }}</li>
-      </ul>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        class="h-9 justify-self-start px-3.5 shadow-3xs md:justify-self-auto"
+        :disabled="!newHeader.key.trim() || !newHeader.value.trim()"
+        @click="emit('addHeaderRow')"
+      >
+        <Plus class="h-4 w-4" />
+      </Button>
     </div>
   </section>
 </template>

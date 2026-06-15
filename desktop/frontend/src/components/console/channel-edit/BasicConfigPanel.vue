@@ -49,6 +49,7 @@ function updateField<K extends keyof FormData>(key: K, value: FormData[K]) {
         <Input
           :model-value="form.name"
           class="h-9"
+          :placeholder="tf('channelEditor.basic.name.placeholder', 'e.g. OpenAI Production')"
           :class="{ 'border-destructive': errors.name }"
           @update:model-value="(val) => updateField('name', val as string)"
         />
@@ -106,7 +107,7 @@ function updateField<K extends keyof FormData>(key: K, value: FormData[K]) {
       <Input
         :model-value="form.website"
         class="h-9"
-        placeholder="https://example.com"
+        :placeholder="tf('channelEditor.basic.website.placeholder', 'https://openai.com')"
         @update:model-value="(val) => updateField('website', val as string)"
       />
     </div>

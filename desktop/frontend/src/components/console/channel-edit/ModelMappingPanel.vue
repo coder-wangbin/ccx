@@ -21,6 +21,7 @@ interface ModelMappingRow {
 const props = defineProps<{
   modelMappingRows: ModelMappingRow[]
   newModelMapping: ModelMappingRow
+  sourceModelOptions: string[]
   reasoningEffortOptions: Array<{ label: string; value: string }>
   targetModelDatalist: string[]
   channelType: string
@@ -31,8 +32,17 @@ const props = defineProps<{
   visionFallbackModel: string
   supportedModelsText: string
   showModelMappingPresets: boolean
+  showMessagesOpenAIChannelPresets: boolean
   showClaudeChannelPresets: boolean
   showCodexResponsesPresets: boolean
+  supportsOpenAIAdvancedOptions: boolean
+  modelMappingHint: string
+  targetModelPlaceholder: string
+  commonSupportedModelFilters: string[]
+  selectedSupportedModelSet: Set<string>
+  sourceMappingError: string
+  fetchModelsError: string
+  supportedModelsError: string
 }>()
 
 const emit = defineEmits<{
@@ -48,11 +58,13 @@ const emit = defineEmits<{
   'hideTargetDropdown': []
   'selectTargetModel': [inputId: string, model: string]
   'handleTargetFocus': []
+  'appendSupportedModelFilter': [filter: string]
 }>()
 
 const { t, tf } = useLanguage()
 
 const hasNoVisionRows = computed(() => props.modelMappingRows.some(row => row.noVision && row.target.trim()))
+const isSupportedModelSelected = (filter: string) => props.selectedSupportedModelSet.has(filter)
 
 function toSelectValue(effort: ReasoningEffort | ''): string {
   return effort === '' ? props.DEFAULT_SELECT_VALUE : effort
@@ -66,72 +78,93 @@ function fromSelectValue(value: string): ReasoningEffort | '' {
 <template>
   <section class="space-y-4 rounded-xl border border-primary/20 bg-gradient-to-b from-primary/[0.02] to-transparent p-5 shadow-sm">
     <div class="border-b border-border/40 pb-3">
-      <div class="space-y-0.5">
-        <h4 class="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-foreground">
-          <span class="h-2 w-2 rounded-full bg-primary shadow-[0_0_10px_hsl(var(--primary))] animate-pulse"></span>
-          {{ t('channelEditor.mapping.redirect.title') }}
-        </h4>
-        <p class="text-[10px] text-muted-foreground">
-          {{ tf('channelEditor.mapping.hint', '拦截调用请求中的 Source 别名并定向投递至上游 Target 真实模型') }}
-        </p>
+      <div class="flex items-start justify-between gap-3">
+        <div class="space-y-0.5">
+          <h4 class="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-foreground">
+            <span class="h-2 w-2 rounded-full bg-primary shadow-[0_0_10px_hsl(var(--primary))] animate-pulse"></span>
+            {{ t('channelEditor.mapping.redirect.title') }}
+          </h4>
+          <p class="text-[10px] text-muted-foreground">
+            {{ modelMappingHint }}
+          </p>
+          <p class="text-[10px] text-primary">
+            {{ tf('addChannel.modelHintTip', '点击目标模型输入框会自动获取上游支持的模型列表,每个 API Key 的检测状态会显示在密钥列表中') }}
+          </p>
+        </div>
+        <span class="shrink-0 rounded-md border border-primary/20 bg-primary/10 px-2 py-1 text-[9px] font-semibold uppercase tracking-wider text-primary">
+          {{ t('addChannel.autoConvertModelNames') }}
+        </span>
       </div>
     </div>
 
-    <!-- 预设快速注入 -->
-    <div class="rounded-lg border border-border/50 bg-card/40 p-3 space-y-2">
-      <div class="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/80">
+    <div
+      v-if="showModelMappingPresets || showMessagesOpenAIChannelPresets || showClaudeChannelPresets || showCodexResponsesPresets"
+      class="flex flex-wrap items-center gap-1.5"
+    >
+      <div class="flex items-center gap-1.5 text-[10px] text-muted-foreground">
         <Zap class="h-3 w-3 text-primary" />
-        {{ tf('console.form.presets', '预设快速注入') }}
+        {{ t('addChannel.oneClickSetup') }}
       </div>
-      <div class="flex flex-wrap items-center gap-1.5">
-        <template v-if="showModelMappingPresets">
-          <Button
-            v-for="tag in ['gpt-5.5', 'gpt-5.4']"
-            :key="'openai-' + tag"
-            type="button"
-            variant="outline"
-            size="sm"
-            class="h-6 rounded-md border border-border/70 bg-background px-2.5 text-[10px] font-medium text-muted-foreground hover:border-primary/40 hover:text-primary hover:bg-primary/5 shadow-3xs"
-            @click="emit('applyPreset', tag)"
-          >
-            {{ tag }}
-          </Button>
-        </template>
-        <template v-if="showClaudeChannelPresets">
-          <Button
-            v-for="tag in ['MiMo', 'DeepSeek', 'MiniMax']"
-            :key="'claude-' + tag"
-            type="button"
-            variant="outline"
-            size="sm"
-            class="h-6 rounded-md border border-border/70 bg-background px-2.5 text-[10px] font-medium text-muted-foreground hover:border-primary/40 hover:text-primary hover:bg-primary/5 shadow-3xs"
-            @click="emit('applyPreset', tag)"
-          >
-            {{ tag }}
-          </Button>
-        </template>
-        <template v-if="showCodexResponsesPresets">
-          <Button
-            v-for="tag in ['MiMo', 'DeepSeek', 'MiniMax']"
-            :key="'codex-' + tag"
-            type="button"
-            variant="outline"
-            size="sm"
-            class="h-6 rounded-md border border-border/70 bg-background px-2.5 text-[10px] font-medium text-muted-foreground hover:border-primary/40 hover:text-primary hover:bg-primary/5 shadow-3xs"
-            @click="emit('applyPreset', tag)"
-          >
-            {{ tag }}
-          </Button>
-        </template>
-      </div>
+      <template v-if="showModelMappingPresets">
+        <Button
+          v-for="tag in ['gpt-5.5', 'gpt-5.4']"
+          :key="'openai-' + tag"
+          type="button"
+          variant="outline"
+          size="sm"
+          class="h-6 rounded-md border border-border/70 bg-background px-2.5 text-[10px] font-medium text-muted-foreground hover:border-primary/40 hover:text-primary hover:bg-primary/5 shadow-3xs"
+          @click="emit('applyPreset', tag)"
+        >
+          {{ tag }}
+        </Button>
+      </template>
+      <template v-if="showMessagesOpenAIChannelPresets">
+        <Button
+          v-for="tag in ['MiMo', 'DeepSeek']"
+          :key="'messages-openai-' + tag"
+          type="button"
+          variant="outline"
+          size="sm"
+          class="h-6 rounded-md border border-border/70 bg-background px-2.5 text-[10px] font-medium text-muted-foreground hover:border-primary/40 hover:text-primary hover:bg-primary/5 shadow-3xs"
+          @click="emit('applyPreset', tag)"
+        >
+          {{ tag }}
+        </Button>
+      </template>
+      <template v-if="showClaudeChannelPresets">
+        <Button
+          v-for="tag in ['MiMo', 'DeepSeek', 'MiniMax']"
+          :key="'claude-' + tag"
+          type="button"
+          variant="outline"
+          size="sm"
+          class="h-6 rounded-md border border-border/70 bg-background px-2.5 text-[10px] font-medium text-muted-foreground hover:border-primary/40 hover:text-primary hover:bg-primary/5 shadow-3xs"
+          @click="emit('applyPreset', tag)"
+        >
+          {{ tag }}
+        </Button>
+      </template>
+      <template v-if="showCodexResponsesPresets">
+        <Button
+          v-for="tag in ['MiMo', 'DeepSeek', 'MiniMax']"
+          :key="'codex-' + tag"
+          type="button"
+          variant="outline"
+          size="sm"
+          class="h-6 rounded-md border border-border/70 bg-background px-2.5 text-[10px] font-medium text-muted-foreground hover:border-primary/40 hover:text-primary hover:bg-primary/5 shadow-3xs"
+          @click="emit('applyPreset', tag)"
+        >
+          {{ tag }}
+        </Button>
+      </template>
     </div>
 
     <!-- 已有映射列表 -->
     <div v-if="modelMappingRows.length" class="space-y-2.5">
       <div class="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60 px-1">
-        <span>{{ tf('console.form.existingMappings', '已有条目映射') }}</span>
+        <span>{{ t('channelEditor.mapping.configured.label') }}</span>
         <span class="rounded-full bg-primary/10 border border-primary/20 px-2 py-0.5 font-mono text-primary">
-          {{ modelMappingRows.length }} {{ tf('console.form.mappings', '条') }}
+          {{ modelMappingRows.length }}
         </span>
       </div>
 
@@ -139,7 +172,7 @@ function fromSelectValue(value: string): ReasoningEffort | '' {
         <div
           v-for="(row, index) in modelMappingRows"
           :key="row.id"
-          class="group grid grid-cols-[1fr_auto_1.5fr_auto_auto] items-center gap-3 rounded-xl border border-border/60 bg-background/50 p-2 shadow-2xs transition-all hover:border-primary/30 hover:bg-background/80"
+          class="group grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_auto_auto] items-center gap-3 rounded-xl border border-border/60 bg-background/50 p-2 shadow-2xs transition-all hover:border-primary/30 hover:bg-background/80"
         >
           <!-- SOURCE -->
           <div class="min-w-0 rounded-lg border border-border/50 bg-muted/40 px-3 py-1.5 h-10 flex flex-col justify-center">
@@ -157,7 +190,7 @@ function fromSelectValue(value: string): ReasoningEffort | '' {
           </div>
 
           <!-- TARGET -->
-          <div class="space-y-0.5 relative">
+          <div class="relative min-w-0 space-y-0.5">
             <span class="text-[8px] font-bold tracking-wider text-muted-foreground/50 block pl-1">TARGET</span>
             <Input
               :model-value="row.target"
@@ -173,8 +206,8 @@ function fromSelectValue(value: string): ReasoningEffort | '' {
           </div>
 
           <!-- VERBOSITY (Reasoning) -->
-          <div class="space-y-0.5">
-            <span class="text-[8px] font-bold tracking-wider text-muted-foreground/50 block pl-1">VERBOSITY</span>
+          <div v-if="supportsOpenAIAdvancedOptions" class="space-y-0.5">
+            <span class="text-[8px] font-bold tracking-wider text-muted-foreground/50 block pl-1">{{ t('channelEditor.mapping.reasoningEffort.label') }}</span>
             <Select
               :model-value="toSelectValue(row.reasoning)"
               @update:model-value="(val) => emit('updateMappingRow', row.id, 'reasoning', fromSelectValue(val as string))"
@@ -217,62 +250,49 @@ function fromSelectValue(value: string): ReasoningEffort | '' {
       </div>
     </div>
 
-    <!-- 视觉回退配置 -->
-    <div v-if="hasNoVisionRows" class="rounded-xl border border-border/60 bg-card/30 p-4 space-y-3">
-      <div class="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/80 border-b border-border/30 pb-1.5">
-        {{ tf('console.form.visionFallback', '视觉回退配置') }}
-      </div>
-      <div class="space-y-1.5">
-        <Label class="text-xs font-semibold text-muted-foreground">
-          {{ tf('channelEditor.compat.visionFallback.label', '视觉回退目标模型') }}
-        </Label>
-        <Input
-          :model-value="visionFallbackModel"
-          class="h-9 w-full font-mono text-xs"
-          placeholder="mimo-v2.5"
-          @update:model-value="(val) => emit('update:visionFallbackModel', val as string)"
-        />
-        <p class="text-[10px] text-muted-foreground">{{ tf('channelEditor.compat.visionFallback.hint', '已通过模型重定向行的视觉开关标记禁用视觉模型；这些模型遇到图像输入时会自动切换到此模型处理') }}</p>
-      </div>
-    </div>
-
-    <!-- 限定可支持模型范围 -->
-    <div class="rounded-xl border border-border/60 bg-card/30 p-4 space-y-3">
+    <div v-if="hasNoVisionRows" class="space-y-1.5 rounded-xl border border-border/60 bg-card/30 p-4">
       <Label class="text-xs font-semibold text-muted-foreground">
-        {{ tf('channelEditor.mapping.supportedModels.label', '限定可支持模型范围（白名单模式，留空表示不限制）') }}
+        {{ tf('channelEditor.compat.visionFallback.label', '视觉回退目标模型') }}
       </Label>
-      <Textarea
-        :model-value="supportedModelsText"
-        placeholder="gpt-4*&#10;claude-3*"
-        class="w-full font-mono text-xs min-h-[64px]"
-        @update:model-value="(val) => emit('update:supportedModelsText', val as string)"
+      <Input
+        :model-value="visionFallbackModel"
+        class="h-9 w-full font-mono text-xs"
+        placeholder="mimo-v2.5"
+        @update:model-value="(val) => emit('update:visionFallbackModel', val as string)"
       />
+      <p class="text-[10px] leading-4 text-muted-foreground">
+        {{ tf('channelEditor.compat.visionFallback.hint', '已通过模型重定向行的视觉开关标记禁用视觉模型；这些模型遇到图像输入时会自动切换到此模型处理') }}
+      </p>
     </div>
 
-    <!-- 添加新映射 -->
-    <div class="rounded-xl border border-primary/20 bg-primary/[0.02] p-3 space-y-2">
-      <div class="text-[10px] font-bold uppercase tracking-wider text-primary">
-        {{ tf('console.form.addNewMapping', '添加新映射关系') }}
-      </div>
-      <div class="grid grid-cols-[1fr_auto_1.5fr_auto_auto] items-end gap-3">
-        <div class="space-y-1">
-          <span class="text-[8px] font-bold tracking-wider text-muted-foreground/60 block pl-1">SOURCE</span>
+    <div class="space-y-3 rounded-xl border border-primary/20 bg-primary/[0.02] p-4">
+      <div class="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_auto_auto] items-end gap-3">
+        <div class="min-w-0 space-y-1">
+          <Label class="text-xs font-semibold text-muted-foreground">
+            {{ t('channelEditor.mapping.source.label') }}
+          </Label>
           <Input
             :model-value="newModelMapping.source"
             class="h-9 w-full rounded-lg border border-primary/20 bg-background px-3 font-mono text-xs outline-none focus:border-primary/50"
-            placeholder="source-model"
+            :placeholder="t('channelEditor.mapping.source.placeholder')"
+            list="source-datalist-new"
             @update:model-value="(val) => emit('update:newModelMapping', { source: val as string })"
           />
+          <datalist id="source-datalist-new">
+            <option v-for="model in sourceModelOptions" :key="model" :value="model">{{ model }}</option>
+          </datalist>
         </div>
         <div class="flex h-9 items-center text-primary/60">
           <ArrowRight class="h-3.5 w-3.5" />
         </div>
-        <div class="space-y-1">
-          <span class="text-[8px] font-bold tracking-wider text-muted-foreground/60 block pl-1">TARGET</span>
+        <div class="min-w-0 space-y-1">
+          <Label class="text-xs font-semibold text-muted-foreground">
+            {{ t('channelEditor.mapping.target.label') }}
+          </Label>
           <Input
             :model-value="newModelMapping.target"
             class="h-9 w-full rounded-lg border border-primary/20 bg-background px-3 font-mono text-xs outline-none focus:border-primary/50"
-            placeholder="target-model"
+            :placeholder="targetModelPlaceholder"
             list="target-datalist-new"
             @update:model-value="(val) => emit('update:newModelMapping', { target: val as string })"
             @focus="emit('handleTargetFocus'); emit('showTargetDropdown', 'new', newModelMapping.target)"
@@ -281,8 +301,10 @@ function fromSelectValue(value: string): ReasoningEffort | '' {
             <option v-for="model in targetModelDatalist" :key="model" :value="model">{{ model }}</option>
           </datalist>
         </div>
-        <div class="space-y-1">
-          <span class="text-[8px] font-bold tracking-wider text-muted-foreground/60 block pl-1">VERBOSITY</span>
+        <div v-if="supportsOpenAIAdvancedOptions" class="space-y-1">
+          <Label class="text-xs font-semibold text-muted-foreground">
+            {{ t('channelEditor.mapping.reasoningEffort.label') }}
+          </Label>
           <Select
             :model-value="toSelectValue(newModelMapping.reasoning)"
             @update:model-value="(val) => emit('update:newModelMapping', { reasoning: fromSelectValue(val as string) as any })"
@@ -302,11 +324,50 @@ function fromSelectValue(value: string): ReasoningEffort | '' {
           variant="default"
           size="sm"
           class="h-9 rounded-lg bg-primary hover:bg-primary/90 px-4 text-xs font-semibold text-primary-foreground shadow-sm"
-          :disabled="!newModelMapping.source.trim() || !newModelMapping.target.trim()"
+          :disabled="!newModelMapping.source.trim() || !newModelMapping.target.trim() || !!sourceMappingError"
           @click="emit('addModelMappingRow')"
         >
           <Plus class="h-3.5 w-3.5 mr-1" />
-          {{ tf('console.form.createMapping', '建立映射') }}
+          {{ tf('common.add', 'Add') }}
+        </Button>
+      </div>
+      <div v-if="sourceMappingError" class="text-[10px] text-destructive">
+        {{ sourceMappingError }}
+      </div>
+      <div v-if="fetchModelsError" class="text-[10px] text-destructive">
+        {{ fetchModelsError }}
+      </div>
+    </div>
+
+    <div class="space-y-2">
+      <Label class="text-xs font-semibold text-muted-foreground">
+        {{ t('addChannel.supportedModelsLabel') }}
+      </Label>
+      <Textarea
+        :model-value="supportedModelsText"
+        :placeholder="t('addChannel.supportedModelsPlaceholder')"
+        class="w-full min-h-[64px] font-mono text-xs"
+        :class="supportedModelsError ? 'border-destructive/40 focus-visible:ring-destructive/20' : ''"
+        @update:model-value="(val) => emit('update:supportedModelsText', val as string)"
+      />
+      <p class="text-[10px] leading-4" :class="supportedModelsError ? 'text-destructive' : 'text-muted-foreground'">
+        {{ supportedModelsError || t('addChannel.supportedModelsHint') }}
+      </p>
+      <div class="flex items-center flex-wrap gap-2">
+        <span class="text-[10px] font-bold uppercase tracking-wider text-primary">
+          {{ tf('addChannel.commonFilters', '常用过滤器') }}
+        </span>
+        <Button
+          v-for="filter in commonSupportedModelFilters"
+          :key="filter"
+          type="button"
+          variant="outline"
+          size="sm"
+          class="h-6 rounded-md border border-border/70 bg-background px-2.5 text-[10px] font-medium text-muted-foreground hover:border-primary/40 hover:text-primary hover:bg-primary/5 shadow-3xs"
+          :class="isSupportedModelSelected(filter) ? 'border-primary/40 text-primary' : ''"
+          @click="emit('appendSupportedModelFilter', filter)"
+        >
+          {{ filter }}
         </Button>
       </div>
     </div>

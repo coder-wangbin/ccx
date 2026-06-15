@@ -22,6 +22,14 @@ interface DisabledKeyInfo {
   disabledAt?: string
 }
 
+interface KeyModelsStatus {
+  loading?: boolean
+  success?: boolean
+  error?: string
+  statusCode?: string | number
+  modelCount?: number
+}
+
 const props = defineProps<{
   existingApiKeys: string[]
   newApiKeysText: string
@@ -30,6 +38,7 @@ const props = defineProps<{
   historicalApiKeys: string[]
   restoringKey: string
   localRestoredKeys: Set<string>
+  keyModelsStatus: Map<string, KeyModelsStatus>
   errors: { apiKeys?: string }
 }>()
 
@@ -49,25 +58,41 @@ function findDuplicateKeyIndex(key: string): number {
   return props.existingApiKeys.indexOf(key)
 }
 
+function getKeyStatus(key: string) {
+  return props.keyModelsStatus.get(key)
+}
+
+function formatModelsCount(statusCode: string | number, count: number) {
+  return tf('addChannel.modelsCount', 'models {statusCode} ({count})', {
+    statusCode: String(statusCode),
+    count: String(count),
+  })
+}
+
+function getDisabledReasonLabel(reason?: string) {
+  const map: Record<string, string> = {
+    insufficient_balance: 'channelCard.blacklistReason.insufficient_balance',
+    unauthorized: 'channelCard.blacklistReason.authentication_error',
+    invalid: 'channelCard.blacklistReason.invalid',
+  }
+  return reason ? tf(map[reason] || 'channelCard.blacklistReason.unknown', reason) : ''
+}
+
 const hasDisabledKeys = computed(() => props.disabledApiKeys.length > 0)
 
 const visibleDisabledKeys = computed(() => {
   return props.disabledApiKeys.filter(item => !props.localRestoredKeys.has(item.key))
 })
-
-const usableKeys = computed(() => {
-  return props.existingApiKeys.filter(k => k.trim())
-})
 </script>
 
 <template>
   <section class="space-y-4 rounded-xl border bg-card/40 p-5 shadow-xs" :class="errors.apiKeys ? 'border-destructive/40' : 'border-border/60'">
-    <div class="flex items-center justify-between border-b border-border/40 pb-2">
+    <div class="flex items-center justify-between gap-3 border-b border-border/40 pb-2">
       <h4 class="text-xs font-bold uppercase tracking-wider text-primary">
-        {{ tf('channelEditor.nav.auth', '认证管理') }} *
+        {{ tf('channelCard.apiKeyManagement', 'API key management') }} *
       </h4>
-      <span class="text-[10px] bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-semibold px-2 py-0.5 rounded-full">
-        {{ usableKeys.length }} {{ tf('channelCard.configuredKeys', '个有效活跃密钥') }}
+      <span class="text-[10px] bg-primary/10 border border-primary/20 text-primary font-semibold px-2 py-0.5 rounded-full">
+        {{ tf('addChannel.apiKeyLoadBalance', 'Multiple keys can be added for load balancing') }}
       </span>
     </div>
 
@@ -83,6 +108,24 @@ const usableKeys = computed(() => {
         <div class="flex min-w-0 items-center gap-2.5">
           <Key class="h-3.5 w-3.5 shrink-0 text-primary/70" />
           <code class="font-mono text-muted-foreground font-medium select-all">{{ maskApiKey(key) }}</code>
+          <span
+            v-if="getKeyStatus(key)?.loading"
+            class="rounded bg-sky-500/10 px-1.5 py-0.5 text-[9px] font-medium text-sky-600"
+          >
+            {{ tf('addChannel.checking', '检测中...') }}
+          </span>
+          <span
+            v-else-if="getKeyStatus(key)?.success"
+            class="rounded bg-emerald-500/10 px-1.5 py-0.5 text-[9px] font-medium text-emerald-600"
+          >
+            {{ formatModelsCount(getKeyStatus(key)?.statusCode ?? 'OK', getKeyStatus(key)?.modelCount ?? 0) }}
+          </span>
+          <span
+            v-else-if="getKeyStatus(key)?.error"
+            class="rounded bg-destructive/10 px-1.5 py-0.5 text-[9px] font-medium text-destructive"
+          >
+            {{ getKeyStatus(key)?.statusCode || 'ERR' }}
+          </span>
           <span
             v-if="findDuplicateKeyIndex(key) !== index && existingApiKeys.indexOf(key) !== index"
             class="text-[10px] text-amber-600 shrink-0"
@@ -142,7 +185,7 @@ const usableKeys = computed(() => {
       <Input
         :model-value="newApiKeysText"
         class="h-9 flex-1 rounded-lg border border-input bg-background/40 px-3 font-mono text-xs placeholder:text-muted-foreground/60 outline-none transition-all focus:border-primary focus:ring-2 focus:ring-primary/20"
-        :placeholder="tf('addChannel.addNewApiKeyPlaceholder', '追加输入新 API Key，按下回车或点击右侧添加')"
+        :placeholder="tf('channelEditor.auth.addNewApiKey.placeholder', 'Enter new API key')"
         @update:model-value="(val) => emit('update:newApiKeysText', val as string)"
         @keydown.enter.prevent="emit('addNewApiKeys')"
       />
@@ -172,7 +215,7 @@ const usableKeys = computed(() => {
               v-if="item.reason"
               class="shrink-0 rounded bg-amber-500/15 px-1 text-[9px] text-amber-700 dark:text-amber-300"
             >
-              {{ item.reason }}
+              {{ getDisabledReasonLabel(item.reason) }}
             </span>
           </div>
           <div v-if="item.disabledAt" class="text-[10px] text-muted-foreground">{{ item.disabledAt }}</div>
@@ -189,11 +232,6 @@ const usableKeys = computed(() => {
           {{ tf('channelEditor.auth.restoreKey', 'Restore') }}
         </Button>
       </div>
-    </div>
-
-    <!-- Historical Keys Info -->
-    <div v-if="historicalApiKeys.length" class="text-xs text-muted-foreground">
-      {{ historicalApiKeys.length }} {{ tf('channelEditor.auth.historicalKeys', 'historical keys recorded') }}
     </div>
   </section>
 </template>

@@ -7,8 +7,13 @@ import {
 } from 'lucide-vue-next'
 import { useConsoleChannels } from '@/composables/useConsoleChannels'
 import { useLanguage } from '@/composables/useLanguage'
+import { AdminApiError } from '@/composables/useAdminApi'
 import { buildChannelPayload } from '@/utils/channel-payload'
-import { syncBaseUrlsFormState } from '@/utils/channel-dialog-state'
+import {
+  filterValidSupportedModelPatterns,
+  parseSupportedModelInput,
+  syncBaseUrlsFormState,
+} from '@/utils/channel-dialog-state'
 import { getChannelTypeApi, type ManagedChannelType } from '@/utils/channel-type-api'
 import { buildExpectedRequestUrls } from '@/utils/expected-request-urls'
 import { parseQuickInput } from '@/utils/quick-input-parser'
@@ -49,6 +54,14 @@ const existingApiKeys = ref<string[]>([])
 const newApiKeysText = ref('')
 const copiedKeyIndex = ref<number | null>(null)
 const localRestoredKeys = ref<Set<string>>(new Set())
+type KeyModelsStatus = {
+  loading?: boolean
+  success?: boolean
+  error?: string
+  statusCode?: string | number
+  modelCount?: number
+}
+const keyModelsStatus = ref<Map<string, KeyModelsStatus>>(new Map())
 
 type ReasoningEffort = 'none' | 'low' | 'medium' | 'high' | 'xhigh' | 'max'
 interface ModelMappingRow {
@@ -296,6 +309,7 @@ function resetForm() {
   existingApiKeys.value = []
   newApiKeysText.value = ''
   copiedKeyIndex.value = null
+  keyModelsStatus.value.clear()
   localRestoredKeys.value = new Set()
   modelMappingRows.value = []
   headerRows.value = []
@@ -334,6 +348,7 @@ function populateFromChannel(ch: Channel) {
   form.apiKeysText = ''
   newApiKeysText.value = ''
   copiedKeyIndex.value = null
+  keyModelsStatus.value.clear()
   localRestoredKeys.value = new Set()
   modelMappingRows.value = modelMappingFromChannel(ch)
   headerRows.value = headerRowsFromChannel(ch)
@@ -496,8 +511,9 @@ function buildSubmitPayload() {
         streamFirstContentTimeoutMs: form.streamFirstContentTimeoutEnabled ? form.streamFirstContentTimeoutMs : undefined,
         streamInactivityTimeoutMs: form.streamInactivityTimeoutEnabled ? form.streamInactivityTimeoutMs : undefined,
         streamToolCallIdleTimeoutMs: form.streamToolCallIdleTimeoutEnabled ? form.streamToolCallIdleTimeoutMs : undefined,
+        rateLimitWindowMinutes: form.rateLimitWindowMinutes,
         routePrefix: form.routePrefix,
-        supportedModels: parseLines(form.supportedModelsText),
+        supportedModels: normalizedSupportedModelState.value.validPatterns,
         autoBlacklistBalance: form.autoBlacklistBalance,
         normalizeMetadataUserId: form.normalizeMetadataUserId,
         stripBillingHeader: form.stripBillingHeader,
@@ -703,7 +719,7 @@ function modelMappingFromChannel(ch: Channel) {
 }
 
 function addModelMappingRow() {
-  if (!newModelMapping.source.trim() || !newModelMapping.target.trim()) return
+  if (!newModelMapping.source.trim() || !newModelMapping.target.trim() || sourceMappingError.value) return
   modelMappingRows.value.push({
     id: ++rowId,
     source: newModelMapping.source.trim(),
@@ -982,7 +998,32 @@ const supportsOpenAIAdvancedOptions = computed(() => form.serviceType === 'opena
 const supportsChatRoleNormalization = computed(() => {
   return props.channelType === 'chat' || (props.channelType === 'responses' && form.serviceType === 'openai')
 })
+const modelMappingHint = computed(() => {
+  if (props.channelType === 'chat' || props.channelType === 'images') {
+    return tf('addChannel.modelMappingHintChat', '配置模型名称映射，将请求中的模型名重定向到目标模型。')
+  }
+  if (props.channelType === 'gemini') {
+    return tf('addChannel.modelMappingHintGemini', '配置模型名称映射，将请求中的模型名重定向到目标模型。')
+  }
+  if (props.channelType === 'responses') {
+    return tf('addChannel.modelMappingHintResponses', '配置模型名称映射，将请求中的模型名重定向到目标模型。')
+  }
+  return tf('addChannel.modelMappingHintMessages', '配置模型名称映射，将请求中的模型名重定向到目标模型。')
+})
+const targetModelPlaceholder = computed(() => {
+  if (props.channelType === 'chat' || props.channelType === 'images') {
+    return tf('addChannel.targetModelPlaceholderChat', '例如：gpt-5.4')
+  }
+  if (props.channelType === 'responses') {
+    return tf('addChannel.targetModelPlaceholderResponses', '例如：gpt-5.4')
+  }
+  if (props.channelType === 'gemini') {
+    return tf('addChannel.targetModelPlaceholderGemini', '例如：gemini-3.5-flash')
+  }
+  return tf('addChannel.targetModelPlaceholderMessages', '例如：claude-opus-4-6')
+})
 const showModelMappingPresets = computed(() => props.channelType === 'messages' && supportsOpenAIAdvanced.value)
+const showMessagesOpenAIChannelPresets = computed(() => props.channelType === 'messages' && supportsOpenAIAdvanced.value)
 const showClaudeChannelPresets = computed(() => form.serviceType === 'claude' && ['messages', 'chat', 'responses'].includes(props.channelType))
 const showCodexResponsesPresets = computed(() => props.channelType === 'responses' && supportsOpenAIAdvanced.value)
 
@@ -1081,10 +1122,40 @@ const targetModelPresets = computed(() => {
 const targetModelDatalist = computed(() => targetModelOptions.value.length ? targetModelOptions.value : targetModelPresets.value)
 
 const commonSupportedModelFilters = ['claude-*', 'gpt-5*', 'gpt-image-2', 'grok-4*', 'gemini-3*', '!*image*']
-const selectedSupportedModelSet = computed(() => new Set(parseLines(form.supportedModelsText)))
+const normalizedSupportedModelState = computed(() => {
+  const parsedPatterns = parseSupportedModelInput(form.supportedModelsText)
+  return filterValidSupportedModelPatterns(parsedPatterns)
+})
+const supportedModelsError = computed(() => (
+  normalizedSupportedModelState.value.hasInvalidPatterns
+    ? t('addChannel.supportedModelsInvalidPattern')
+    : ''
+))
+const selectedSupportedModelSet = computed(() => new Set(normalizedSupportedModelState.value.validPatterns))
+
+const isPresetSourceModel = (value: string): boolean => sourceModelOptions.value.includes(value)
+
+const validateSourceModelName = (value: string): string => {
+  const source = value.trim()
+  if (!source) return ''
+  if (!isPresetSourceModel(source) && source.length > 50) return t('addChannel.sourceModelNameTooLong')
+  if (/\s/.test(source)) return t('addChannel.sourceModelNoSpaces')
+  if (!/^[\w.\-/:@+]+$/.test(source)) return t('addChannel.sourceModelInvalidChars')
+  return ''
+}
+
+const sourceMappingError = computed(() => {
+  const source = newModelMapping.source.trim()
+  if (!source) return ''
+  const sourceNameError = validateSourceModelName(source)
+  if (sourceNameError) return sourceNameError
+  return modelMappingRows.value.some(row => row.source === source)
+    ? t('channelEditor.mapping.source.duplicate')
+    : ''
+})
 
 function toggleSupportedModelFilter(filter: string) {
-  const current = parseLines(form.supportedModelsText)
+  const current = [...normalizedSupportedModelState.value.validPatterns]
   const idx = current.indexOf(filter)
   if (idx !== -1) {
     current.splice(idx, 1)
@@ -1127,7 +1198,7 @@ async function fetchTargetModels() {
   }
   if (!form.baseUrl.trim() || getSubmitApiKeys().length === 0) {
     console.log('[fetchTargetModels] 中断：缺少配置')
-    fetchedModelsError.value = tf('channelEditor.mapping.modelFetchNeedsConfig', '需要 Base URL 和 API Key 才能获取模型列表')
+    fetchedModelsError.value = t('addChannel.fillBaseUrlAndApiKey')
     return
   }
 
@@ -1136,17 +1207,64 @@ async function fetchTargetModels() {
   try {
     console.log('[fetchTargetModels] 开始请求 API')
     // 直接调用 API，不依赖于 persistCurrentDraft（避免表单验证失败导致无法获取模型）
-    const typeApi = getChannelTypeApi(props.channelType as ManagedChannelType)
+    const effectiveServiceType = props.channelType === 'images'
+      ? 'openai'
+      : (form.serviceType || defaultServiceTypeForChannel())
+    let modelsApiType: ManagedChannelType
+    if (props.channelType === 'images') {
+      modelsApiType = 'images'
+    } else if (effectiveServiceType === 'gemini') {
+      modelsApiType = 'gemini'
+    } else if (effectiveServiceType === 'responses') {
+      modelsApiType = 'responses'
+    } else if (effectiveServiceType === 'openai') {
+      modelsApiType = 'chat'
+    } else {
+      modelsApiType = 'messages'
+    }
+
+    const typeApi = getChannelTypeApi(modelsApiType)
+    const channelId = props.channel.index
     const keys = getSubmitApiKeys()
-    const resp = await typeApi.getChannelModels(props.channel.index, {
-      key: keys[0],
-      baseUrl: form.baseUrl,
-      proxyUrl: form.proxyUrl,
-      insecureSkipVerify: form.insecureSkipVerify,
-    })
-    // 上游原始响应：Claude/OpenAI 返回 { data: [...] }，部分返回裸数组
-    const list: any[] = Array.isArray(resp) ? resp : (resp?.data ?? [])
-    targetModelOptions.value = [...new Set<string>(list.map((m: any) => m.id || m.name || String(m)).filter(Boolean))].sort()
+    const customHeaders = getHeadersAsObject()
+    const results = await Promise.all(keys.map(async (key) => {
+      keyModelsStatus.value.set(key, { loading: true, success: false })
+      try {
+        const resp = await typeApi.getChannelModels(channelId, {
+          key,
+          baseUrl: form.baseUrl,
+          proxyUrl: form.proxyUrl,
+          insecureSkipVerify: form.insecureSkipVerify,
+          customHeaders: Object.keys(customHeaders).length ? customHeaders : undefined,
+        })
+        const list: any[] = Array.isArray(resp) ? resp : (resp?.data ?? [])
+        keyModelsStatus.value.set(key, {
+          loading: false,
+          success: true,
+          statusCode: 200,
+          modelCount: list.length,
+        })
+        return list
+      } catch (e) {
+        keyModelsStatus.value.set(key, {
+          loading: false,
+          success: false,
+          statusCode: e instanceof AdminApiError ? e.status : 'ERR',
+          error: e instanceof Error ? e.message : String(e),
+        })
+        return []
+      }
+    }))
+    targetModelOptions.value = [...new Set<string>(
+      results
+        .flat()
+        .map((m: any) => m.id || m.name || String(m))
+        .filter(Boolean)
+    )].sort()
+    const anySuccess = keys.some(key => keyModelsStatus.value.get(key)?.success)
+    if (!anySuccess) {
+      fetchedModelsError.value = t('addChannel.allApiKeysModelsFailed')
+    }
     console.log('[fetchTargetModels] 成功获取模型', targetModelOptions.value.length)
   } catch (e) {
     console.error('[fetchTargetModels] 请求失败', e)
@@ -1232,8 +1350,8 @@ function addHeaderRow() {
   newHeader.value = ''
 }
 
-function removeHeaderRow(index: number) {
-  headerRows.value.splice(index, 1)
+function removeHeaderRow(id: number) {
+  headerRows.value = headerRows.value.filter(row => row.id !== id)
 }
 
 function updateHeaderRow(id: number, field: 'key' | 'value', value: string) {
@@ -1295,10 +1413,11 @@ function buildCurrentPayload() {
     streamInactivityTimeoutMs: form.streamInactivityTimeoutEnabled ? form.streamInactivityTimeoutMs : undefined,
     streamToolCallIdleTimeoutMs: form.streamToolCallIdleTimeoutEnabled ? form.streamToolCallIdleTimeoutMs : undefined,
     rateLimitRpm: form.rateLimitRpm,
+    rateLimitWindowMinutes: form.rateLimitWindowMinutes,
     rateLimitMaxConcurrent: form.rateLimitMaxConcurrent,
     rateLimitAutoFromHeaders: form.rateLimitAutoFromHeaders,
     routePrefix: form.routePrefix,
-    supportedModels: parseLines(form.supportedModelsText),
+    supportedModels: normalizedSupportedModelState.value.validPatterns,
     autoBlacklistBalance: form.autoBlacklistBalance,
     normalizeMetadataUserId: form.normalizeMetadataUserId,
     stripBillingHeader: form.stripBillingHeader,
@@ -1422,6 +1541,7 @@ void getFilteredTargetModels
                       <ModelMappingPanel
                         :model-mapping-rows="modelMappingRows"
                         :new-model-mapping="newModelMapping"
+                        :source-model-options="sourceModelOptions"
                         :reasoning-effort-options="reasoningEffortOptions"
                         :target-model-datalist="targetModelDatalist"
                         :channel-type="channelType"
@@ -1431,9 +1551,18 @@ void getFilteredTargetModels
                         :DEFAULT_SELECT_VALUE="DEFAULT_SELECT_VALUE"
                         :vision-fallback-model="form.visionFallbackModel"
                         :supported-models-text="form.supportedModelsText"
+                        :model-mapping-hint="modelMappingHint"
+                        :target-model-placeholder="targetModelPlaceholder"
                         :show-model-mapping-presets="showModelMappingPresets"
+                        :show-messages-open-a-i-channel-presets="showMessagesOpenAIChannelPresets"
                         :show-claude-channel-presets="showClaudeChannelPresets"
                         :show-codex-responses-presets="showCodexResponsesPresets"
+                        :supports-open-a-i-advanced-options="supportsOpenAIAdvancedOptions"
+                        :common-supported-model-filters="commonSupportedModelFilters"
+                        :selected-supported-model-set="selectedSupportedModelSet"
+                        :source-mapping-error="sourceMappingError"
+                        :fetch-models-error="fetchedModelsError"
+                        :supported-models-error="supportedModelsError"
                         @update:new-model-mapping="(updates) => Object.assign(newModelMapping, updates)"
                         @update:vision-fallback-model="form.visionFallbackModel = $event"
                         @update:supported-models-text="form.supportedModelsText = $event"
@@ -1446,6 +1575,7 @@ void getFilteredTargetModels
                         @hide-target-dropdown="hideTargetDropdown"
                         @select-target-model="selectTargetModel"
                         @handle-target-focus="handleTargetFocus"
+                        @append-supported-model-filter="toggleSupportedModelFilter"
                       />
                     </section>
 
@@ -1459,6 +1589,7 @@ void getFilteredTargetModels
                         :historical-api-keys="historicalApiKeys"
                         :restoring-key="restoringKey"
                         :local-restored-keys="localRestoredKeys"
+                        :key-models-status="keyModelsStatus"
                         :errors="errors"
                         @update:new-api-keys-text="newApiKeysText = $event"
                         @add-new-api-keys="addNewApiKeys"
@@ -1492,7 +1623,7 @@ void getFilteredTargetModels
                         @remove-header-row="removeHeaderRow"
                         @update-header-row="updateHeaderRow"
                       />
-                      <div class="mt-4">
+                      <div class="mt-6">
                         <StreamTimeoutPanel
                           :form="form"
                           @update:form="(updates) => Object.assign(form, updates)"
