@@ -74,8 +74,8 @@ let scrollHandler: (() => void) | null = null
 // 导航 section 定义（使用 computed 保证语言切换后更新）
 const sections = computed(() => [
   { id: 'basic', label: t('channelEditor.nav.basic') },
-  { id: 'redirect', label: t('channelEditor.nav.redirect') },
   { id: 'auth', label: t('channelEditor.nav.auth') },
+  { id: 'redirect', label: t('channelEditor.nav.redirect') },
   { id: 'advanced', label: t('channelEditor.nav.advanced') },
   { id: 'headers', label: t('channelEditor.nav.custom') },
 ])
@@ -1440,6 +1440,27 @@ void fromSelectValue
                       />
                     </section>
 
+                    <!-- Section: 认证管理 -->
+                    <section :ref="(el: any) => setSectionRef('auth', el)" data-section-id="auth" class="scroll-mt-4">
+                      <AuthPanel
+                        :existing-api-keys="existingApiKeys"
+                        :new-api-keys-text="newApiKeysText"
+                        :copied-key-index="copiedKeyIndex"
+                        :disabled-api-keys="disabledApiKeys"
+                        :historical-api-keys="historicalApiKeys"
+                        :restoring-key="restoringKey"
+                        :local-restored-keys="localRestoredKeys"
+                        :errors="errors"
+                        @update:new-api-keys-text="newApiKeysText = $event"
+                        @add-new-api-keys="addNewApiKeys"
+                        @remove-existing-api-key="removeExistingApiKey"
+                        @move-api-key-to-top="moveApiKeyToTop"
+                        @move-api-key-to-bottom="moveApiKeyToBottom"
+                        @copy-api-key="copyApiKey"
+                        @handle-disabled-key-restore="handleDisabledKeyRestore"
+                      />
+                    </section>
+
                     <!-- Section: 模型重定向 -->
                     <section :ref="(el: any) => setSectionRef('redirect', el)" data-section-id="redirect" class="scroll-mt-4">
                       <ModelMappingPanel
@@ -1469,27 +1490,6 @@ void fromSelectValue
                         @hide-target-dropdown="hideTargetDropdown"
                         @select-target-model="selectTargetModel"
                         @handle-target-focus="handleTargetFocus"
-                      />
-                    </section>
-
-                    <!-- Section: 认证管理 -->
-                    <section :ref="(el: any) => setSectionRef('auth', el)" data-section-id="auth" class="scroll-mt-4">
-                      <AuthPanel
-                        :existing-api-keys="existingApiKeys"
-                        :new-api-keys-text="newApiKeysText"
-                        :copied-key-index="copiedKeyIndex"
-                        :disabled-api-keys="disabledApiKeys"
-                        :historical-api-keys="historicalApiKeys"
-                        :restoring-key="restoringKey"
-                        :local-restored-keys="localRestoredKeys"
-                        :errors="errors"
-                        @update:new-api-keys-text="newApiKeysText = $event"
-                        @add-new-api-keys="addNewApiKeys"
-                        @remove-existing-api-key="removeExistingApiKey"
-                        @move-api-key-to-top="moveApiKeyToTop"
-                        @move-api-key-to-bottom="moveApiKeyToBottom"
-                        @copy-api-key="copyApiKey"
-                        @handle-disabled-key-restore="handleDisabledKeyRestore"
                       />
                     </section>
 
