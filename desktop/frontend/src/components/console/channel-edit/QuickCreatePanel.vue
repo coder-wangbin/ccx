@@ -107,16 +107,17 @@ const serviceMeta = computed<ServiceMeta>(() => serviceMetaMap[props.serviceType
             </div>
 
             <!-- 上游类型选择器 -->
-            <div class="flex items-center gap-3 rounded-lg border bg-muted/10 p-3" :class="serviceMeta.badgeClass">
+            <div class="flex items-center gap-3 rounded-lg bg-muted/10 p-3" :class="serviceMeta.badgeClass">
               <component :is="serviceMeta.icon" class="h-4 w-4 shrink-0" :class="serviceMeta.iconClass" />
               <div class="shrink-0 text-[11px] text-muted-foreground">
                 {{ t('channelEditor.basic.serviceType.label') }}
               </div>
+              <div class="flex-1" />
               <Select :model-value="serviceType" @update:model-value="(val) => emit('update:service-type', String(val))">
-                <SelectTrigger class="h-7 min-w-0 flex-1 border-0 bg-transparent p-0 shadow-none focus:ring-0">
+                <SelectTrigger class="h-7 w-auto border-0 bg-transparent p-0 shadow-none focus:ring-0">
                   <SelectValue :placeholder="t('channelEditor.basic.serviceType.placeholder')" class="text-xs font-semibold" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent class="min-w-[180px] max-w-[220px]">
                   <SelectItem v-for="opt in serviceTypeOptions" :key="opt.value" :value="opt.value">
                     {{ opt.label }}
                   </SelectItem>
