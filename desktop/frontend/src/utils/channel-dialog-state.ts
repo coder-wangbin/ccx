@@ -52,6 +52,133 @@ export function syncBaseUrlsFormState(rawText: string, serviceType: ServiceType)
   }
 }
 
+const MULTI_PART_PUBLIC_SUFFIXES = new Set([
+  'ac.cn',
+  'com.cn',
+  'edu.cn',
+  'gov.cn',
+  'net.cn',
+  'org.cn',
+  'co.uk',
+  'org.uk',
+  'ac.uk',
+  'gov.uk',
+  'com.au',
+  'net.au',
+  'org.au',
+  'co.jp',
+  'ne.jp',
+  'or.jp',
+  'co.kr',
+  'or.kr',
+  'com.br',
+  'com.mx',
+  'com.sg',
+  'com.hk',
+  'com.tw',
+  'com.vn',
+  'co.id',
+  'co.in',
+  'co.nz',
+  'github.io',
+  'pages.dev',
+  'workers.dev',
+  'vercel.app',
+  'netlify.app',
+  'onrender.com',
+  'railway.app',
+])
+
+const GENERIC_HOST_PREFIXES = new Set(['www', 'api', 'apis', 'openapi', 'gateway', 'proxy'])
+const MAX_CHANNEL_NAME_PREFIX_LENGTH = 40
+
+function isIPv4Address(hostname: string): boolean {
+  const parts = hostname.split('.')
+  return parts.length === 4 && parts.every(part => {
+    if (!/^\d+$/.test(part)) return false
+    const value = Number(part)
+    return value >= 0 && value <= 255
+  })
+}
+
+function slugifyHostPart(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .replace(/-{2,}/g, '-')
+}
+
+function appendPort(prefix: string, port: string): string {
+  return port ? `${prefix}-${port}` : prefix
+}
+
+function publicSuffixLabelCount(labels: string[]): number {
+  const maxSuffixLabels = Math.min(3, labels.length - 1)
+
+  for (let count = maxSuffixLabels; count >= 2; count--) {
+    const suffix = labels.slice(labels.length - count).join('.')
+    if (MULTI_PART_PUBLIC_SUFFIXES.has(suffix)) {
+      return count
+    }
+  }
+
+  return 1
+}
+
+function dropGenericLeadingLabels(labels: string[]): string[] {
+  const result = [...labels]
+  while (result.length > 1 && GENERIC_HOST_PREFIXES.has(result[0])) {
+    result.shift()
+  }
+  return result
+}
+
+function fitChannelNamePrefix(labels: string[]): string[] {
+  let result = labels
+  while (result.length > 1 && result.join('-').length > MAX_CHANNEL_NAME_PREFIX_LENGTH) {
+    result = result.slice(1)
+  }
+  return result
+}
+
+export function extractChannelNamePrefix(url: string): string {
+  try {
+    const parsed = new URL(url.trim())
+    const hostname = parsed.hostname.toLowerCase().replace(/^\[|\]$/g, '')
+
+    if (!hostname) {
+      return 'channel'
+    }
+
+    if (isIPv4Address(hostname)) {
+      return appendPort(hostname.replace(/\./g, '-'), parsed.port)
+    }
+
+    if (hostname.includes(':')) {
+      return slugifyHostPart(appendPort(`ipv6-${hostname}`, parsed.port)) || 'ipv6'
+    }
+
+    const labels = hostname.split('.').map(slugifyHostPart).filter(Boolean)
+    if (labels.length === 0) {
+      return 'channel'
+    }
+
+    if (labels.length === 1) {
+      return appendPort(labels[0], parsed.port)
+    }
+
+    const suffixCount = publicSuffixLabelCount(labels)
+    const stemEnd = Math.max(1, labels.length - suffixCount)
+    const stemLabels = labels.slice(0, stemEnd)
+    const meaningfulLabels = fitChannelNamePrefix(dropGenericLeadingLabels(stemLabels))
+
+    return meaningfulLabels.join('-') || 'channel'
+  } catch {
+    return 'channel'
+  }
+}
+
 // 模型名合法字符：字母、数字、点、下划线、连字符、冒号、斜杠，外加通配符 * 与排除前缀 !
 // 显式排除中文顿号（、）、逗号、分号、竖线等分隔符与其他标点，避免被当作单条规则保留
 const SUPPORTED_MODEL_TOKEN_CHARS = /^[A-Za-z0-9._:/*!-]+$/

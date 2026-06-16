@@ -10,6 +10,7 @@ import { useLanguage } from '@/composables/useLanguage'
 import { AdminApiError } from '@/composables/useAdminApi'
 import { buildChannelPayload } from '@/utils/channel-payload'
 import {
+  extractChannelNamePrefix,
   filterValidSupportedModelPatterns,
   parseSupportedModelInput,
   syncBaseUrlsFormState,
@@ -291,29 +292,14 @@ function generateRandomString(length: number): string {
   return result
 }
 
-// 从 URL 提取二级域名
-function extractDomain(url: string): string {
-  try {
-    const hostname = new URL(url).hostname
-    const cleanHost = hostname.replace(/^www\./, '')
-    const parts = cleanHost.split('.')
-    if (parts.length <= 1) return cleanHost
-    if (parts.length === 2) return parts[0]
-    return parts[parts.length - 2]
-  }
-  catch {
-    return 'channel'
-  }
-}
-
 const randomSuffix = ref(generateRandomString(6))
 
 // 自动生成的渠道名称
 const generatedChannelName = computed(() => {
   const firstUrl = detectedBaseUrls.value[0]
   if (!firstUrl) return `channel-${randomSuffix.value}`
-  const domain = extractDomain(firstUrl)
-  return `${domain}-${randomSuffix.value}`
+  const prefix = extractChannelNamePrefix(firstUrl)
+  return `${prefix}-${randomSuffix.value}`
 })
 
 watch(detectedServiceType, (serviceType) => {

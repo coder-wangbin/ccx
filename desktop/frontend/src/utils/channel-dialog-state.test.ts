@@ -1,10 +1,36 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  extractChannelNamePrefix,
   filterValidSupportedModelPatterns,
   isValidSupportedModelPattern,
   parseSupportedModelInput
 } from './channel-dialog-state'
+
+describe('extractChannelNamePrefix', () => {
+  it('保留常见 API 域名的服务商主体', () => {
+    expect(extractChannelNamePrefix('https://api.openai.com/v1')).toBe('openai')
+    expect(extractChannelNamePrefix('https://www.anthropic.com')).toBe('anthropic')
+  })
+
+  it('应为多级子域名保留可区分的前缀', () => {
+    expect(extractChannelNamePrefix('https://api.us-east-1.openai.com/v1')).toBe('us-east-1-openai')
+    expect(extractChannelNamePrefix('https://relay.team.example.com.cn/v1')).toBe('relay-team-example')
+    expect(extractChannelNamePrefix('https://worker.demo.pages.dev/v1')).toBe('worker-demo')
+  })
+
+  it('应为 IP 和本地域名生成稳定可读的前缀', () => {
+    expect(extractChannelNamePrefix('http://192.168.1.8:11434/v1')).toBe('192-168-1-8-11434')
+    expect(extractChannelNamePrefix('http://127.0.0.1/v1')).toBe('127-0-0-1')
+    expect(extractChannelNamePrefix('http://localhost:11434/v1')).toBe('localhost-11434')
+    expect(extractChannelNamePrefix('http://[::1]:11434/v1')).toBe('ipv6-1-11434')
+  })
+
+  it('无效 URL 应回退到通用前缀', () => {
+    expect(extractChannelNamePrefix('not a url')).toBe('channel')
+    expect(extractChannelNamePrefix('')).toBe('channel')
+  })
+})
 
 describe('isValidSupportedModelPattern', () => {
   it('支持精确、前缀、后缀、包含和排除规则', () => {
