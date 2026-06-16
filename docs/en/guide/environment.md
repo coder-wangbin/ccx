@@ -58,7 +58,8 @@ ENABLE_RESPONSE_LOGS=false             # 是否记录响应日志
 QUIET_POLLING_LOGS=true                # 静默前端轮询端点日志（如 /api/messages/channels/dashboard）
 
 # 性能配置
-REQUEST_TIMEOUT=300000                 # 请求超时时间（毫秒）
+REQUEST_TIMEOUT=300000                 # Non-streaming upstream request timeout (ms, 1000-300000)
+RESPONSE_HEADER_TIMEOUT=60             # Wait for upstream HTTP response headers (seconds, 30-120; tuning bench can override up to 300s at runtime)
 MAX_REQUEST_BODY_SIZE_MB=50            # 请求体最大大小（MB，默认 50）
 
 # CORS 配置
@@ -69,6 +70,20 @@ CORS_ORIGIN=*                          # CORS 允许的源
 METRICS_WINDOW_SIZE=10                 # 滑动窗口大小（最小 3，默认 10）
 METRICS_FAILURE_THRESHOLD=0.5          # 失败率阈值（0-1，默认 0.5 即 50%）
 ```
+
+Runtime settings saved from the tuning bench are persisted under `circuitBreaker` in `config.json` and take effect immediately as global defaults:
+
+| Field | Default | Range | Description |
+| --- | --- | --- | --- |
+| `requestTimeoutMs` | `REQUEST_TIMEOUT` | `1000-300000` | Total timeout for non-streaming upstream requests. Applies only to non-streaming requests; streaming requests are controlled by response-header wait and stream health checks. |
+| `responseHeaderTimeoutMs` | `RESPONSE_HEADER_TIMEOUT * 1000` | `1000-300000` | Time to wait for upstream HTTP response headers after the connection is established. Keep normal channels short; prefer channel-level overrides for slow-start/local inference channels. |
+
+Channel config entries (`*Upstream[]` items in `config.json`) can override these global defaults:
+
+| Field | Default | Range | Description |
+| --- | --- | --- | --- |
+| `requestTimeoutMs` | `0` | `0` or `1000-300000` | Total timeout for non-streaming upstream requests. `0` or empty inherits the tuning-bench/env global value. |
+| `responseHeaderTimeoutMs` | `0` | `0` or `1000-300000` | Time to wait for upstream HTTP response headers after the connection is established. `0` or empty inherits the tuning-bench/env global value. |
 
 The runtime config file also supports stream health fields under `circuitBreaker`:
 

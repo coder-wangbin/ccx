@@ -58,7 +58,8 @@ ENABLE_RESPONSE_LOGS=false             # 是否记录响应日志
 QUIET_POLLING_LOGS=true                # 静默前端轮询端点日志（如 /api/messages/channels/dashboard）
 
 # 性能配置
-REQUEST_TIMEOUT=300000                 # 请求超时时间（毫秒）
+REQUEST_TIMEOUT=300000                 # 非流式上游请求超时时间（毫秒，1000-300000）
+RESPONSE_HEADER_TIMEOUT=60             # 等待上游 HTTP 响应头超时（秒，30-120；调校台可运行时覆盖到 300 秒）
 MAX_REQUEST_BODY_SIZE_MB=50            # 请求体最大大小（MB，默认 50）
 
 # CORS 配置
@@ -69,6 +70,20 @@ CORS_ORIGIN=*                          # CORS 允许的源
 METRICS_WINDOW_SIZE=10                 # 滑动窗口大小（最小 3，默认 10）
 METRICS_FAILURE_THRESHOLD=0.5          # 失败率阈值（0-1，默认 0.5 即 50%）
 ```
+
+调校台保存的运行时配置会写入 `config.json` 的 `circuitBreaker`，并在保存后立即作为全局默认值生效：
+
+| 字段 | 默认值 | 范围 | 说明 |
+| --- | --- | --- | --- |
+| `requestTimeoutMs` | `REQUEST_TIMEOUT` | `1000-300000` | 非流式上游请求总超时。仅作用于非流式请求；流式请求仍由响应头等待和流式健康检测控制。 |
+| `responseHeaderTimeoutMs` | `RESPONSE_HEADER_TIMEOUT * 1000` | `1000-300000` | 连接建立后等待上游 HTTP 响应头的时间。普通渠道建议保持较短，慢启动/本地推理渠道优先使用渠道级覆盖。 |
+
+渠道配置（`config.json` 的各 `*Upstream[]` 项）支持覆盖这两个全局默认值：
+
+| 字段 | 默认值 | 范围 | 说明 |
+| --- | --- | --- | --- |
+| `requestTimeoutMs` | `0` | `0` 或 `1000-300000` | 非流式上游请求总超时；`0` 或留空继承调校台/环境变量的全局值。 |
+| `responseHeaderTimeoutMs` | `0` | `0` 或 `1000-300000` | 连接建立后等待上游 HTTP 响应头的时间；`0` 或留空继承调校台/环境变量的全局值。 |
 
 运行时配置文件中的 `circuitBreaker` 还支持流式健康检测字段：
 
