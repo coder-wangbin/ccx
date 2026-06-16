@@ -88,10 +88,8 @@ const envGroups = computed<EnvGroup[]>(() => [
     title: t('env.groupPerformance'),
     description: t('env.groupPerformanceDesc'),
     fields: [
-      { key: 'REQUEST_TIMEOUT', label: t('env.fieldRequestTimeout'), type: 'number' as const, defaultValue: '120000', min: 1000, max: 300000 },
       { key: 'SERVER_READ_TIMEOUT', label: t('env.fieldServerReadTimeout'), type: 'number' as const, defaultValue: '60000', min: 10000, max: 300000 },
       { key: 'MAX_REQUEST_BODY_SIZE_MB', label: t('env.fieldMaxRequestBodySize'), type: 'number' as const, defaultValue: '50', min: 1 },
-      { key: 'RESPONSE_HEADER_TIMEOUT', label: t('env.fieldResponseHeaderTimeout'), type: 'number' as const, defaultValue: '60', min: 30, max: 120 },
     ],
   },
   {

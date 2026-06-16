@@ -58,20 +58,20 @@ ENABLE_RESPONSE_LOGS=false             # 是否记录响应日志
 QUIET_POLLING_LOGS=true                # 静默前端轮询端点日志（如 /api/messages/channels/dashboard）
 
 # 性能配置
-REQUEST_TIMEOUT=120000                 # 非流式上游请求总超时（毫秒，1000-300000，默认 2 分钟，最大 5 分钟）
-RESPONSE_HEADER_TIMEOUT=60             # 等待上游 HTTP 响应头超时（秒，30-120；调校台可运行时覆盖到 300 秒）
 MAX_REQUEST_BODY_SIZE_MB=50            # 请求体最大大小（MB，默认 50）
 
 # CORS 配置
 ENABLE_CORS=false                      # 是否启用 CORS
 CORS_ORIGIN=*                          # CORS 允许的源
 
-# 熔断指标配置
-METRICS_WINDOW_SIZE=10                 # 滑动窗口大小（最小 3，默认 10）
-METRICS_FAILURE_THRESHOLD=0.5          # 失败率阈值（0-1，默认 0.5 即 50%）
+# 调校台启动兜底（旧部署兼容）：运行时请优先使用 Web/桌面调校台
+# REQUEST_TIMEOUT=120000               # 非流式上游请求总超时（毫秒，1000-300000）
+# RESPONSE_HEADER_TIMEOUT=60           # 等待上游 HTTP 响应头超时（秒，30-120；调校台支持到 300 秒）
+# METRICS_WINDOW_SIZE=10               # 滑动窗口大小（最小 3，默认 10）
+# METRICS_FAILURE_THRESHOLD=0.5        # 失败率阈值（0-1，默认 0.5 即 50%）
 ```
 
-调校台保存的运行时配置会写入 `config.json` 的 `circuitBreaker`，并在保存后立即作为全局默认值生效：
+调校台保存的运行时配置会写入 `config.json` 的 `circuitBreaker`，并在保存后立即作为全局默认值生效。对应环境变量只作为启动兜底/旧部署兼容项；一旦调校台保存了同名字段，运行时以 `config.json` 为准：
 
 | 字段 | 默认值 | 范围 | 说明 |
 | --- | --- | --- | --- |

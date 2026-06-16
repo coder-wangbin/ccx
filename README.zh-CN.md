@@ -168,7 +168,6 @@ PROXY_ACCESS_KEY=your-proxy-access-key
 ADMIN_ACCESS_KEY=your-admin-secret-key
 APP_UI_LANGUAGE=zh-CN
 LOG_LEVEL=info
-REQUEST_TIMEOUT=120000
 ```
 
 ## 主要接口

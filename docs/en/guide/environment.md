@@ -57,21 +57,21 @@ ENABLE_REQUEST_LOGS=true               # 是否记录请求日志
 ENABLE_RESPONSE_LOGS=false             # 是否记录响应日志
 QUIET_POLLING_LOGS=true                # 静默前端轮询端点日志（如 /api/messages/channels/dashboard）
 
-# 性能配置
-REQUEST_TIMEOUT=120000                 # Non-streaming upstream request timeout (ms, 1000-300000; default 2 minutes, max 5 minutes)
-RESPONSE_HEADER_TIMEOUT=60             # Wait for upstream HTTP response headers (seconds, 30-120; tuning bench can override up to 300s at runtime)
-MAX_REQUEST_BODY_SIZE_MB=50            # 请求体最大大小（MB，默认 50）
+# Performance
+MAX_REQUEST_BODY_SIZE_MB=50            # Maximum request body size (MB, default 50)
 
-# CORS 配置
-ENABLE_CORS=false                      # 是否启用 CORS
-CORS_ORIGIN=*                          # CORS 允许的源
+# CORS
+ENABLE_CORS=false                      # Enable CORS
+CORS_ORIGIN=*                          # Allowed CORS origin
 
-# 熔断指标配置
-METRICS_WINDOW_SIZE=10                 # 滑动窗口大小（最小 3，默认 10）
-METRICS_FAILURE_THRESHOLD=0.5          # 失败率阈值（0-1，默认 0.5 即 50%）
+# Tuning-bench startup fallback (legacy/env-only deployments). Prefer the Web/Desktop tuning bench at runtime.
+# REQUEST_TIMEOUT=120000               # Non-streaming upstream request timeout (ms, 1000-300000)
+# RESPONSE_HEADER_TIMEOUT=60           # Wait for upstream HTTP response headers (seconds, 30-120; tuning bench supports up to 300s)
+# METRICS_WINDOW_SIZE=10               # Sliding window size (min 3, default 10)
+# METRICS_FAILURE_THRESHOLD=0.5        # Failure-rate threshold (0-1, default 0.5)
 ```
 
-Runtime settings saved from the tuning bench are persisted under `circuitBreaker` in `config.json` and take effect immediately as global defaults:
+Runtime settings saved from the tuning bench are persisted under `circuitBreaker` in `config.json` and take effect immediately as global defaults. The corresponding environment variables are startup fallback / legacy compatibility only; once the tuning bench saves the same field, `config.json` is authoritative at runtime:
 
 | Field | Default | Range | Description |
 | --- | --- | --- | --- |
