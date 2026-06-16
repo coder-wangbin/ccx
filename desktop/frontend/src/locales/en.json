@@ -555,7 +555,7 @@
   "channelEditor.transport.routePrefix.label": "Route prefix",
   "channelEditor.transport.skipTls.label": "Skip TLS verification",
   "channelEditor.nav.auth": "Authentication",
-  "channelEditor.auth.keys.label": "API Keys (one per line)",
+  "channelEditor.auth.keys.label": "API Keys",
   "channelEditor.auth.disabledKeys.label": "Disabled keys",
   "channelEditor.auth.restoreKey": "Restore",
   "channelEditor.auth.historicalKeys": "historical keys recorded",

@@ -555,7 +555,7 @@
   "channelEditor.transport.routePrefix.label": "接口路由前缀",
   "channelEditor.transport.skipTls.label": "跳过 TLS 验证",
   "channelEditor.nav.auth": "认证管理",
-  "channelEditor.auth.keys.label": "API Keys（每行一个）",
+  "channelEditor.auth.keys.label": "API Keys",
   "channelEditor.auth.disabledKeys.label": "已禁用密钥",
   "channelEditor.auth.restoreKey": "恢复",
   "channelEditor.auth.historicalKeys": "历史密钥记录",
