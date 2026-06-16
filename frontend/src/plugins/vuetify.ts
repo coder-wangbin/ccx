@@ -206,6 +206,7 @@ import {
   mdiPlusCircleOutline,
   mdiFastForward,
   mdiImageMultiple,
+  mdiShapeOutline,
 } from '@mdi/js'
 
 // 图标名称到 SVG path 的映射 (使用 kebab-case)
@@ -301,6 +302,7 @@ const iconMap: Record<string, string> = {
   'shield-refresh': mdiShieldRefresh,
   'shield-off-outline': mdiShieldOffOutline,
   'shield-lock-outline': mdiShieldLockOutline,
+  'shape-outline': mdiShapeOutline,
 
   // 功能图标
   'key': mdiKey,
