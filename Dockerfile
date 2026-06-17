@@ -10,7 +10,7 @@ ARG TARGETARCH
 
 WORKDIR /src
 
-RUN apk add --no-cache git make libstdc++ libgcc
+RUN apk add --no-cache bash git make libstdc++ libgcc
 
 COPY --from=bun-runtime /usr/local/bin/bun /usr/local/bin/bun
 COPY --from=bun-runtime /usr/local/bin/bunx /usr/local/bin/bunx
