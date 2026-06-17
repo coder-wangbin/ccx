@@ -49,6 +49,54 @@ func redirectModelInBody(bodyBytes []byte, upstream *config.UpstreamConfig) []by
 	return newBytes
 }
 
+// applyClaudeReasoningEffort 根据原始模型名将渠道级思考强度写入 Claude 请求体。
+func applyClaudeReasoningEffort(bodyBytes []byte, upstream *config.UpstreamConfig) []byte {
+	decoder := json.NewDecoder(bytes.NewReader(bodyBytes))
+	decoder.UseNumber()
+
+	var data map[string]interface{}
+	if err := decoder.Decode(&data); err != nil {
+		return bodyBytes
+	}
+
+	model, ok := data["model"].(string)
+	if !ok {
+		return bodyBytes
+	}
+
+	effort := config.ResolveReasoningEffort(model, upstream)
+	if effort == "" {
+		return bodyBytes
+	}
+
+	applyClaudeThinkingEffort(data, effort)
+
+	newBytes, err := utils.MarshalJSONNoEscape(data)
+	if err != nil {
+		return bodyBytes
+	}
+	return newBytes
+}
+
+func applyClaudeThinkingEffort(data map[string]interface{}, effort string) {
+	delete(data, "reasoning")
+	delete(data, "reasoning_effort")
+
+	if effort == "off" || effort == "none" {
+		data["thinking"] = map[string]interface{}{"type": "disabled"}
+		return
+	}
+
+	thinking, _ := data["thinking"].(map[string]interface{})
+	if thinking == nil {
+		thinking = make(map[string]interface{})
+	}
+	thinking["type"] = "enabled"
+	thinking["effort"] = effort
+	delete(thinking, "budget_tokens")
+	data["thinking"] = thinking
+}
+
 const (
 	legacyThinkingPlaceholder    = "(no prior reasoning recorded)"
 	missingAssistantResponseText = "[prior assistant response unavailable]"
@@ -592,6 +640,9 @@ func (p *ClaudeProvider) ConvertToProviderRequest(c *gin.Context, upstream *conf
 		return nil, nil, err
 	}
 
+	if len(upstream.ReasoningMapping) > 0 {
+		bodyBytes = applyClaudeReasoningEffort(bodyBytes, upstream)
+	}
 	// 模型重定向：仅修改 model 字段，保持其他内容不变
 	if len(upstream.ModelMapping) > 0 {
 		bodyBytes = redirectModelInBody(bodyBytes, upstream)
