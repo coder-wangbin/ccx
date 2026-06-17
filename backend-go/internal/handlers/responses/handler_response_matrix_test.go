@@ -308,3 +308,109 @@ func TestResponsesHandler_SingleChannelTracksConversation(t *testing.T) {
 		t.Fatalf("FallbackTitle = %q, want hello cockpit", conv.FallbackTitle)
 	}
 }
+
+func TestResponsesHandler_CompactionTriggerUsesLocalCompactForOpenAIStream(t *testing.T) {
+	sessionManager := session.NewSessionManager(time.Hour, 100, 100000)
+	var upstreamBody map[string]interface{}
+
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := json.NewDecoder(r.Body).Decode(&upstreamBody); err != nil {
+			t.Fatalf("decode upstream request: %v", err)
+		}
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("data: {\"id\":\"chatcmpl-compact\",\"choices\":[{\"delta\":{\"role\":\"assistant\",\"content\":\"## Summary\"}}]}\n\n"))
+		_, _ = w.Write([]byte("data: {\"id\":\"chatcmpl-compact\",\"choices\":[{\"delta\":{\"content\":\"\\nCompacted context\"}}]}\n\n"))
+		_, _ = w.Write([]byte("data: {\"id\":\"chatcmpl-compact\",\"choices\":[{\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":101,\"completion_tokens\":9,\"total_tokens\":110}}\n\n"))
+		_, _ = w.Write([]byte("data: [DONE]\n\n"))
+	}))
+	defer upstream.Close()
+
+	router := newResponsesTestRouter(t, config.UpstreamConfig{
+		Name:        "openai-compact-v2",
+		BaseURL:     upstream.URL,
+		APIKeys:     []string{"sk-test"},
+		ServiceType: "openai",
+		Status:      "active",
+	}, sessionManager)
+
+	body := `{"model":"gpt-5","stream":true,"input":[{"type":"message","role":"user","content":[{"type":"input_text","text":"Need a compact summary"}]},{"type":"compaction_trigger"}]}`
+	w := performResponsesHandlerRequest(t, router, body)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200, body=%s", w.Code, w.Body.String())
+	}
+
+	if got := upstreamBody["stream"]; got != true {
+		t.Fatalf("upstream stream = %v, want true", got)
+	}
+	messages, ok := upstreamBody["messages"].([]interface{})
+	if !ok || len(messages) == 0 {
+		t.Fatalf("upstream request should be chat completions with messages, got %#v", upstreamBody)
+	}
+	if _, ok := upstreamBody["tools"]; ok {
+		t.Fatalf("local compact upstream request should not include tools: %#v", upstreamBody)
+	}
+	upstreamJSON, _ := json.Marshal(upstreamBody)
+	if !bytes.Contains(upstreamJSON, []byte("conversation compressor")) {
+		t.Fatalf("upstream request should use local compact prompt, got %s", string(upstreamJSON))
+	}
+	if bytes.Contains(upstreamJSON, []byte("compaction_trigger")) {
+		t.Fatalf("upstream local compact prompt should not forward compaction_trigger item, got %s", string(upstreamJSON))
+	}
+
+	bodyText := w.Body.String()
+	if count := bytes.Count(w.Body.Bytes(), []byte(`"type":"compaction"`)); count != 2 {
+		t.Fatalf("expected compaction item in item.done and completed output only, count=%d body=%s", count, bodyText)
+	}
+	if bytes.Contains(w.Body.Bytes(), []byte(`"type":"message"`)) {
+		t.Fatalf("v2 compact stream should not return message output item: %s", bodyText)
+	}
+	if !bytes.Contains(w.Body.Bytes(), []byte(`"encrypted_content":"## Summary\nCompacted context"`)) {
+		t.Fatalf("response missing compaction encrypted_content summary: %s", bodyText)
+	}
+	if !bytes.Contains(w.Body.Bytes(), []byte(`event: response.output_item.done`)) ||
+		!bytes.Contains(w.Body.Bytes(), []byte(`event: response.completed`)) {
+		t.Fatalf("response missing required SSE events: %s", bodyText)
+	}
+}
+
+func TestResponsesHandler_CompactionTriggerUsesLocalCompactForOpenAINonStream(t *testing.T) {
+	sessionManager := session.NewSessionManager(time.Hour, 100, 100000)
+
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"id":"chatcmpl-compact","choices":[{"message":{"role":"assistant","content":"plain compact summary"},"finish_reason":"stop"}],"usage":{"prompt_tokens":20,"completion_tokens":4,"total_tokens":24}}`))
+	}))
+	defer upstream.Close()
+
+	router := newResponsesTestRouter(t, config.UpstreamConfig{
+		Name:        "openai-compact-v2-nonstream",
+		BaseURL:     upstream.URL,
+		APIKeys:     []string{"sk-test"},
+		ServiceType: "openai",
+		Status:      "active",
+	}, sessionManager)
+
+	body := `{"model":"gpt-5","stream":false,"input":[{"type":"message","role":"user","content":"Need compact"},{"type":"compaction_trigger"}]}`
+	w := performResponsesHandlerRequest(t, router, body)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200, body=%s", w.Code, w.Body.String())
+	}
+
+	var resp struct {
+		Output []struct {
+			Type             string `json:"type"`
+			EncryptedContent string `json:"encrypted_content"`
+		} `json:"output"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal response: %v, body=%s", err, w.Body.String())
+	}
+	if len(resp.Output) != 1 {
+		t.Fatalf("output len = %d, want 1: %s", len(resp.Output), w.Body.String())
+	}
+	if resp.Output[0].Type != "compaction" || resp.Output[0].EncryptedContent != "plain compact summary" {
+		t.Fatalf("unexpected compaction output: %#v", resp.Output[0])
+	}
+}

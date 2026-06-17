@@ -70,13 +70,15 @@ func Handler(
 		// 记录原始请求信息（仅在入口处记录一次）
 		common.LogOriginalRequest(c, bodyBytes, envCfg, "Responses")
 
+		isCompactionV2 := hasCompactionTrigger(responsesReq.Input)
+
 		// 检查是否为多渠道模式
 		isMultiChannel := channelScheduler.IsMultiChannelMode(scheduler.ChannelKindResponses)
 
 		if isMultiChannel {
-			handleMultiChannel(c, envCfg, cfgManager, channelScheduler, sessionManager, bodyBytes, responsesReq, userID, startTime)
+			handleMultiChannel(c, envCfg, cfgManager, channelScheduler, sessionManager, bodyBytes, responsesReq, userID, startTime, isCompactionV2)
 		} else {
-			handleSingleChannel(c, envCfg, cfgManager, channelScheduler, sessionManager, bodyBytes, userID, responsesReq, startTime)
+			handleSingleChannel(c, envCfg, cfgManager, channelScheduler, sessionManager, bodyBytes, userID, responsesReq, startTime, isCompactionV2)
 		}
 	})
 }
@@ -101,6 +103,7 @@ func handleMultiChannel(
 	responsesReq types.ResponsesRequest,
 	userID string,
 	startTime time.Time,
+	isCompactionV2 bool,
 ) {
 	provider := &providers.ResponsesProvider{SessionManager: sessionManager}
 	metricsManager := channelScheduler.GetResponsesMetricsManager()
@@ -119,6 +122,27 @@ func handleMultiChannel(
 
 			if upstream == nil {
 				return common.MultiChannelAttemptResult{}
+			}
+
+			if isCompactionV2 && needsLocalCompact(upstream) {
+				success, successKey, compactErr := tryLocalCompactV2WithAllKeys(c, upstream, channelIndex, responsesReq.Model, cfgManager, channelScheduler, channelScheduler.GetChannelLogStore(scheduler.ChannelKindResponses), bodyBytes, envCfg, sessionManager)
+				result := common.MultiChannelAttemptResult{Attempted: true, SuccessKey: successKey}
+				if success {
+					result.Handled = true
+					return result
+				}
+				if compactErr != nil {
+					if compactErr.shouldFailover {
+						result.FailoverError = &common.FailoverError{Status: compactErr.status, Body: compactErr.body}
+						result.LastError = compactErr.err
+						return result
+					}
+					c.Data(compactErr.status, "application/json", compactErr.body)
+					result.Handled = true
+					result.LastError = compactErr.err
+					return result
+				}
+				return result
 			}
 
 			baseURLs := upstream.GetAllBaseURLs()
@@ -195,6 +219,7 @@ func handleSingleChannel(
 	userID string,
 	responsesReq types.ResponsesRequest,
 	startTime time.Time,
+	isCompactionV2 bool,
 ) {
 	upstream, channelIndex, err := cfgManager.GetCurrentResponsesUpstreamWithIndex()
 	if err != nil {
@@ -219,6 +244,27 @@ func handleSingleChannel(
 	baseURLs := upstream.GetAllBaseURLs()
 
 	urlResults := common.BuildDefaultURLResults(baseURLs)
+
+	if isCompactionV2 && needsLocalCompact(upstream) {
+		handled, _, compactErr := tryLocalCompactV2WithAllKeys(c, upstream, channelIndex, responsesReq.Model, cfgManager, channelScheduler, channelScheduler.GetChannelLogStore(scheduler.ChannelKindResponses), bodyBytes, envCfg, sessionManager)
+		if handled {
+			return
+		}
+		if compactErr != nil {
+			if cfgManager.GetFuzzyModeEnabled() {
+				c.JSON(503, gin.H{
+					"type": "error",
+					"error": gin.H{
+						"type":    "service_unavailable",
+						"message": "All upstream channels are currently unavailable",
+					},
+				})
+				return
+			}
+			c.Data(compactErr.status, "application/json", compactErr.body)
+			return
+		}
+	}
 
 	handled, successKey, _, lastFailoverError, _, lastError := common.TryUpstreamWithAllKeys(
 		c,

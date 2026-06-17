@@ -362,6 +362,53 @@ func handleLocalCompactNonStream(
 	return true, nil
 }
 
+func handleLocalCompactV2NonStream(
+	c *gin.Context,
+	resp *http.Response,
+	upstreamType string,
+	originalReq types.ResponsesRequest,
+	sessionManager *session.SessionManager,
+) (bool, *compactError) {
+	respBody, _ := io.ReadAll(resp.Body)
+	respBody = utils.DecompressGzipIfNeeded(resp, respBody)
+
+	converter := converters.NewConverter(upstreamType)
+	respMap, err := converters.JSONToMap(respBody)
+	if err != nil {
+		return false, &compactError{status: 502, body: respBody, shouldFailover: true, err: err}
+	}
+
+	responsesResp, err := converter.FromProviderResponse(respMap, "")
+	if err != nil {
+		return false, &compactError{status: 502, body: respBody, shouldFailover: true, err: err}
+	}
+
+	if responsesResp.ID == "" {
+		responsesResp.ID = fmt.Sprintf("resp_%d", time.Now().UnixNano())
+	}
+	if responsesResp.Status == "" {
+		responsesResp.Status = "completed"
+	}
+	if responsesResp.Model == "" {
+		responsesResp.Model = originalReq.Model
+	}
+	if originalReq.PreviousResponseID != "" {
+		responsesResp.PreviousID = originalReq.PreviousResponseID
+	}
+
+	summaryText := compactSummaryTextFromOutput(responsesResp.Output)
+	if summaryText == "" {
+		return false, &compactError{status: 502, body: []byte(`{"error":"本地 compact 未返回摘要内容"}`), shouldFailover: true}
+	}
+
+	responsesResp.Output = []types.ResponsesItem{newCompactionItem(summaryText)}
+	writeCompactedSession(responsesResp, originalReq, sessionManager)
+
+	utils.ForwardResponseHeaders(resp.Header, c.Writer)
+	c.JSON(200, responsesResp)
+	return true, nil
+}
+
 // PLACEHOLDER_HANDLE_STREAM
 
 func handleLocalCompactStream(
@@ -456,6 +503,118 @@ func handleLocalCompactStream(
 	return true, nil
 }
 
+func handleLocalCompactV2Stream(
+	c *gin.Context,
+	resp *http.Response,
+	upstreamType string,
+	originalReq types.ResponsesRequest,
+	sessionManager *session.SessionManager,
+) (bool, *compactError) {
+	needConvert := upstreamType != "responses"
+	var converterState any
+	var summaryBuf strings.Builder
+	var responseID string
+	var collectedUsage responsesStreamUsage
+
+	scanner := bufio.NewScanner(resp.Body)
+	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+
+	for scanner.Scan() {
+		line := scanner.Text()
+		if line == "" {
+			continue
+		}
+
+		var eventsToProcess []string
+		if needConvert {
+			switch upstreamType {
+			case "claude":
+				eventsToProcess = converters.ConvertClaudeMessagesToResponses(
+					c.Request.Context(), originalReq.Model, nil, nil, []byte(line), &converterState,
+				)
+			case "gemini":
+				eventsToProcess = converters.ConvertGeminiStreamToResponses(
+					c.Request.Context(), originalReq.Model, nil, nil, []byte(line), &converterState,
+				)
+			default:
+				eventsToProcess = converters.ConvertOpenAIChatToResponses(
+					c.Request.Context(), originalReq.Model, nil, nil, []byte(line), &converterState,
+				)
+			}
+		} else {
+			eventsToProcess = []string{line + "\n"}
+		}
+
+		for _, event := range eventsToProcess {
+			if shouldSkipCompactStreamEvent(event) {
+				continue
+			}
+			collectStreamSummary(event, &summaryBuf, &responseID)
+			if detected, _, usageData := checkResponsesEventUsageWithLogTag(event, false, common.RequestLogTag(c)); detected {
+				updateResponsesStreamUsage(&collectedUsage, usageData)
+			}
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return false, &compactError{status: 502, body: []byte(`{"error":"读取本地 compact 流失败"}`), shouldFailover: true, err: err}
+	}
+
+	summaryText := summaryBuf.String()
+	if summaryText == "" {
+		return false, &compactError{status: 502, body: []byte(`{"error":"本地 compact 未返回摘要内容"}`), shouldFailover: true}
+	}
+	if responseID == "" {
+		responseID = fmt.Sprintf("resp_%d", time.Now().UnixNano())
+	}
+
+	responsesResp := &types.ResponsesResponse{
+		ID:     responseID,
+		Model:  originalReq.Model,
+		Status: "completed",
+		Output: []types.ResponsesItem{newCompactionItem(summaryText)},
+		Usage:  responsesUsageFromStreamUsage(collectedUsage),
+	}
+	if originalReq.PreviousResponseID != "" {
+		responsesResp.PreviousID = originalReq.PreviousResponseID
+	}
+	if responsesResp.Usage.OutputTokens == 0 {
+		responsesResp.Usage.OutputTokens = utils.EstimateTokens(summaryText)
+	}
+	if responsesResp.Usage.InputTokens == 0 || responsesResp.Usage.TotalTokens == 0 {
+		inputTokens := utils.EstimateResponsesRequestTokens(mustMarshalResponsesRequest(originalReq))
+		if responsesResp.Usage.InputTokens == 0 {
+			responsesResp.Usage.InputTokens = inputTokens
+		}
+		responsesResp.Usage.TotalTokens = calculateTotalTokensWithCache(
+			responsesResp.Usage.InputTokens,
+			responsesResp.Usage.OutputTokens,
+			responsesResp.Usage.CacheReadInputTokens,
+			responsesResp.Usage.CacheCreationInputTokens,
+			responsesResp.Usage.CacheCreation5mInputTokens,
+			responsesResp.Usage.CacheCreation1hInputTokens,
+		)
+	}
+
+	writeCompactedSession(responsesResp, originalReq, sessionManager)
+
+	c.Header("Content-Type", "text/event-stream")
+	c.Header("Cache-Control", "no-cache")
+	c.Header("Connection", "keep-alive")
+	c.Header("X-Accel-Buffering", "no")
+	c.Status(200)
+
+	for _, event := range buildCompactionV2SSEEvents(responsesResp) {
+		if _, err := c.Writer.Write([]byte(event)); err != nil {
+			return true, nil
+		}
+		if flusher, ok := c.Writer.(http.Flusher); ok {
+			flusher.Flush()
+		}
+	}
+
+	return true, nil
+}
+
 func shouldSkipCompactStreamEvent(event string) bool {
 	// 跳过所有 reasoning 相关事件
 	if strings.Contains(event, `"type":"reasoning"`) {
@@ -522,6 +681,33 @@ func normalizeCompactOutput(output []types.ResponsesItem) []types.ResponsesItem 
 	return output
 }
 
+func compactSummaryTextFromOutput(output []types.ResponsesItem) string {
+	for _, item := range normalizeCompactOutput(output) {
+		switch item.Type {
+		case "message":
+			if text := extractContentText(item.Content); text != "" {
+				return text
+			}
+		case "text":
+			if text := extractContentText(item.Content); text != "" {
+				return text
+			}
+		case "compaction", "compaction_summary":
+			if item.EncryptedContent != "" {
+				return item.EncryptedContent
+			}
+		}
+	}
+	return ""
+}
+
+func newCompactionItem(summaryText string) types.ResponsesItem {
+	return types.ResponsesItem{
+		Type:             "compaction",
+		EncryptedContent: summaryText,
+	}
+}
+
 func normalizeCompactResponseBody(respBody []byte) []byte {
 	var payload map[string]interface{}
 	if err := json.Unmarshal(respBody, &payload); err != nil {
@@ -580,6 +766,10 @@ func writeCompactedSession(resp *types.ResponsesResponse, originalReq types.Resp
 	for _, item := range resp.Output {
 		if item.Type == "message" && item.Role == "assistant" {
 			summaryText = extractContentText(item.Content)
+			break
+		}
+		if (item.Type == "compaction" || item.Type == "compaction_summary") && item.EncryptedContent != "" {
+			summaryText = item.EncryptedContent
 			break
 		}
 	}
