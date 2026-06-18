@@ -70,10 +70,24 @@ func UpdateUpstream(cfgManager *config.ConfigManager, sch *scheduler.ChannelSche
 			return
 		}
 
+		oldName := ""
+		if updates.Name != nil {
+			cfg := cfgManager.GetConfig()
+			if id >= 0 && id < len(cfg.ResponsesUpstream) {
+				oldName = cfg.ResponsesUpstream[id].Name
+			}
+		}
+
 		shouldResetMetrics, err := cfgManager.UpdateResponsesUpstream(id, updates)
 		if err != nil {
 			c.JSON(500, gin.H{"error": err.Error()})
 			return
+		}
+
+		if updates.Name != nil && oldName != "" && oldName != *updates.Name {
+			if logStore := sch.GetChannelLogStore(scheduler.ChannelKindResponses); logStore != nil {
+				logStore.RenameChannel(oldName, *updates.Name)
+			}
 		}
 
 		// 单 key 更换时重置熔断状态

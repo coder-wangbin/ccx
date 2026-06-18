@@ -99,7 +99,7 @@ func TestRecordChannelLogWithSource_UsesExplicitSource(t *testing.T) {
 
 func TestCompleteLog_MapsClientCanceledToCancelledStatus(t *testing.T) {
 	store := metrics.NewChannelLogStore()
-	requestID := CreatePendingLog(store, "test-metrics-key-3", 0, "model-a", "", "", "", "sk-test-secret", "https://example.com", "Responses", "edits", metrics.RequestSourceProxy)
+	requestID := CreatePendingLog(store, "test-metrics-key-3", 0, "test-channel", "model-a", "", "", "", "sk-test-secret", "https://example.com", "Responses", "edits", metrics.RequestSourceProxy)
 
 	CompleteLog(store, "test-metrics-key-3", requestID, 200, false, "client canceled", false)
 
@@ -120,7 +120,7 @@ func TestCompleteLog_MapsClientCanceledToCancelledStatus(t *testing.T) {
 
 func TestCompleteLog_LeavesRealFailuresAsFailed(t *testing.T) {
 	store := metrics.NewChannelLogStore()
-	requestID := CreatePendingLog(store, "test-metrics-key-4", 0, "model-a", "", "", "", "sk-test-secret", "https://example.com", "Responses", "", metrics.RequestSourceProxy)
+	requestID := CreatePendingLog(store, "test-metrics-key-4", 0, "test-channel", "model-a", "", "", "", "sk-test-secret", "https://example.com", "Responses", "", metrics.RequestSourceProxy)
 
 	CompleteLog(store, "test-metrics-key-4", requestID, 502, false, "upstream timeout", false)
 
@@ -135,7 +135,7 @@ func TestCompleteLog_LeavesRealFailuresAsFailed(t *testing.T) {
 
 func TestCompleteLog_NormalizesEmptyStreamErrorInfo(t *testing.T) {
 	store := metrics.NewChannelLogStore()
-	requestID := CreatePendingLog(store, "test-metrics-key-5", 0, "model-a", "", "", "", "sk-test-secret", "https://example.com", "Messages", "", metrics.RequestSourceProxy)
+	requestID := CreatePendingLog(store, "test-metrics-key-5", 0, "test-channel", "model-a", "", "", "", "sk-test-secret", "https://example.com", "Messages", "", metrics.RequestSourceProxy)
 
 	CompleteLog(store, "test-metrics-key-5", requestID, 200, false, "upstream returned empty stream response: 检测到空流，但未匹配到明确类别", false)
 

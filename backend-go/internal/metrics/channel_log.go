@@ -10,6 +10,7 @@ import (
 type ChannelLog struct {
 	RequestID               string    `json:"requestId"` // 请求唯一标识
 	ChannelIndex            int       `json:"-"`         // 创建时的渠道索引（不序列化，仅用于内部排查）
+	ChannelName             string    `json:"-"`         // 创建时的渠道名称（不序列化，用于共享 metricsKey 日志归属）
 	MetricsKey              string    `json:"-"`         // 指标身份键（不序列化，仅用于日志分桶）
 	Timestamp               time.Time `json:"timestamp"`
 	Model                   string    `json:"model"`                             // 实际使用的模型（重定向后）
@@ -120,6 +121,22 @@ func (s *ChannelLogStore) Remove(metricsKeys []string) {
 	for requestID, metricsKey := range s.requestLocations {
 		if _, shouldRemove := removeSet[metricsKey]; shouldRemove {
 			delete(s.requestLocations, requestID)
+		}
+	}
+}
+
+func (s *ChannelLogStore) RenameChannel(oldName, newName string) {
+	if oldName == "" || newName == "" || oldName == newName {
+		return
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, entries := range s.logs {
+		for _, logEntry := range entries {
+			if logEntry != nil && logEntry.ChannelName == oldName {
+				logEntry.ChannelName = newName
+			}
 		}
 	}
 }

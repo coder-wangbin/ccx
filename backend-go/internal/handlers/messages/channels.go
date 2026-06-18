@@ -72,6 +72,14 @@ func UpdateUpstream(cfgManager *config.ConfigManager, sch *scheduler.ChannelSche
 			return
 		}
 
+		oldName := ""
+		if updates.Name != nil {
+			cfg := cfgManager.GetConfig()
+			if id >= 0 && id < len(cfg.Upstream) {
+				oldName = cfg.Upstream[id].Name
+			}
+		}
+
 		shouldResetMetrics, err := cfgManager.UpdateUpstream(id, updates)
 		if err != nil {
 			if strings.Contains(err.Error(), "无效的上游索引") {
@@ -80,6 +88,12 @@ func UpdateUpstream(cfgManager *config.ConfigManager, sch *scheduler.ChannelSche
 				c.JSON(500, gin.H{"error": "Failed to save config"})
 			}
 			return
+		}
+
+		if updates.Name != nil && oldName != "" && oldName != *updates.Name {
+			if logStore := sch.GetChannelLogStore(scheduler.ChannelKindMessages); logStore != nil {
+				logStore.RenameChannel(oldName, *updates.Name)
+			}
 		}
 
 		if shouldResetMetrics {

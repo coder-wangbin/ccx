@@ -290,6 +290,7 @@ func executeRedirectModelTest(ctx context.Context, channel *config.UpstreamConfi
 			protocol,
 			false,
 			metrics.RequestSourceCapabilityTest,
+			channel.Name,
 		)
 	}
 

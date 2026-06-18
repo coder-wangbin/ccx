@@ -42,10 +42,15 @@ func GetChannelLogs(
 			if logEntry == nil {
 				return false
 			}
-			if !sharedMetricsKeys[logEntry.MetricsKey] {
-				return true
+			// 日志带创建时渠道名时按名称归属：可避免删除/重命名/重排后日志串台。
+			if logEntry.ChannelName != "" && upstream.Name != "" {
+				return logEntry.ChannelName == upstream.Name
 			}
-			return logEntry.ChannelIndex == channelIndex
+			// 旧日志无渠道名：共享 metricsKey 按 index 比对，独占 metricsKey 直接放行。
+			if sharedMetricsKeys[logEntry.MetricsKey] {
+				return logEntry.ChannelIndex == channelIndex
+			}
+			return true
 		})
 		if logs == nil {
 			logs = make([]*metrics.ChannelLog, 0)

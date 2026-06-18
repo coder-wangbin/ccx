@@ -74,6 +74,14 @@ func UpdateUpstream(cfgManager *config.ConfigManager, sch *scheduler.ChannelSche
 			return
 		}
 
+		oldName := ""
+		if updates.Name != nil {
+			cfg := cfgManager.GetConfig()
+			if id >= 0 && id < len(cfg.ImagesUpstream) {
+				oldName = cfg.ImagesUpstream[id].Name
+			}
+		}
+
 		shouldResetMetrics, err := cfgManager.UpdateImagesUpstream(id, updates)
 		if err != nil {
 			if strings.Contains(err.Error(), "仅支持 openai serviceType") {
@@ -82,6 +90,12 @@ func UpdateUpstream(cfgManager *config.ConfigManager, sch *scheduler.ChannelSche
 				c.JSON(500, gin.H{"error": err.Error()})
 			}
 			return
+		}
+
+		if updates.Name != nil && oldName != "" && oldName != *updates.Name {
+			if logStore := sch.GetChannelLogStore(scheduler.ChannelKindImages); logStore != nil {
+				logStore.RenameChannel(oldName, *updates.Name)
+			}
 		}
 
 		// 单 key 更换时重置熔断状态

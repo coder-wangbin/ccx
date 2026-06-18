@@ -680,6 +680,7 @@ func executeModelTest(ctx context.Context, channel *config.UpstreamConfig, proto
 			protocol,
 			false,
 			metrics.RequestSourceCapabilityTest,
+			channel.Name,
 		)
 	}
 

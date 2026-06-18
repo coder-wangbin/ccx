@@ -63,14 +63,14 @@ func tryLocalCompactV2WithAllKeys(
 		success, compactErr := tryLocalCompactV2WithKey(c, upstream, apiKey, bodyBytes, envCfg, cfgManager, sessionManager)
 		metricsKey := metrics.GenerateMetricsIdentityKey(upstream.BaseURL, apiKey, metricsServiceType)
 		if success {
-			common.RecordChannelLog(channelLogStore, metricsKey, channelIndex, requestModel, "", http.StatusOK, time.Since(attemptStart).Milliseconds(), true, apiKey, upstream.BaseURL, "", "Responses", attempt > 0)
+			common.RecordChannelLog(channelLogStore, metricsKey, channelIndex, requestModel, "", http.StatusOK, time.Since(attemptStart).Milliseconds(), true, apiKey, upstream.BaseURL, "", "Responses", attempt > 0, upstream.Name)
 			channelScheduler.RecordSuccessWithUsage(upstream.BaseURL, apiKey, metricsServiceType, nil, scheduler.ChannelKindResponses)
 			return true, apiKey, nil
 		}
 
 		if compactErr != nil {
 			lastErr = compactErr
-			common.RecordChannelLog(channelLogStore, metricsKey, channelIndex, requestModel, "", compactErr.status, time.Since(attemptStart).Milliseconds(), false, apiKey, upstream.BaseURL, compactErr.errorInfo(), "Responses", attempt > 0)
+			common.RecordChannelLog(channelLogStore, metricsKey, channelIndex, requestModel, "", compactErr.status, time.Since(attemptStart).Milliseconds(), false, apiKey, upstream.BaseURL, compactErr.errorInfo(), "Responses", attempt > 0, upstream.Name)
 			if compactErr.shouldFailover {
 				failedKeys[apiKey] = true
 				cfgManager.MarkKeyAsFailed(apiKey, "Responses")

@@ -7,7 +7,8 @@
 
 ### 修复
 
-- **渠道日志按 channelIndex 过滤共享 metricsKey** - GetChannelLogs 对共享 metricsKey 按 channelIndex 筛选，避免多渠道同 base URL 时日志串台
+- **渠道日志按稳定渠道名过滤共享 metricsKey** - GetChannelLogs 对共享 metricsKey 优先按创建时渠道名筛选，旧日志回退 channelIndex，避免删除/重排后日志串台
+- **Codex SQLite visibility 回填来源保护** - 迁移 threads 时根据 source 列跳过 exec 等后台线程，避免误标记为用户会话
 - **trace 亲和性遵守 SupportedModels** - 新增测试验证亲和渠道不支持当前模型时正确跳过并回退优先级选择
 
 ## [v2.9.2] - 2026-06-18

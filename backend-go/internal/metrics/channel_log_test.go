@@ -114,6 +114,24 @@ func TestChannelLogStoreRemove(t *testing.T) {
 	}
 }
 
+func TestChannelLogStoreRenameChannel(t *testing.T) {
+	store := NewChannelLogStore()
+	store.Record("key-a", &ChannelLog{RequestID: "old", ChannelName: "OldName"})
+	store.Record("key-a", &ChannelLog{RequestID: "other", ChannelName: "OtherName"})
+
+	store.RenameChannel("OldName", "NewName")
+	logs := store.Get("key-a")
+	if len(logs) != 2 {
+		t.Fatalf("logs count = %d, want 2", len(logs))
+	}
+	if logs[1].ChannelName != "NewName" {
+		t.Fatalf("renamed log channel = %q, want NewName", logs[1].ChannelName)
+	}
+	if logs[0].ChannelName != "OtherName" {
+		t.Fatalf("other log channel = %q, want OtherName", logs[0].ChannelName)
+	}
+}
+
 func TestChannelLogStoreUpdateUsesRequestLocationsKey(t *testing.T) {
 	store := NewChannelLogStore()
 	store.Record("key-a", &ChannelLog{RequestID: "r1", Status: StatusPending})

@@ -124,7 +124,7 @@ func handleSingleChannelCompact(
 		success, compactErr := tryCompactWithKey(c, upstream, apiKey, bodyBytes, envCfg, cfgManager, sessionManager)
 		metricsKey := metrics.GenerateMetricsIdentityKey(upstream.BaseURL, apiKey, metricsServiceType)
 		if success {
-			common.RecordChannelLog(channelLogStore, metricsKey, channelIndex, requestModel, "", http.StatusOK, time.Since(attemptStart).Milliseconds(), true, apiKey, upstream.BaseURL, "", "Responses", attempt > 0)
+			common.RecordChannelLog(channelLogStore, metricsKey, channelIndex, requestModel, "", http.StatusOK, time.Since(attemptStart).Milliseconds(), true, apiKey, upstream.BaseURL, "", "Responses", attempt > 0, upstream.Name)
 			channelScheduler.RecordSuccessWithUsage(upstream.BaseURL, apiKey, metricsServiceType, nil, scheduler.ChannelKindResponses)
 			return
 		}
@@ -135,11 +135,11 @@ func handleSingleChannelCompact(
 				failedKeys[apiKey] = true
 				cfgManager.MarkKeyAsFailed(apiKey, "Responses")
 				channelScheduler.RecordFailure(upstream.BaseURL, apiKey, metricsServiceType, scheduler.ChannelKindResponses)
-				common.RecordChannelLog(channelLogStore, metricsKey, channelIndex, requestModel, "", compactErr.status, time.Since(attemptStart).Milliseconds(), false, apiKey, upstream.BaseURL, compactErr.errorInfo(), "Responses", attempt > 0)
+				common.RecordChannelLog(channelLogStore, metricsKey, channelIndex, requestModel, "", compactErr.status, time.Since(attemptStart).Milliseconds(), false, apiKey, upstream.BaseURL, compactErr.errorInfo(), "Responses", attempt > 0, upstream.Name)
 				continue
 			}
 			// 非故障转移错误，直接返回
-			common.RecordChannelLog(channelLogStore, metricsKey, channelIndex, requestModel, "", compactErr.status, time.Since(attemptStart).Milliseconds(), false, apiKey, upstream.BaseURL, compactErr.errorInfo(), "Responses", attempt > 0)
+			common.RecordChannelLog(channelLogStore, metricsKey, channelIndex, requestModel, "", compactErr.status, time.Since(attemptStart).Milliseconds(), false, apiKey, upstream.BaseURL, compactErr.errorInfo(), "Responses", attempt > 0, upstream.Name)
 			c.Data(compactErr.status, "application/json", compactErr.body)
 			return
 		}
@@ -286,7 +286,7 @@ func tryCompactChannelWithAllKeys(
 		metricsKey := metrics.GenerateMetricsIdentityKey(upstream.BaseURL, apiKey, metricsServiceType)
 
 		if success {
-			common.RecordChannelLog(channelLogStore, metricsKey, channelIndex, requestModel, "", http.StatusOK, time.Since(attemptStart).Milliseconds(), true, apiKey, upstream.BaseURL, "", "Responses", attempt > 0)
+			common.RecordChannelLog(channelLogStore, metricsKey, channelIndex, requestModel, "", http.StatusOK, time.Since(attemptStart).Milliseconds(), true, apiKey, upstream.BaseURL, "", "Responses", attempt > 0, upstream.Name)
 			channelScheduler.RecordSuccessWithUsage(upstream.BaseURL, apiKey, metricsServiceType, nil, scheduler.ChannelKindResponses)
 			// 释放探针
 			probeKey := upstream.BaseURL + "|" + apiKey
@@ -303,7 +303,7 @@ func tryCompactChannelWithAllKeys(
 				failedKeys[apiKey] = true
 				cfgManager.MarkKeyAsFailed(apiKey, "Responses")
 				channelScheduler.RecordFailure(upstream.BaseURL, apiKey, metricsServiceType, scheduler.ChannelKindResponses)
-				common.RecordChannelLog(channelLogStore, metricsKey, channelIndex, requestModel, "", compactErr.status, time.Since(attemptStart).Milliseconds(), false, apiKey, upstream.BaseURL, compactErr.errorInfo(), "Responses", attempt > 0)
+				common.RecordChannelLog(channelLogStore, metricsKey, channelIndex, requestModel, "", compactErr.status, time.Since(attemptStart).Milliseconds(), false, apiKey, upstream.BaseURL, compactErr.errorInfo(), "Responses", attempt > 0, upstream.Name)
 				// 释放探针
 				probeKey := upstream.BaseURL + "|" + apiKey
 				if probeAcquired[probeKey] {
@@ -313,7 +313,7 @@ func tryCompactChannelWithAllKeys(
 				continue
 			}
 			// 非故障转移错误，返回但标记渠道成功（请求已处理）
-			common.RecordChannelLog(channelLogStore, metricsKey, channelIndex, requestModel, "", compactErr.status, time.Since(attemptStart).Milliseconds(), false, apiKey, upstream.BaseURL, compactErr.errorInfo(), "Responses", attempt > 0)
+			common.RecordChannelLog(channelLogStore, metricsKey, channelIndex, requestModel, "", compactErr.status, time.Since(attemptStart).Milliseconds(), false, apiKey, upstream.BaseURL, compactErr.errorInfo(), "Responses", attempt > 0, upstream.Name)
 			// 释放探针
 			probeKey := upstream.BaseURL + "|" + apiKey
 			if probeAcquired[probeKey] {

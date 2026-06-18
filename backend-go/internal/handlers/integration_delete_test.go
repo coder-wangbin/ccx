@@ -211,6 +211,137 @@ func TestGetChannelLogs_FiltersSharedMetricsKeyByChannelIndex(t *testing.T) {
 	}
 }
 
+func TestGetChannelLogs_FiltersSharedMetricsKeyByChannelNameAfterDeletion(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	cfg := config.Config{
+		ResponsesUpstream: []config.UpstreamConfig{
+			{
+				Name:        "RemainingA",
+				BaseURL:     "http://127.0.0.1:3699",
+				APIKeys:     []string{"sk-local"},
+				ServiceType: "responses",
+			},
+			{
+				Name:        "RemainingB",
+				BaseURL:     "http://127.0.0.1:3699",
+				APIKeys:     []string{"sk-local"},
+				ServiceType: "responses",
+			},
+		},
+	}
+
+	tmpDir := t.TempDir()
+	configFile := filepath.Join(tmpDir, "config.json")
+	data, err := json.MarshalIndent(cfg, "", "  ")
+	if err != nil {
+		t.Fatalf("序列化配置失败: %v", err)
+	}
+	if err := os.WriteFile(configFile, data, 0644); err != nil {
+		t.Fatalf("写入配置文件失败: %v", err)
+	}
+
+	cfgManager, err := config.NewConfigManager(configFile, "")
+	if err != nil {
+		t.Fatalf("创建配置管理器失败: %v", err)
+	}
+	t.Cleanup(func() { cfgManager.Close() })
+
+	logStore := metrics.NewChannelLogStore()
+	metricsKey := metrics.GenerateMetricsIdentityKey("http://127.0.0.1:3699", "sk-local", "responses")
+	now := time.Now()
+	logStore.Record(metricsKey, &metrics.ChannelLog{RequestID: "deleted-old-index", ChannelIndex: 0, ChannelName: "Deleted", Model: "gpt-5.4", Timestamp: now.Add(-2 * time.Second)})
+	logStore.Record(metricsKey, &metrics.ChannelLog{RequestID: "remaining-a-old-index", ChannelIndex: 1, ChannelName: "RemainingA", Model: "gpt-5.5", Timestamp: now.Add(-time.Second)})
+	logStore.Record(metricsKey, &metrics.ChannelLog{RequestID: "remaining-b-old-index", ChannelIndex: 2, ChannelName: "RemainingB", Model: "gpt-5.6", Timestamp: now})
+
+	r := gin.New()
+	r.GET("/responses/channels/:id/logs", GetChannelLogs(logStore, cfgManager, scheduler.ChannelKindResponses))
+
+	req := httptest.NewRequest(http.MethodGet, "/responses/channels/0/logs", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", w.Code)
+	}
+
+	var resp struct {
+		Logs []*metrics.ChannelLog `json:"logs"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if len(resp.Logs) != 1 {
+		t.Fatalf("logs count = %d, want 1: %#v", len(resp.Logs), resp.Logs)
+	}
+	if resp.Logs[0].RequestID != "remaining-a-old-index" {
+		t.Fatalf("logs[0].RequestID = %q, want remaining-a-old-index", resp.Logs[0].RequestID)
+	}
+}
+
+func TestGetChannelLogs_ExcludesDeletedChannelResidualAfterBecomingExclusive(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	// 删除前有两个渠道共享同一 metricsKey；删除其一后仅 Remaining 独占该桶，
+	// 但桶里仍残留已删除渠道的历史日志（带删除渠道名），必须按渠道名排除。
+	cfg := config.Config{
+		ResponsesUpstream: []config.UpstreamConfig{
+			{
+				Name:        "Remaining",
+				BaseURL:     "http://127.0.0.1:3699",
+				APIKeys:     []string{"sk-local"},
+				ServiceType: "responses",
+			},
+		},
+	}
+
+	tmpDir := t.TempDir()
+	configFile := filepath.Join(tmpDir, "config.json")
+	data, err := json.MarshalIndent(cfg, "", "  ")
+	if err != nil {
+		t.Fatalf("序列化配置失败: %v", err)
+	}
+	if err := os.WriteFile(configFile, data, 0644); err != nil {
+		t.Fatalf("写入配置文件失败: %v", err)
+	}
+
+	cfgManager, err := config.NewConfigManager(configFile, "")
+	if err != nil {
+		t.Fatalf("创建配置管理器失败: %v", err)
+	}
+	t.Cleanup(func() { cfgManager.Close() })
+
+	logStore := metrics.NewChannelLogStore()
+	metricsKey := metrics.GenerateMetricsIdentityKey("http://127.0.0.1:3699", "sk-local", "responses")
+	now := time.Now()
+	logStore.Record(metricsKey, &metrics.ChannelLog{RequestID: "deleted-residual", ChannelIndex: 1, ChannelName: "Deleted", Model: "gpt-5.4", Timestamp: now.Add(-time.Second)})
+	logStore.Record(metricsKey, &metrics.ChannelLog{RequestID: "remaining", ChannelIndex: 0, ChannelName: "Remaining", Model: "gpt-5.5", Timestamp: now})
+
+	r := gin.New()
+	r.GET("/responses/channels/:id/logs", GetChannelLogs(logStore, cfgManager, scheduler.ChannelKindResponses))
+
+	req := httptest.NewRequest(http.MethodGet, "/responses/channels/0/logs", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", w.Code)
+	}
+
+	var resp struct {
+		Logs []*metrics.ChannelLog `json:"logs"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if len(resp.Logs) != 1 {
+		t.Fatalf("logs count = %d, want 1: %#v", len(resp.Logs), resp.Logs)
+	}
+	if resp.Logs[0].RequestID != "remaining" {
+		t.Fatalf("logs[0].RequestID = %q, want remaining", resp.Logs[0].RequestID)
+	}
+}
+
 // TestGetChannelDashboard_AfterChannelDeletion 验证 dashboard 在渠道删除后 metrics 索引一致性
 func TestGetChannelDashboard_AfterChannelDeletion(t *testing.T) {
 	gin.SetMode(gin.TestMode)

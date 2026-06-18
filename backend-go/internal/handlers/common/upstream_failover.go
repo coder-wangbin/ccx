@@ -263,7 +263,7 @@ func TryUpstreamWithAllKeys(
 			metricsKey := metrics.GenerateMetricsIdentityKey(currentBaseURL, apiKey, metricsServiceType)
 
 			// 创建 pending 状态日志
-			logRequestID := CreatePendingLog(channelLogStore, metricsKey, channelIndex, redirectedModel, originalModel, originalReasoningEffort, actualReasoningEffort, apiKey, currentBaseURL, apiType, operation, metrics.RequestSourceProxy)
+			logRequestID := CreatePendingLog(channelLogStore, metricsKey, channelIndex, upstream.Name, redirectedModel, originalModel, originalReasoningEffort, actualReasoningEffort, apiKey, currentBaseURL, apiType, operation, metrics.RequestSourceProxy)
 
 			// TCP 建连开始即计数：将活跃度统计提前到发起上游请求之前
 			requestID := metricsManager.RecordRequestConnected(currentBaseURL, apiKey, metricsServiceType, redirectedModel)

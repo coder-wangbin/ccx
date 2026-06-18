@@ -23,6 +23,7 @@ func CreatePendingLog(
 	channelLogStore *metrics.ChannelLogStore,
 	metricsKey string,
 	channelIndex int,
+	channelName string,
 	model, originalModel string,
 	originalReasoningEffort, actualReasoningEffort string,
 	apiKey, baseURL, interfaceType, operation string,
@@ -41,6 +42,7 @@ func CreatePendingLog(
 	channelLogStore.Record(metricsKey, &metrics.ChannelLog{
 		RequestID:               requestID,
 		ChannelIndex:            channelIndex, // 记录创建时的渠道索引，便于内部排查
+		ChannelName:             channelName,
 		Timestamp:               now,
 		StartTime:               now,
 		Model:                   model,
@@ -161,6 +163,7 @@ func RecordChannelLog(
 	success bool,
 	apiKey, baseURL, errorInfo, interfaceType string,
 	isRetry bool,
+	channelName ...string,
 ) {
 	RecordChannelLogWithSource(
 		channelLogStore,
@@ -177,6 +180,7 @@ func RecordChannelLog(
 		interfaceType,
 		isRetry,
 		metrics.RequestSourceProxy,
+		channelName...,
 	)
 }
 
@@ -193,6 +197,7 @@ func RecordChannelLogWithSource(
 	apiKey, baseURL, errorInfo, interfaceType string,
 	isRetry bool,
 	requestSource string,
+	channelName ...string,
 ) {
 	if channelLogStore == nil || metricsKey == "" {
 		return
@@ -205,6 +210,10 @@ func RecordChannelLogWithSource(
 		requestSource = metrics.RequestSourceProxy
 	}
 
+	recordedChannelName := ""
+	if len(channelName) > 0 {
+		recordedChannelName = channelName[0]
+	}
 	now := time.Now()
 	startTime := now.Add(-time.Duration(durationMs) * time.Millisecond)
 	requestID := GenerateRequestID()
@@ -219,6 +228,7 @@ func RecordChannelLogWithSource(
 	channelLogStore.Record(metricsKey, &metrics.ChannelLog{
 		RequestID:     requestID,
 		ChannelIndex:  channelIndex, // 记录创建时的渠道索引，便于内部排查
+		ChannelName:   recordedChannelName,
 		Timestamp:     now,
 		StartTime:     startTime,
 		Model:         model,
