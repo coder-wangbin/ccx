@@ -2,6 +2,8 @@
 
 CCX releases are signed using [Sigstore](https://www.sigstore.dev/) keyless signing on the checksums manifest. Verifying the signature proves that the release artifacts were built by the `BenedictKing/ccx` GitHub Actions workflow and have not been tampered with.
 
+Windows GitHub installers are also Authenticode-signed through the SignPath Foundation. Sigstore verifies the Release manifest and CI origin; Authenticode lets Windows verify installer publisher and file integrity.
+
 ## How It Works
 
 1. During CI, GitHub Actions requests a **short-lived signing certificate** (valid ~10 minutes) from Sigstore's Fulcio CA via the OIDC protocol. The certificate binds the signing identity to the GitHub Actions workflow.
@@ -93,6 +95,19 @@ shasum -a 256 ccx-darwin-arm64
 # Compare the output with the corresponding line in checksums.txt
 ```
 
+### 4. Verify Windows Authenticode signature
+
+You can verify SignPath code signing for Windows GitHub installers with PowerShell:
+
+```powershell
+$version = "2.7.12"  # Replace with the target version without v
+$signature = Get-AuthenticodeSignature ".\CCX-Desktop-$version-windows-amd64-setup.exe"
+$signature.Status
+$signature.SignerCertificate.Subject
+```
+
+`Status` should be `Valid`. If it shows `NotSigned`, `UnknownError`, or unexpected certificate details, do not run the installer. Re-download it from the official Release and verify SHA256 again.
+
 ## Common Verification Failures
 
 | Symptom | Cause |
@@ -112,6 +127,8 @@ shasum -a 256 ccx-darwin-arm64
 | `checksums-{platform}.txt` | Single-platform SHA256 manifest |
 | `checksums-{platform}.txt.sigstore.json` | Single-platform Sigstore bundle |
 | `{artifact}.sha256` | Individual artifact SHA256 (hex hash only, used by updater for automated verification) |
+| `CCX-Desktop-*-windows-*-setup.exe` | SignPath Authenticode-signed Windows GitHub installer |
+| `CCX-Desktop-*-windows-*-store.msix` | Windows Store/MSIX submission and validation package; public installs should prefer Microsoft Store |
 
 ## Learn More
 

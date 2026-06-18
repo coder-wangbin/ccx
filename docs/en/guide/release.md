@@ -124,11 +124,17 @@ git push origin vX.Y.Z
 
 ## Release Signing
 
-Releases are signed using [Sigstore](https://www.sigstore.dev/) / cosign keyless signing. After pushing the tag, CI automatically:
+Releases use two signing layers:
 
-1. Builds artifacts on all three platforms (macOS / Windows / Linux), generates per-platform checksums and signs them
-2. The `finalize` job merges all per-platform checksums into `checksums.txt` and signs the consolidated manifest
-3. All signature files are published alongside the release
+- [Sigstore](https://www.sigstore.dev/) / cosign keyless signing signs the checksums manifests so users can verify Release asset integrity and CI origin.
+- [SignPath Foundation](https://signpath.org/) signs the Windows GitHub installer chain with Authenticode. CI signs `ccx-windows-*.exe`, the desktop `ccx-desktop.exe`, then creates and signs `CCX-Desktop-*-windows-*-setup.exe`.
+
+After pushing the tag, CI automatically:
+
+1. Builds artifacts on all three platforms (macOS / Windows / Linux); Windows GitHub installer artifacts are signed by SignPath first
+2. Generates per-platform checksums and signs them with Sigstore
+3. The `finalize` job merges all per-platform checksums into `checksums.txt` and signs the consolidated manifest
+4. All signature files are published alongside the release
 
 After publishing, verify these signature assets exist in the Release:
 
@@ -139,5 +145,16 @@ After publishing, verify these signature assets exist in the Release:
 - `checksums-linux.txt(.sigstore.json)` — Linux platform
 
 Existing `.sha256` sidecar files are preserved; desktop/backend updater behavior is unchanged.
+
+The Windows SignPath integration requires these GitHub settings:
+
+| Type | Name | Notes |
+|------|------|-------|
+| Secret | `SIGNPATH_API_TOKEN` | SignPath API token with submitter permissions for the target project/policy |
+| Variable | `SIGNPATH_ARTIFACT_CONFIGURATION_SLUG` | Optional; empty uses the project's default artifact configuration |
+
+The workflow currently uses SignPath organization `4ffeb1d3-df31-4323-a3e9-15fecdcbaad2`, project `ccx`, and signing policy `test-signing`.
+
+Keep the SignPath artifact configuration scoped to single Windows executable/installer signing. If it is generated from sample artifacts, review it so third-party components are not signed with the project certificate.
 
 See [Verifying Release Artifacts](./verification.md) for user verification instructions.

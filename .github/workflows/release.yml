@@ -1,5 +1,6 @@
 name: Release
 permissions:
+  actions: read
   contents: write
   id-token: write
 
@@ -142,6 +143,11 @@ jobs:
     defaults:
       run:
         shell: bash
+    env:
+      SIGNPATH_ORGANIZATION_ID: 4ffeb1d3-df31-4323-a3e9-15fecdcbaad2
+      SIGNPATH_PROJECT_SLUG: ccx
+      SIGNPATH_SIGNING_POLICY_SLUG: test-signing
+      SIGNPATH_ARTIFACT_CONFIGURATION_SLUG: ${{ vars.SIGNPATH_ARTIFACT_CONFIGURATION_SLUG }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -178,6 +184,21 @@ jobs:
       - name: Install cosign
         uses: sigstore/cosign-installer@v4.0.0
 
+      - name: Verify SignPath configuration
+        env:
+          SIGNPATH_API_TOKEN: ${{ secrets.SIGNPATH_API_TOKEN }}
+        run: |
+          missing=0
+          for name in SIGNPATH_API_TOKEN SIGNPATH_ORGANIZATION_ID SIGNPATH_PROJECT_SLUG SIGNPATH_SIGNING_POLICY_SLUG; do
+            if [ -z "${!name}" ]; then
+              echo "Missing required SignPath setting: ${name}" >&2
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            exit 1
+          fi
+
       - name: Build Backend amd64
         run: |
           go mod download
@@ -188,6 +209,28 @@ jobs:
         run: |
           CGO_ENABLED=0 GOOS=windows GOARCH=arm64 go build -trimpath -buildvcs=false -ldflags "-s -w -linkmode=internal -X main.Version=${{ github.ref_name }} -X main.BuildTime=$(date -u '+%Y-%m-%d_%H:%M:%S') -X main.GitCommit=${{ github.sha }}" -o ccx-windows-arm64.exe
         working-directory: ./backend-go
+
+      - name: Sign Backend amd64
+        uses: ./.github/actions/signpath-sign
+        with:
+          file: backend-go/ccx-windows-amd64.exe
+          output-directory: .signpath/backend-amd64
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ env.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ env.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ env.SIGNPATH_SIGNING_POLICY_SLUG }}
+          artifact-configuration-slug: ${{ env.SIGNPATH_ARTIFACT_CONFIGURATION_SLUG }}
+
+      - name: Sign Backend arm64
+        uses: ./.github/actions/signpath-sign
+        with:
+          file: backend-go/ccx-windows-arm64.exe
+          output-directory: .signpath/backend-arm64
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ env.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ env.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ env.SIGNPATH_SIGNING_POLICY_SLUG }}
+          artifact-configuration-slug: ${{ env.SIGNPATH_ARTIFACT_CONFIGURATION_SLUG }}
 
       - name: Generate checksums
         run: |
@@ -228,7 +271,7 @@ jobs:
           Write-Output "NSIS directory: $nsisDir"
           echo "$nsisDir" >> $env:GITHUB_PATH
 
-      - name: Build Desktop amd64 NSIS
+      - name: Build Desktop amd64 executable
         env:
           BUILD_VERSION: ${{ github.ref_name }}
           GIT_COMMIT: ${{ github.sha }}
@@ -239,7 +282,34 @@ jobs:
           BUILD_TIME=$(date -u '+%Y-%m-%d_%H:%M:%S')
           VERSION="${BUILD_VERSION#v}"
           rm -f bin/*installer*.exe bin/*setup*.exe
-          wails3 task windows:package ARCH=amd64 BUILD_VERSION="${VERSION}" BUILD_TIME="${BUILD_TIME}" GIT_COMMIT="${GIT_COMMIT}"
+          wails3 task windows:build ARCH=amd64 PRODUCTION=true BUILD_VERSION="${VERSION}" BUILD_TIME="${BUILD_TIME}" GIT_COMMIT="${GIT_COMMIT}"
+        working-directory: ./desktop
+
+      - name: Sign Desktop amd64 executable
+        uses: ./.github/actions/signpath-sign
+        with:
+          file: desktop/bin/ccx-desktop.exe
+          output-directory: .signpath/desktop-amd64
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ env.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ env.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ env.SIGNPATH_SIGNING_POLICY_SLUG }}
+          artifact-configuration-slug: ${{ env.SIGNPATH_ARTIFACT_CONFIGURATION_SLUG }}
+
+      - name: Verify Desktop amd64 executable signature
+        shell: powershell
+        run: |
+          $signature = Get-AuthenticodeSignature "desktop/bin/ccx-desktop.exe"
+          if ($signature.Status -ne "Valid") {
+            throw "Invalid Authenticode signature for desktop/bin/ccx-desktop.exe: $($signature.Status)"
+          }
+
+      - name: Build Desktop amd64 NSIS
+        env:
+          BUILD_VERSION: ${{ github.ref_name }}
+        run: |
+          VERSION="${BUILD_VERSION#v}"
+          wails3 task windows:create:nsis:installer:from-binary ARCH=amd64
           INSTALLER=$(find bin -maxdepth 1 -type f \( -iname '*amd64*installer*.exe' -o -iname '*installer*.exe' -o -iname '*setup*.exe' \) | head -1)
           if [ -z "$INSTALLER" ]; then
             echo "Desktop installer not found"
@@ -250,11 +320,28 @@ jobs:
           # 立即移出 bin 目录，防止 arm64 步骤的 rm 清除
           mkdir -p .release-staging
           mv "bin/CCX-Desktop-${VERSION}-windows-amd64-setup.exe" ".release-staging/"
-          mv "bin/CCX-Desktop-${VERSION}-windows-amd64-setup.exe.sha256" ".release-staging/" 2>/dev/null || true
+        working-directory: ./desktop
+
+      - name: Sign Desktop amd64 NSIS
+        uses: ./.github/actions/signpath-sign
+        with:
+          file: desktop/.release-staging/CCX-Desktop-*-windows-amd64-setup.exe
+          output-directory: .signpath/installer-amd64
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ env.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ env.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ env.SIGNPATH_SIGNING_POLICY_SLUG }}
+          artifact-configuration-slug: ${{ env.SIGNPATH_ARTIFACT_CONFIGURATION_SLUG }}
+
+      - name: Generate Desktop amd64 NSIS checksum
+        env:
+          BUILD_VERSION: ${{ github.ref_name }}
+        run: |
+          VERSION="${BUILD_VERSION#v}"
           sha256sum ".release-staging/CCX-Desktop-${VERSION}-windows-amd64-setup.exe" | awk '{print $1}' > ".release-staging/CCX-Desktop-${VERSION}-windows-amd64-setup.exe.sha256"
         working-directory: ./desktop
 
-      - name: Build Desktop arm64 NSIS
+      - name: Build Desktop arm64 executable
         env:
           BUILD_VERSION: ${{ github.ref_name }}
           GIT_COMMIT: ${{ github.sha }}
@@ -264,7 +351,34 @@ jobs:
           BUILD_TIME=$(date -u '+%Y-%m-%d_%H:%M:%S')
           VERSION="${BUILD_VERSION#v}"
           rm -f bin/*installer*.exe bin/*setup*.exe
-          wails3 task windows:package ARCH=arm64 BUILD_VERSION="${VERSION}" BUILD_TIME="${BUILD_TIME}" GIT_COMMIT="${GIT_COMMIT}"
+          wails3 task windows:build ARCH=arm64 PRODUCTION=true BUILD_VERSION="${VERSION}" BUILD_TIME="${BUILD_TIME}" GIT_COMMIT="${GIT_COMMIT}"
+        working-directory: ./desktop
+
+      - name: Sign Desktop arm64 executable
+        uses: ./.github/actions/signpath-sign
+        with:
+          file: desktop/bin/ccx-desktop.exe
+          output-directory: .signpath/desktop-arm64
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ env.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ env.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ env.SIGNPATH_SIGNING_POLICY_SLUG }}
+          artifact-configuration-slug: ${{ env.SIGNPATH_ARTIFACT_CONFIGURATION_SLUG }}
+
+      - name: Verify Desktop arm64 executable signature
+        shell: powershell
+        run: |
+          $signature = Get-AuthenticodeSignature "desktop/bin/ccx-desktop.exe"
+          if ($signature.Status -ne "Valid") {
+            throw "Invalid Authenticode signature for desktop/bin/ccx-desktop.exe: $($signature.Status)"
+          }
+
+      - name: Build Desktop arm64 NSIS
+        env:
+          BUILD_VERSION: ${{ github.ref_name }}
+        run: |
+          VERSION="${BUILD_VERSION#v}"
+          wails3 task windows:create:nsis:installer:from-binary ARCH=arm64
           INSTALLER=$(find bin -maxdepth 1 -type f \( -iname '*arm64*installer*.exe' -o -iname '*installer*.exe' -o -iname '*setup*.exe' \) | head -1)
           if [ -z "$INSTALLER" ]; then
             echo "Desktop installer not found"
@@ -275,8 +389,45 @@ jobs:
           # 将 arm64 也移入 staging，与 amd64 汇合
           mkdir -p .release-staging
           mv "bin/CCX-Desktop-${VERSION}-windows-arm64-setup.exe" ".release-staging/"
+        working-directory: ./desktop
+
+      - name: Sign Desktop arm64 NSIS
+        uses: ./.github/actions/signpath-sign
+        with:
+          file: desktop/.release-staging/CCX-Desktop-*-windows-arm64-setup.exe
+          output-directory: .signpath/installer-arm64
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ env.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ env.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ env.SIGNPATH_SIGNING_POLICY_SLUG }}
+          artifact-configuration-slug: ${{ env.SIGNPATH_ARTIFACT_CONFIGURATION_SLUG }}
+
+      - name: Generate Desktop arm64 NSIS checksum
+        env:
+          BUILD_VERSION: ${{ github.ref_name }}
+        run: |
+          VERSION="${BUILD_VERSION#v}"
           sha256sum ".release-staging/CCX-Desktop-${VERSION}-windows-arm64-setup.exe" | awk '{print $1}' > ".release-staging/CCX-Desktop-${VERSION}-windows-arm64-setup.exe.sha256"
         working-directory: ./desktop
+
+      - name: Verify Windows Authenticode signatures
+        shell: powershell
+        env:
+          BUILD_VERSION: ${{ github.ref_name }}
+        run: |
+          $version = $env:BUILD_VERSION -replace '^v', ''
+          $files = @(
+            "backend-go/ccx-windows-amd64.exe",
+            "backend-go/ccx-windows-arm64.exe",
+            "desktop/.release-staging/CCX-Desktop-$version-windows-amd64-setup.exe",
+            "desktop/.release-staging/CCX-Desktop-$version-windows-arm64-setup.exe"
+          )
+          foreach ($file in $files) {
+            $signature = Get-AuthenticodeSignature $file
+            if ($signature.Status -ne "Valid") {
+              throw "Invalid Authenticode signature for ${file}: $($signature.Status)"
+            }
+          }
 
       - name: Build Desktop amd64 Store MSIX
         env:

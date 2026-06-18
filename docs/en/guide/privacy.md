@@ -47,7 +47,7 @@ When visiting the CCX documentation site, GitHub repository, or GitHub Releases,
 
 ## Code signing
 
-CCX Desktop uses the SignPath Foundation for code signing. Code signing helps users verify application origin and integrity; it does not mean the CCX project collects user data.
+CCX Desktop uses the SignPath Foundation for GitHub Windows installer code signing. The Microsoft Store build is signed through the Store submission process. Code signing helps users verify application origin and integrity; it does not mean the CCX project collects user data.
 
 ## Contact
 

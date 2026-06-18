@@ -2,6 +2,8 @@
 
 CCX 的正式 Release 使用 [Sigstore](https://www.sigstore.dev/) keyless signing 对 checksums 清单签名。通过验证签名，可以确认发布产物确实由 `BenedictKing/ccx` 仓库的 GitHub Actions 工作流构建，而非被篡改或来自非官方渠道。
 
+Windows GitHub 安装器同时使用 SignPath Foundation 做 Authenticode 代码签名。Sigstore 用于验证 Release 清单和 CI 来源，Authenticode 用于让 Windows 验证安装包发布者和文件完整性。
+
 ## 工作原理
 
 1. CI 构建时，GitHub Actions 通过 OIDC 协议向 Sigstore 的 Fulcio CA 申请**短期签名证书**（有效期约 10 分钟），证书中绑定了 GitHub Actions 身份信息。
@@ -93,6 +95,19 @@ shasum -a 256 ccx-darwin-arm64
 # 将输出与 checksums.txt 中对应行比较
 ```
 
+### 4. 验证 Windows Authenticode 签名
+
+Windows GitHub 安装包可用 PowerShell 验证 SignPath 代码签名：
+
+```powershell
+$version = "2.7.12"  # 替换为要验证的版本（不含 v）
+$signature = Get-AuthenticodeSignature ".\CCX-Desktop-$version-windows-amd64-setup.exe"
+$signature.Status
+$signature.SignerCertificate.Subject
+```
+
+`Status` 应为 `Valid`。如果显示 `NotSigned`、`UnknownError` 或证书信息不符合预期，不要运行该安装包，重新从官方 Release 下载并重新验证 SHA256。
+
 ## 验证失败的常见原因
 
 | 现象 | 原因 |
@@ -112,6 +127,7 @@ shasum -a 256 ccx-darwin-arm64
 | `checksums-{platform}.txt` | 单平台 SHA256 清单 |
 | `checksums-{platform}.txt.sigstore.json` | 单平台 Sigstore bundle |
 | `{artifact}.sha256` | 单个产物的 SHA256（仅含 hex hash，供 updater 自动校验） |
+| `CCX-Desktop-*-windows-*-setup.exe` | SignPath Authenticode 签名的 Windows GitHub 安装包 |
 | `CCX-Desktop-*-windows-*-store.msix` | Windows Store/MSIX 提交与验证包，公开安装优先使用 Microsoft Store |
 
 ## 了解更多

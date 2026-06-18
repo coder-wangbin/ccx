@@ -124,11 +124,17 @@ git push origin vX.Y.Z
 
 ## Release 签名
 
-正式 Release 通过 [Sigstore](https://www.sigstore.dev/) / cosign keyless signing 签名 checksums 清单。推送 tag 后 CI 会自动完成以下步骤：
+正式 Release 同时使用两类签名：
 
-1. 三个平台（macOS / Windows / Linux）分别构建产物、生成平台级 checksums 并签名
-2. `finalize` job 合并三个平台的 checksums 为 `checksums.txt`，再次签名
-3. 所有签名文件随 Release 一起发布
+- [Sigstore](https://www.sigstore.dev/) / cosign keyless signing 签名 checksums 清单，用于验证 Release assets 的完整性和 CI 来源。
+- [SignPath Foundation](https://signpath.org/) 对 Windows GitHub 安装包链路做 Authenticode 代码签名。CI 会签名 Windows 后端 `ccx-windows-*.exe`、桌面主程序 `ccx-desktop.exe`，再生成并签名 `CCX-Desktop-*-windows-*-setup.exe`。
+
+推送 tag 后 CI 会自动完成以下步骤：
+
+1. 三个平台（macOS / Windows / Linux）分别构建产物；Windows GitHub 安装包产物先经 SignPath 签名
+2. 生成平台级 checksums 并用 Sigstore 签名
+3. `finalize` job 合并三个平台的 checksums 为 `checksums.txt`，再次签名
+4. 所有签名文件随 Release 一起发布
 
 发布后请确认 Release assets 中存在以下签名文件：
 
@@ -139,6 +145,17 @@ git push origin vX.Y.Z
 - `checksums-linux.txt(.sigstore.json)` — Linux 平台
 
 现有 `.sha256` sidecar 文件保留不变，desktop/backend updater 行为不受影响。
+
+Windows SignPath 集成依赖以下 GitHub 配置：
+
+| 类型 | 名称 | 说明 |
+|------|------|------|
+| Secret | `SIGNPATH_API_TOKEN` | SignPath API token，需具备对应项目/策略的 submitter 权限 |
+| Variable | `SIGNPATH_ARTIFACT_CONFIGURATION_SLUG` | 可选；为空时使用项目默认 artifact configuration |
+
+当前 workflow 固定使用 SignPath organization `4ffeb1d3-df31-4323-a3e9-15fecdcbaad2`、project `ccx`、signing policy `test-signing`。
+
+SignPath artifact configuration 建议保持为单文件 Windows 可执行文件/安装器签名配置；如从样例自动生成配置，需要确认没有把第三方组件纳入本项目证书签名范围。
 
 ## Windows Store / MSIX
 
