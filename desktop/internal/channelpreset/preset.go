@@ -20,6 +20,7 @@ const (
 	ProviderKimiCode     = "kimi-code"
 	ProviderVolcArk      = "volc-ark"
 	ProviderQianfan      = "qianfan"
+	ProviderXFyun        = "xfyun"
 	ProviderOriginRouter = "originrouter"
 	ProviderOpenRouter   = "openrouter"
 	ProviderModelScope   = "modelscope"
@@ -136,6 +137,7 @@ var providerConsoleURLs = map[string]string{
 	ProviderKimiCode:     "https://www.kimi.com/code/console",
 	ProviderVolcArk:      "https://console.volcengine.com/ark",
 	ProviderQianfan:      "https://console.bce.baidu.com/qianfan/resource/subscribe",
+	ProviderXFyun:        "https://console.xfyun.cn/",
 	ProviderOriginRouter: "https://easytransnote.com/ai/console/#key",
 	ProviderOpenRouter:   "https://openrouter.ai/keys",
 	ProviderModelScope:   "https://modelscope.cn/my/myaccesstoken",
@@ -410,6 +412,26 @@ func Presets() []ProviderPreset {
 			Plans: []ProviderPlan{
 				{ID: "anthropic", Label: "Anthropic-compatible", BaseURL: "https://qianfan.baidubce.com/anthropic/coding", Description: "Claude Messages 原生入口", Recommended: true},
 				{ID: "openai-chat", Label: "OpenAI-compatible", BaseURL: "https://qianfan.baidubce.com/v2/coding#", Description: "Chat / Responses 通用入口"},
+			},
+			Targets: []ChannelTarget{
+				{Type: TargetMessages, Label: "Messages 原生透传", Description: "Claude Code 直连或 CCX messages 渠道", Recommended: true},
+				{Type: TargetResponses, Label: "Codex Responses", Description: "OpenAI Responses 协议，供 Codex 使用"},
+				{Type: TargetChat, Label: "Chat 渠道透传", Description: "OpenAI Chat 协议，供 Chat 客户端使用"},
+			},
+			DefaultTarget: TargetMessages,
+		},
+		{
+			ID:                  ProviderXFyun,
+			Order:               88,
+			Label:               "讯飞星辰",
+			Description:         "科大讯飞星辰 MaaS 平台，面向 Agent 和企业应用提供大模型推理服务，支持 Claude Messages 与 OpenAI 兼容入口。",
+			DirectAgent:         true,
+			NativeMessages:      true,
+			ChatCompatible:      true,
+			ResponsesCompatible: true,
+			Plans: []ProviderPlan{
+				{ID: "anthropic", Label: "Anthropic-compatible", BaseURL: "https://maas-api.cn-huabei-1.xf-yun.com/anthropic", Description: "Claude Messages 原生入口", Recommended: true},
+				{ID: "openai-chat", Label: "OpenAI-compatible", BaseURL: "https://maas-api.cn-huabei-1.xf-yun.com/v2", Description: "Chat / Responses 通用入口"},
 			},
 			Targets: []ChannelTarget{
 				{Type: TargetMessages, Label: "Messages 原生透传", Description: "Claude Code 直连或 CCX messages 渠道", Recommended: true},
@@ -771,11 +793,11 @@ var channelTargetConfigs = map[string]map[string]channelTargetConfig{
 				"sonnet": "glm-5.2",
 			},
 			ReasoningMapping: map[string]string{
-				"fable":       "max",
-				"haiku":       "high",
-				"opus":        "max",
-				"sonnet":      "max",
-				"minimax-m3":  "xhigh",
+				"fable":      "max",
+				"haiku":      "high",
+				"opus":       "max",
+				"sonnet":     "max",
+				"minimax-m3": "xhigh",
 			},
 			ReasoningParamStyle:      "reasoning",
 			PassbackReasoningContent: true,
@@ -791,6 +813,7 @@ var channelTargetConfigs = map[string]map[string]channelTargetConfig{
 				"sonnet": "qianfan-code-latest",
 			},
 		},
+		ProviderXFyun: {},
 	},
 	TargetChat: {
 		ProviderDeepSeek: {
@@ -821,6 +844,9 @@ var channelTargetConfigs = map[string]map[string]channelTargetConfig{
 			NormalizeNonstandardChatRoles: true,
 		},
 		ProviderQianfan: {
+			NormalizeNonstandardChatRoles: true,
+		},
+		ProviderXFyun: {
 			NormalizeNonstandardChatRoles: true,
 		},
 	},
@@ -942,6 +968,9 @@ var channelTargetConfigs = map[string]map[string]channelTargetConfig{
 			},
 			NormalizeNonstandardChatRoles: true,
 		},
+		ProviderXFyun: {
+			NormalizeNonstandardChatRoles: true,
+		},
 	},
 }
 
@@ -990,7 +1019,6 @@ func applyKimiPlanOverrides(config channelTargetConfig, target string, planID st
 
 	return config
 }
-
 
 func applyChannelTargetConfig(payload *ChannelPayload, config channelTargetConfig) {
 	payload.ModelMapping = maps.Clone(config.ModelMapping)

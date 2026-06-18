@@ -42,5 +42,7 @@ describe('quick input service type detection', () => {
     expect(parseQuickInput('https://openrouter.ai/api sk-key1234567890').detectedServiceType).toBe('claude')
     expect(parseQuickInput('https://openrouter.ai/api/v1 sk-key1234567890').detectedServiceType).toBe('openai')
     expect(parseQuickInput('https://api.kimi.com/coding/v1 sk-key1234567890').detectedServiceType).toBe('openai')
+    expect(parseQuickInput('https://maas-api.cn-huabei-1.xf-yun.com/anthropic sk-key1234567890').detectedServiceType).toBe('claude')
+    expect(parseQuickInput('https://maas-api.cn-huabei-1.xf-yun.com/v2 sk-key1234567890').detectedServiceType).toBe('openai')
   })
 })

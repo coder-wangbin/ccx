@@ -65,6 +65,7 @@ const presetOrder = [
   'minimax',
   'dashscope',
   'modelscope',
+  'xfyun',
   'tencent-lkeap',
   'volc-ark',
   'qianfan',

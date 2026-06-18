@@ -234,6 +234,7 @@ const detectServiceTypeAndCleanUrl = (
       'https://openrouter.ai/api',
       'https://api-inference.modelscope.cn',
       'https://api.easytransnote.com/coding',
+      'https://maas-api.cn-huabei-1.xf-yun.com/anthropic',
     ])
     const knownOpenAIUrls = new Set([
       'https://api.deepseek.com/v1',
@@ -258,6 +259,7 @@ const detectServiceTypeAndCleanUrl = (
       'https://openrouter.ai/api/v1',
       'https://api-inference.modelscope.cn/v1',
       'https://api.easytransnote.com/coding/v1',
+      'https://maas-api.cn-huabei-1.xf-yun.com/v2',
     ])
     if (knownClaudeUrls.has(urlKey)) {
       return { serviceType: 'claude', cleanedUrl: url }

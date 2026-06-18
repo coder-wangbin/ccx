@@ -463,6 +463,31 @@ func TestBuildPayload(t *testing.T) {
 			wantCodex:      true,
 			wantStripCodex: true,
 		},
+		{
+			name:           "xfyun messages (anthropic endpoint)",
+			req:            CreateChannelRequest{Provider: ProviderXFyun, Target: TargetMessages, APIKey: "xf-test"},
+			wantBaseURL:    "https://maas-api.cn-huabei-1.xf-yun.com/anthropic",
+			wantService:    "claude",
+			wantNoModelMap: true,
+		},
+		{
+			name:           "xfyun chat",
+			req:            CreateChannelRequest{Provider: ProviderXFyun, Target: TargetChat, APIKey: "xf-test"},
+			wantBaseURL:    "https://maas-api.cn-huabei-1.xf-yun.com/v2",
+			wantService:    "openai",
+			wantNormalize:  true,
+			wantNoModelMap: true,
+		},
+		{
+			name:           "xfyun responses",
+			req:            CreateChannelRequest{Provider: ProviderXFyun, Target: TargetResponses, APIKey: "xf-test"},
+			wantBaseURL:    "https://maas-api.cn-huabei-1.xf-yun.com/v2",
+			wantService:    "openai",
+			wantNormalize:  true,
+			wantCodex:      true,
+			wantStripCodex: true,
+			wantNoModelMap: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -593,6 +618,9 @@ func TestBestPlanForTarget(t *testing.T) {
 		{ProviderRunAPI, TargetMessages, "anthropic"},
 		{ProviderRunAPI, TargetChat, "openai-chat"},
 		{ProviderRunAPI, TargetResponses, "openai-chat"},
+		{ProviderXFyun, TargetMessages, "anthropic"},
+		{ProviderXFyun, TargetChat, "openai-chat"},
+		{ProviderXFyun, TargetResponses, "openai-chat"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.provider+"/"+tt.target, func(t *testing.T) {
