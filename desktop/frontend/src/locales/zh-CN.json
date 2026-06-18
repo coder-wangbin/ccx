@@ -530,7 +530,7 @@
   "orchestration.openWebsite": "访问网站",
   "orchestration.pause": "暂停",
   "orchestration.resume": "恢复",
-  "orchestration.promotion": "提升优先级",
+  "orchestration.promotion": "抢优先级 (5分钟)",
   "orchestration.delete": "删除渠道",
   "orchestration.resumeReset": "重置熔断器",
   "orchestration.moveTop": "置顶",

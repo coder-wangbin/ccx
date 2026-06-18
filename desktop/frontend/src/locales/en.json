@@ -530,7 +530,7 @@
   "orchestration.openWebsite": "Visit Website",
   "orchestration.pause": "Suspend",
   "orchestration.resume": "Resume",
-  "orchestration.promotion": "Promote",
+  "orchestration.promotion": "Boost priority (5 min)",
   "orchestration.delete": "Delete Channel",
   "orchestration.resumeReset": "Reset Circuit Breaker",
   "orchestration.moveTop": "Move to top",
