@@ -81,7 +81,7 @@ func applyClaudeReasoningEffort(bodyBytes []byte, upstream *config.UpstreamConfi
 func applyClaudeThinkingEffort(data map[string]interface{}, effort string) {
 	delete(data, "reasoning")
 	delete(data, "reasoning_effort")
-	syncClaudeOutputConfigEffort(data, effort)
+	stripClaudeOutputConfigEffort(data)
 
 	if effort == "off" || effort == "none" {
 		data["thinking"] = map[string]interface{}{"type": "disabled"}
@@ -98,21 +98,16 @@ func applyClaudeThinkingEffort(data map[string]interface{}, effort string) {
 	data["thinking"] = thinking
 }
 
-func syncClaudeOutputConfigEffort(data map[string]interface{}, effort string) {
+func stripClaudeOutputConfigEffort(data map[string]interface{}) {
 	outputConfig, ok := data["output_config"].(map[string]interface{})
 	if !ok {
 		return
 	}
 
-	if effort == "off" || effort == "none" {
-		delete(outputConfig, "effort")
-		if len(outputConfig) == 0 {
-			delete(data, "output_config")
-		}
-		return
+	delete(outputConfig, "effort")
+	if len(outputConfig) == 0 {
+		delete(data, "output_config")
 	}
-
-	outputConfig["effort"] = effort
 }
 
 const (

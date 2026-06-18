@@ -65,7 +65,7 @@ func TestClaudeProvider_InjectsReasoningEffortForRedirectedModel(t *testing.T) {
 		"model": "claude-opus-4-xhigh",
 		"messages": [{"role": "user", "content": "hi"}],
 		"thinking": {"type": "enabled", "effort": "xhigh", "budget_tokens": 32000},
-		"output_config": {"effort": "xhigh"},
+		"output_config": {"effort": "xhigh", "foo": "bar"},
 		"reasoning": {"effort": "xhigh"},
 		"reasoning_effort": "xhigh"
 	}`)
@@ -114,8 +114,11 @@ func TestClaudeProvider_InjectsReasoningEffortForRedirectedModel(t *testing.T) {
 	if !ok {
 		t.Fatalf("output_config = %#v, want object; body=%s", got["output_config"], string(reqBody))
 	}
-	if outputConfig["effort"] != "max" {
-		t.Fatalf("output_config.effort = %v, want max", outputConfig["effort"])
+	if _, exists := outputConfig["effort"]; exists {
+		t.Fatalf("output_config.effort should be removed when thinking.effort is used: %#v", outputConfig)
+	}
+	if outputConfig["foo"] != "bar" {
+		t.Fatalf("output_config should keep unrelated fields: %#v", outputConfig)
 	}
 }
 
