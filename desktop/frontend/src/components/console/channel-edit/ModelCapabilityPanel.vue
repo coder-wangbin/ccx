@@ -257,21 +257,18 @@ function removeRow(id: number) {
             </span>
             <div class="min-w-0 flex-1">
               <div class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-                <div class="min-w-0 max-w-full truncate font-mono text-xs font-bold text-foreground">
+                <div class="shrink-0 truncate font-mono text-xs font-bold text-foreground">
                   {{ row.model || t('addChannel.modelCapabilityModelPlaceholder') }}
                 </div>
                 <Badge
                   v-if="row.source === 'builtin' && row.matchedPattern"
                   variant="outline"
-                  class="min-w-0 max-w-full justify-start truncate rounded-md px-1.5 py-0 font-mono text-[10px] text-primary md:max-w-[50%] lg:max-w-[42%] xl:max-w-[48%]"
+                  class="min-w-0 max-w-full justify-start truncate rounded-md px-1.5 py-0 font-mono text-[10px] text-primary"
                 >
                   <span class="truncate">
                     {{ t('addChannel.modelCapabilityBuiltinMatched', { pattern: row.matchedPattern }) }}
                   </span>
                 </Badge>
-              </div>
-              <div v-if="row.displayName" class="truncate text-[10px] text-muted-foreground">
-                {{ row.displayName }}
               </div>
             </div>
           </div>
