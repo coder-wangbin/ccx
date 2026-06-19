@@ -351,6 +351,142 @@ func TestModelsHandler_MergesChatModels(t *testing.T) {
 	}
 }
 
+func TestModelsHandler_EnrichesInputModalitiesAndVisionFallback(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"object":"list","data":[{"id":"mimo-v2.5-pro","object":"model"}]}`))
+	}))
+	defer upstream.Close()
+
+	cfgManager := setupModelsConfigManager(t, config.Config{
+		Upstream: []config.UpstreamConfig{{
+			Name:                "mimo",
+			BaseURL:             upstream.URL,
+			APIKeys:             []string{"sk-mimo"},
+			ServiceType:         "claude",
+			ModelMapping:        map[string]string{"opus": "mimo-v2.5-pro"},
+			NoVisionModels:      []string{"mimo-v2.5-pro"},
+			VisionFallbackModel: "mimo-v2.5",
+		}},
+	})
+	sch := newModelsTestScheduler(cfgManager)
+	router := newModelsRouterForAggregate(&config.EnvConfig{ProxyAccessKey: "test-key"}, cfgManager, sch)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/models", nil)
+	req.Header.Set("Authorization", "Bearer test-key")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, body=%s", w.Code, w.Body.String())
+	}
+
+	var resp ModelsResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("解析响应失败: %v", err)
+	}
+
+	modelsByID := make(map[string]ModelEntry, len(resp.Data))
+	for _, model := range resp.Data {
+		modelsByID[model.ID] = model
+	}
+
+	pro, ok := modelsByID["mimo-v2.5-pro"]
+	if !ok {
+		t.Fatalf("缺少 noVision 模型: %#v", resp.Data)
+	}
+	if !sameStrings(pro.InputModalities, []string{"text"}) {
+		t.Fatalf("mimo-v2.5-pro input_modalities = %v, want [text]", pro.InputModalities)
+	}
+
+	opus, ok := modelsByID["opus"]
+	if !ok {
+		t.Fatalf("缺少请求模型别名 opus: %#v", resp.Data)
+	}
+	if !sameStrings(opus.InputModalities, []string{"text", "image"}) {
+		t.Fatalf("opus input_modalities = %v, want [text image]", opus.InputModalities)
+	}
+
+	fallback, ok := modelsByID["mimo-v2.5"]
+	if !ok {
+		t.Fatalf("缺少 vision fallback 模型: %#v", resp.Data)
+	}
+	if !sameStrings(fallback.InputModalities, []string{"text", "image"}) {
+		t.Fatalf("mimo-v2.5 input_modalities = %v, want [text image]", fallback.InputModalities)
+	}
+}
+
+func TestMergeModels_PreservesVisionWhenAnyChannelSupportsImage(t *testing.T) {
+	result := mergeModels(
+		[]ModelEntry{{
+			ID:              "model-shared",
+			Object:          "model",
+			InputModalities: []string{"text"},
+		}},
+		[]ModelEntry{{
+			ID:              "model-shared",
+			Object:          "model",
+			InputModalities: []string{"text", "image"},
+		}},
+	)
+
+	if len(result) != 1 {
+		t.Fatalf("结果数量 = %d, want 1", len(result))
+	}
+	if !sameStrings(result[0].InputModalities, []string{"text", "image"}) {
+		t.Fatalf("input_modalities = %v, want [text image]", result[0].InputModalities)
+	}
+}
+
+func TestEnrichModelModalitiesForUpstream_MappedModelNeedsVisionFallback(t *testing.T) {
+	upstream := &config.UpstreamConfig{
+		ModelMapping:   map[string]string{"alias-pro": "mimo-v2.5-pro"},
+		NoVisionModels: []string{"mimo-v2.5-pro"},
+	}
+
+	result := enrichModelModalitiesForUpstream([]ModelEntry{{ID: "alias-pro", Object: "model"}}, upstream)
+
+	alias := findModelEntry(result, "alias-pro")
+	if alias == nil {
+		t.Fatalf("缺少请求模型别名: %#v", result)
+	}
+	if !sameStrings(alias.InputModalities, []string{"text"}) {
+		t.Fatalf("alias-pro input_modalities = %v, want [text]", alias.InputModalities)
+	}
+
+	upstream.VisionFallbackModel = "mimo-v2.5"
+	result = enrichModelModalitiesForUpstream([]ModelEntry{{ID: "mimo-v2.5-pro", Object: "model"}}, upstream)
+
+	alias = findModelEntry(result, "alias-pro")
+	if alias == nil {
+		t.Fatalf("缺少请求模型别名: %#v", result)
+	}
+	if !sameStrings(alias.InputModalities, []string{"text", "image"}) {
+		t.Fatalf("alias-pro input_modalities = %v, want [text image]", alias.InputModalities)
+	}
+}
+
+func findModelEntry(models []ModelEntry, id string) *ModelEntry {
+	for i := range models {
+		if models[i].ID == id {
+			return &models[i]
+		}
+	}
+	return nil
+}
+
+func sameStrings(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
 func TestModelSortKey(t *testing.T) {
 	tests := []struct {
 		name     string

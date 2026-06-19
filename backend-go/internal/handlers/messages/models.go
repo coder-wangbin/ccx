@@ -33,10 +33,11 @@ type ModelsResponse struct {
 
 // ModelEntry 单个模型条目
 type ModelEntry struct {
-	ID      string `json:"id"`
-	Object  string `json:"object"`
-	Created int64  `json:"created"`
-	OwnedBy string `json:"owned_by"`
+	ID              string   `json:"id"`
+	Object          string   `json:"object"`
+	Created         int64    `json:"created"`
+	OwnedBy         string   `json:"owned_by"`
+	InputModalities []string `json:"input_modalities,omitempty"`
 }
 
 // ModelsHandler 处理 /v1/models 请求，从 Messages、Responses 和 Chat 渠道获取并合并模型列表
@@ -101,7 +102,7 @@ func ModelsDetailHandler(envCfg *config.EnvConfig, cfgManager *config.ConfigMana
 			scheduler.ChannelKindChat,
 			scheduler.ChannelKindGemini,
 		} {
-			if body, ok := tryModelsRequest(c, cfgManager, channelScheduler, "GET", "/"+modelID, kind); ok {
+			if body, _, ok := tryModelsRequest(c, cfgManager, channelScheduler, "GET", "/"+modelID, kind); ok {
 				c.Data(http.StatusOK, "application/json", body)
 				return
 			}
@@ -118,14 +119,14 @@ func ModelsDetailHandler(envCfg *config.EnvConfig, cfgManager *config.ConfigMana
 
 // fetchModelsFromChannels 从指定类型的渠道获取模型列表
 func fetchModelsFromChannels(c *gin.Context, cfgManager *config.ConfigManager, channelScheduler *scheduler.ChannelScheduler, kind scheduler.ChannelKind) []ModelEntry {
-	body, ok := tryModelsRequest(c, cfgManager, channelScheduler, "GET", "", kind)
+	body, upstream, ok := tryModelsRequest(c, cfgManager, channelScheduler, "GET", "", kind)
 	if !ok {
 		return nil
 	}
 
 	// Gemini 渠道或 serviceType=gemini 的渠道返回 {"models": [...]} 格式
 	if kind == scheduler.ChannelKindGemini {
-		return parseGeminiModelsResponse(body)
+		return enrichModelModalitiesForUpstream(parseGeminiModelsResponse(body), upstream)
 	}
 
 	// 尝试 OpenAI 格式解析
@@ -138,11 +139,122 @@ func fetchModelsFromChannels(c *gin.Context, cfgManager *config.ConfigManager, c
 	// 如果 data 为空，尝试 Gemini 格式（Responses 渠道中 serviceType=gemini 的情况）
 	if len(resp.Data) == 0 {
 		if geminiModels := parseGeminiModelsResponse(body); len(geminiModels) > 0 {
-			return geminiModels
+			return enrichModelModalitiesForUpstream(geminiModels, upstream)
 		}
 	}
 
-	return resp.Data
+	return enrichModelModalitiesForUpstream(resp.Data, upstream)
+}
+
+func enrichModelModalitiesForUpstream(models []ModelEntry, upstream *config.UpstreamConfig) []ModelEntry {
+	if upstream == nil {
+		return models
+	}
+
+	enriched := make([]ModelEntry, 0, len(models)+1)
+	seen := make(map[string]int, len(models)+1)
+	addOrUpdate := func(model ModelEntry) {
+		if model.ID == "" {
+			return
+		}
+		if idx, exists := seen[model.ID]; exists {
+			enriched[idx].InputModalities = mergeInputModalities(enriched[idx].InputModalities, model.InputModalities)
+			return
+		}
+		seen[model.ID] = len(enriched)
+		enriched = append(enriched, model)
+	}
+
+	for _, model := range models {
+		if _, isRequestModel := upstream.ModelMapping[model.ID]; isRequestModel {
+			model.InputModalities = inputModalitiesForRequestModel(upstream, model.ID)
+		} else {
+			model.InputModalities = inputModalitiesForActualModel(upstream, model.ID)
+		}
+		addOrUpdate(model)
+	}
+
+	for requestModel := range upstream.ModelMapping {
+		requestModel = strings.TrimSpace(requestModel)
+		if requestModel == "" {
+			continue
+		}
+		addOrUpdate(ModelEntry{
+			ID:              requestModel,
+			Object:          "model",
+			InputModalities: inputModalitiesForRequestModel(upstream, requestModel),
+		})
+	}
+
+	if fallback := strings.TrimSpace(upstream.VisionFallbackModel); fallback != "" && !upstream.NoVision {
+		addOrUpdate(ModelEntry{
+			ID:              fallback,
+			Object:          "model",
+			InputModalities: inputModalitiesForActualModel(upstream, fallback),
+		})
+	}
+
+	return enriched
+}
+
+func inputModalitiesForActualModel(upstream *config.UpstreamConfig, modelID string) []string {
+	if actualModelSupportsImageInput(upstream, modelID) {
+		return []string{"text", "image"}
+	}
+	return []string{"text"}
+}
+
+func inputModalitiesForRequestModel(upstream *config.UpstreamConfig, modelID string) []string {
+	if requestModelSupportsImageInput(upstream, modelID) {
+		return []string{"text", "image"}
+	}
+	return []string{"text"}
+}
+
+func requestModelSupportsImageInput(upstream *config.UpstreamConfig, modelID string) bool {
+	if upstream == nil || upstream.NoVision {
+		return false
+	}
+
+	actualModel := config.RedirectModel(modelID, upstream)
+	if actualModelSupportsImageInput(upstream, actualModel) {
+		return true
+	}
+
+	fallback := strings.TrimSpace(upstream.VisionFallbackModel)
+	return fallback != "" && actualModelSupportsImageInput(upstream, fallback)
+}
+
+func actualModelSupportsImageInput(upstream *config.UpstreamConfig, modelID string) bool {
+	if upstream == nil || upstream.NoVision {
+		return false
+	}
+
+	for _, noVisionModel := range upstream.NoVisionModels {
+		if noVisionModel == modelID {
+			return false
+		}
+	}
+	return true
+}
+
+func mergeInputModalities(a, b []string) []string {
+	if hasInputModality(a, "image") || hasInputModality(b, "image") {
+		return []string{"text", "image"}
+	}
+	if len(a) > 0 || len(b) > 0 {
+		return []string{"text"}
+	}
+	return nil
+}
+
+func hasInputModality(modalities []string, modality string) bool {
+	for _, item := range modalities {
+		if item == modality {
+			return true
+		}
+	}
+	return false
 }
 
 // parseGeminiModelsResponse 解析 Gemini 格式的模型列表响应
@@ -175,18 +287,18 @@ func modelSortKey(id string) string {
 
 	// Claude 原生模型排序（按能力从高到低）
 	claudeModels := map[string]string{
-		"claude-fable-5":                "001-fable",
-		"claude-mythos-5":               "002-mythos",
-		"claude-opus-4-8":               "003-opus-4-8",
-		"claude-opus-4-7":               "004-opus-4-7",
-		"claude-opus-4-6":               "005-opus-4-6",
-		"claude-sonnet-4-6":             "006-sonnet-4-6",
-		"claude-haiku-4-5-20251001":     "007-haiku-4-5",
-		"claude-3-5-sonnet-20241022":    "008-sonnet-3-5",
-		"claude-3-5-haiku-20241022":     "009-haiku-3-5",
-		"claude-3-opus-20240229":        "010-opus-3",
-		"claude-3-sonnet-20240229":      "011-sonnet-3",
-		"claude-3-haiku-20240307":       "012-haiku-3",
+		"claude-fable-5":             "001-fable",
+		"claude-mythos-5":            "002-mythos",
+		"claude-opus-4-8":            "003-opus-4-8",
+		"claude-opus-4-7":            "004-opus-4-7",
+		"claude-opus-4-6":            "005-opus-4-6",
+		"claude-sonnet-4-6":          "006-sonnet-4-6",
+		"claude-haiku-4-5-20251001":  "007-haiku-4-5",
+		"claude-3-5-sonnet-20241022": "008-sonnet-3-5",
+		"claude-3-5-haiku-20241022":  "009-haiku-3-5",
+		"claude-3-opus-20240229":     "010-opus-3",
+		"claude-3-sonnet-20240229":   "011-sonnet-3",
+		"claude-3-haiku-20240307":    "012-haiku-3",
 	}
 	if key, ok := claudeModels[lowerID]; ok {
 		return key
@@ -264,13 +376,15 @@ func modelSortKey(id string) string {
 
 // mergeModels 合并多个模型列表并去重（按 ID），然后按智能规则排序
 func mergeModels(modelLists ...[]ModelEntry) []ModelEntry {
-	seen := make(map[string]bool)
+	seen := make(map[string]int)
 	var result []ModelEntry
 
 	for _, models := range modelLists {
 		for _, m := range models {
-			if !seen[m.ID] {
-				seen[m.ID] = true
+			if idx, exists := seen[m.ID]; exists {
+				result[idx].InputModalities = mergeInputModalities(result[idx].InputModalities, m.InputModalities)
+			} else {
+				seen[m.ID] = len(result)
 				result = append(result, m)
 			}
 		}
@@ -285,7 +399,7 @@ func mergeModels(modelLists ...[]ModelEntry) []ModelEntry {
 }
 
 // tryModelsRequest 使用调度器选择渠道，按故障转移顺序尝试请求 models 端点
-func tryModelsRequest(c *gin.Context, cfgManager *config.ConfigManager, channelScheduler *scheduler.ChannelScheduler, method, suffix string, kind scheduler.ChannelKind) ([]byte, bool) {
+func tryModelsRequest(c *gin.Context, cfgManager *config.ConfigManager, channelScheduler *scheduler.ChannelScheduler, method, suffix string, kind scheduler.ChannelKind) ([]byte, *config.UpstreamConfig, bool) {
 	failedChannels := make(map[int]bool)
 	maxChannelRetries := 10 // 最多尝试 10 个渠道
 	channelType := channelKindLabel(kind)
@@ -363,7 +477,7 @@ func tryModelsRequest(c *gin.Context, cfgManager *config.ConfigManager, channelS
 				}
 				log.Printf("[%s-Models] 请求成功: method=%s, channel=%s, key=%s, url=%s, reason=%s",
 					channelType, method, upstream.Name, utils.MaskAPIKey(apiKey), candidateURL, selection.Reason)
-				return body, true
+				return body, upstream, true
 			}
 
 			// 401/403 认证失败不继续尝试其他候选 URL
@@ -385,7 +499,7 @@ func tryModelsRequest(c *gin.Context, cfgManager *config.ConfigManager, channelS
 	}
 
 	log.Printf("[%s-Models] 所有渠道均失败: method=%s, suffix=%s", channelType, method, suffix)
-	return nil, false
+	return nil, nil, false
 }
 
 func channelKindLabel(kind scheduler.ChannelKind) string {
