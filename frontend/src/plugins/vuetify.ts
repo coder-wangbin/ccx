@@ -195,6 +195,7 @@ import {
   mdiKeyRemove,
   mdiKeyAlert,
   mdiCashRemove,
+  mdiCashMultiple,
   mdiAccountSwitch,
   mdiChatOutline,
   mdiDragHorizontalVariant,
@@ -409,6 +410,7 @@ const iconMap: Record<string, string> = {
   'key-remove': mdiKeyRemove,
   'key-alert': mdiKeyAlert,
   'cash-remove': mdiCashRemove,
+  'cash-multiple': mdiCashMultiple,
 
   // 渠道配置
   'account-switch': mdiAccountSwitch,

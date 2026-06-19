@@ -144,8 +144,9 @@ const mappedTargetModels = computed(() => {
   return modelMappingRows.value
     .map(row => row.target.trim())
     .filter(model => {
-      if (!model || seen.has(model)) return false
-      seen.add(model)
+      const key = model.toLowerCase()
+      if (!model || seen.has(key)) return false
+      seen.add(key)
       return true
     })
 })
@@ -482,6 +483,7 @@ watch(() => props.channel, (ch) => {
   resetForm()
   if (ch) {
     populateFromChannel(ch)
+    syncModelCapabilitiesFromMapping()
     // 如果有模型映射配置，主动触发一次模型列表获取
     // 使用 nextTick 确保表单数据已填充完成
     if (ch.modelMapping && Object.keys(ch.modelMapping).length > 0) {
@@ -1589,10 +1591,11 @@ function syncModelCapabilitiesFromMapping() {
   const existingModels = new Set(
     modelCapabilityRows.value
       .map(row => row.model.trim())
+      .map(model => model.toLowerCase())
       .filter(Boolean)
   )
   const rowsToAdd = mappedTargetModels.value
-    .filter(model => !existingModels.has(model))
+    .filter(model => !existingModels.has(model.toLowerCase()))
     .map(model => {
       const builtin = resolveBuiltinUpstreamModelCapability(model)
       return createModelCapabilityRow(

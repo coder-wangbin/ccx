@@ -250,26 +250,30 @@ function removeRow(id: number) {
         :key="row.id"
         class="overflow-hidden rounded-lg border border-border/60 bg-background/70 shadow-2xs"
       >
-        <div class="flex items-center justify-between gap-3 border-b border-border/50 bg-muted/30 px-3 py-2">
-          <div class="flex min-w-0 items-center gap-2">
+        <div class="flex items-start justify-between gap-3 border-b border-border/50 bg-muted/30 px-3 py-2">
+          <div class="flex min-w-0 items-start gap-2">
             <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-primary/20 bg-primary/10 text-xs font-bold text-primary">
               {{ modelInitial(row) }}
             </span>
-            <div class="min-w-0">
-              <div class="truncate font-mono text-xs font-bold text-foreground">
-                {{ row.model || t('addChannel.modelCapabilityModelPlaceholder') }}
+            <div class="min-w-0 flex-1">
+              <div class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+                <div class="min-w-0 max-w-full truncate font-mono text-xs font-bold text-foreground">
+                  {{ row.model || t('addChannel.modelCapabilityModelPlaceholder') }}
+                </div>
+                <Badge
+                  v-if="row.source === 'builtin' && row.matchedPattern"
+                  variant="outline"
+                  class="min-w-0 max-w-full justify-start truncate rounded-md px-1.5 py-0 font-mono text-[10px] text-primary md:max-w-[50%] lg:max-w-[42%] xl:max-w-[48%]"
+                >
+                  <span class="truncate">
+                    {{ t('addChannel.modelCapabilityBuiltinMatched', { pattern: row.matchedPattern }) }}
+                  </span>
+                </Badge>
               </div>
               <div v-if="row.displayName" class="truncate text-[10px] text-muted-foreground">
                 {{ row.displayName }}
               </div>
             </div>
-            <Badge
-              v-if="row.source === 'builtin' && row.matchedPattern"
-              variant="outline"
-              class="max-w-56 truncate text-primary"
-            >
-              {{ t('addChannel.modelCapabilityBuiltinMatched', { pattern: row.matchedPattern }) }}
-            </Badge>
           </div>
           <Button
             type="button"
@@ -378,7 +382,7 @@ function removeRow(id: number) {
                     <input
                       :list="reasoningDatalistId"
                       class="min-w-20 flex-1 border-0 bg-transparent font-mono text-xs outline-none placeholder:text-muted-foreground"
-                      placeholder="high, max"
+                      :placeholder="reasoningEfforts(row).length ? '' : 'high, max'"
                       @input="handleReasoningInput(row, $event)"
                       @keydown="handleReasoningKeydown(row, $event)"
                       @blur="(event) => { addReasoningEffort(row, (event.target as HTMLInputElement).value); (event.target as HTMLInputElement).value = '' }"
