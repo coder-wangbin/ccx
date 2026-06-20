@@ -251,6 +251,12 @@ func (u *UpstreamConfig) Clone() *UpstreamConfig {
 		cloned.APIKeys = make([]string, len(u.APIKeys))
 		copy(cloned.APIKeys, u.APIKeys)
 	}
+	if u.APIKeyConfigs != nil {
+		cloned.APIKeyConfigs = make([]APIKeyConfig, len(u.APIKeyConfigs))
+		for i, cfg := range u.APIKeyConfigs {
+			cloned.APIKeyConfigs[i] = cloneAPIKeyConfig(cfg)
+		}
+	}
 	if u.HistoricalAPIKeys != nil {
 		cloned.HistoricalAPIKeys = make([]string, len(u.HistoricalAPIKeys))
 		copy(cloned.HistoricalAPIKeys, u.HistoricalAPIKeys)
@@ -327,6 +333,21 @@ func applyModelCapabilityUpdates(upstream *UpstreamConfig, updates UpstreamUpdat
 	if updates.AllowUnknownContext != nil {
 		upstream.AllowUnknownContext = *updates.AllowUnknownContext
 	}
+}
+
+func cloneAPIKeyConfig(cfg APIKeyConfig) APIKeyConfig {
+	if cfg.Enabled != nil {
+		v := *cfg.Enabled
+		cfg.Enabled = &v
+	}
+	if cfg.RateLimitAutoFromHeaders != nil {
+		v := *cfg.RateLimitAutoFromHeaders
+		cfg.RateLimitAutoFromHeaders = &v
+	}
+	if cfg.Models != nil {
+		cfg.Models = append([]string(nil), cfg.Models...)
+	}
+	return cfg
 }
 
 func cloneAgentModelProfile(profile AgentModelProfile) AgentModelProfile {

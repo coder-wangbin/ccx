@@ -34,6 +34,8 @@ func TestUpdateUpstream_BaseURLConsistency(t *testing.T) {
 	if err != nil {
 		t.Fatalf("初始化配置管理器失败: %v", err)
 	}
+	// 关闭配置监听，避免 watcher 并发与测试 log 重定向竞态。
+	cm.CloseWatcher()
 	defer cm.Close()
 
 	tests := []struct {
@@ -853,6 +855,8 @@ func TestUpdateGeminiUpstream_AdvancedOptions(t *testing.T) {
 	if err != nil {
 		t.Fatalf("初始化配置管理器失败: %v", err)
 	}
+	// 关闭配置监听，避免 watcher 并发与测试 log 重定向竞态。
+	cm.CloseWatcher()
 	defer cm.Close()
 
 	_, err = cm.UpdateGeminiUpstream(0, UpstreamUpdate{

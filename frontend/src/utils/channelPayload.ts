@@ -40,6 +40,7 @@ export interface ChannelFormLike {
   passbackThinkingBlocks: boolean
   description: string
   apiKeys: string[]
+  apiKeyConfigs?: Channel['apiKeyConfigs']
   modelMapping: Record<string, SelectableString>
   modelCapabilitiesText?: string
   modelCapabilityRows?: ModelCapabilityRow[]
@@ -334,7 +335,17 @@ export function normalizeSelectableString(value: SelectableString): string {
 }
 
 export function buildChannelPayload(form: ChannelFormLike): Omit<Channel, 'index' | 'latency' | 'status'> {
-  const processedApiKeys = form.apiKeys.filter(key => key.trim())
+  const processedApiKeys = form.apiKeys.map(key => key.trim()).filter(Boolean)
+  const processedApiKeySet = new Set(processedApiKeys)
+  const processedApiKeyConfigs = (form.apiKeyConfigs || [])
+    .filter(cfg => cfg?.key && processedApiKeySet.has(cfg.key.trim()))
+    .map(cfg => ({
+      ...cfg,
+      key: cfg.key.trim(),
+      name: cfg.name?.trim() || undefined,
+      quotaGroup: cfg.quotaGroup?.trim() || undefined,
+      models: Array.isArray(cfg.models) ? cfg.models.map(model => model.trim()).filter(Boolean) : undefined,
+    }))
   const advancedOptions = normalizeAdvancedChannelOptions(form.serviceType, {
     reasoningMapping: form.reasoningMapping,
     reasoningParamStyle: form.reasoningParamStyle,
@@ -406,6 +417,10 @@ export function buildChannelPayload(form: ChannelFormLike): Omit<Channel, 'index
   channelData.historicalImageTurnLimit = Number.isInteger(historicalImageTurnLimit) && historicalImageTurnLimit > 0
     ? historicalImageTurnLimit
     : 0
+
+  if (form.apiKeyConfigs !== undefined) {
+    channelData.apiKeyConfigs = processedApiKeyConfigs
+  }
 
   if (deduplicatedUrls.length > 1) {
     channelData.baseUrls = deduplicatedUrls

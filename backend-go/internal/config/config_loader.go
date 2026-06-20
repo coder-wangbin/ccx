@@ -27,6 +27,7 @@ func NewConfigManager(configFile string, backupDir string) (*ConfigManager, erro
 		keyRecoveryTime: keyRecoveryTime,
 		maxFailureCount: maxFailureCount,
 		stopChan:        make(chan struct{}),
+		reloadCh:        make(chan struct{}, 1),
 	}
 
 	// 加载配置
@@ -598,11 +599,10 @@ func (cm *ConfigManager) startWatcher() error {
 					return
 				}
 				if event.Op&fsnotify.Write == fsnotify.Write {
-					log.Printf("[Config-Watcher] 检测到配置文件变化，重载配置...")
-					if err := cm.loadConfig(); err != nil {
-						log.Printf("[Config-Watcher] 警告: 配置重载失败: %v", err)
-					} else {
-						log.Printf("[Config-Watcher] 配置已重载")
+					// watcher 回调只发送重载信号，避免后台 goroutine 调用 log 导致测试中的 log 重定向竞态。
+					select {
+					case cm.reloadCh <- struct{}{}:
+					default:
 					}
 				}
 			case err, ok := <-watcher.Errors:
@@ -614,7 +614,42 @@ func (cm *ConfigManager) startWatcher() error {
 		}
 	}()
 
+	cm.backgroundWG.Add(1)
+	go func() {
+		defer cm.backgroundWG.Done()
+		for {
+			select {
+			case <-cm.stopChan:
+				return
+			case <-cm.reloadCh:
+				time.Sleep(100 * time.Millisecond)
+				if err := cm.loadConfig(); err != nil {
+					log.Printf("[Config-Watcher] 警告: 配置重载失败: %v", err)
+				} else {
+					log.Printf("[Config-Watcher] 配置已重载")
+				}
+			}
+		}
+	}()
+
 	return watcher.Add(cm.configFile)
+}
+
+// CloseWatcher 关闭配置文件监听并等待后台 goroutine 退出。
+// 调用后不能再调用 Close 中的 stopChan close，所以同时标记 stopChan 已关闭。
+func (cm *ConfigManager) CloseWatcher() {
+	if cm == nil {
+		return
+	}
+	cm.closeOnce.Do(func() {
+		if cm.stopChan != nil {
+			close(cm.stopChan)
+		}
+		if cm.watcher != nil {
+			_ = cm.watcher.Close()
+		}
+		cm.backgroundWG.Wait()
+	})
 }
 
 // Close 关闭 ConfigManager 并释放资源（幂等，可安全多次调用）

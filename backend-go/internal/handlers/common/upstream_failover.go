@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/BenedictKing/ccx/internal/config"
+	"github.com/BenedictKing/ccx/internal/keypool"
 	"github.com/BenedictKing/ccx/internal/metrics"
 	"github.com/BenedictKing/ccx/internal/providers"
 	"github.com/BenedictKing/ccx/internal/scheduler"
@@ -114,6 +115,7 @@ func TryUpstreamWithAllKeys(
 
 	var lastFailoverError *FailoverError
 	deprioritizeCandidates := make(map[string]bool)
+	failedQuotaGroups := make(map[string]bool)
 	probeAcquired := make(map[string]bool)
 	// 当前持有的限速并发信号量释放函数（兜底：函数任意路径返回时释放，避免泄漏）
 	var activeRateLimitRelease func()
@@ -196,7 +198,7 @@ func TryUpstreamWithAllKeys(
 			RestoreRequestBody(c, attemptBody)
 			c.Set("requestBodyBytes", attemptBody)
 
-			apiKey, err := nextAPIKey(upstream, failedKeys)
+			selection, apiKey, err := selectAttemptAPIKey(upstream, failedKeys, failedQuotaGroups, nextAPIKey)
 			if err != nil {
 				lastError = err
 				break // 当前 BaseURL 没有可用 Key，尝试下一个 BaseURL
@@ -229,19 +231,41 @@ func TryUpstreamWithAllKeys(
 			upstreamCopy := upstream.Clone()
 			upstreamCopy.BaseURL = currentBaseURL
 
-			// 主动限速：在构建/发送请求前获取许可（令牌桶 + 并发信号量）
+			// 主动限速：在构建/发送请求前获取许可（渠道级 + Key/Quota scope）
 			if rateLimitMgr := channelScheduler.GetRateLimitManager(); rateLimitMgr != nil {
-				limiter := rateLimitMgr.Get(apiType, channelIndex)
-				if limiter != nil {
-					const maxRateLimitWait = 10 * time.Second
+				const maxRateLimitWait = 10 * time.Second
+				releases := make([]func(), 0, 2)
+				if limiter := rateLimitMgr.Get(apiType, channelIndex); limiter != nil {
 					release, rlErr := limiter.Acquire(c.Request.Context(), maxRateLimitWait, time.Now())
 					if rlErr != nil {
 						lastError = rlErr
-						RequestLogf(c, "[%s-RateLimit] 请求被限速器拦截: %v，尝试下一个 Key/渠道", apiType, rlErr)
+						RequestLogf(c, "[%s-RateLimit] 渠道限速器拦截: %v，尝试下一个 Key/渠道", apiType, rlErr)
 						failedKeys[apiKey] = true
 						continue
 					}
-					activeRateLimitRelease = release
+					releases = append(releases, release)
+				}
+				if selection.LimiterScope != "" {
+					keyLimiter := rateLimitMgr.GetOrCreateScoped(apiType, channelIndex, selection.LimiterScope, keypool.ConfigForCandidate(*upstream, selection.Config))
+					release, rlErr := keyLimiter.Acquire(c.Request.Context(), maxRateLimitWait, time.Now())
+					if rlErr != nil {
+						lastError = rlErr
+						RequestLogf(c, "[%s-RateLimit] Key/Quota 限速器拦截: scope=%s, err=%v，尝试下一个 Key/渠道", apiType, selection.LimiterScope, rlErr)
+						failedKeys[apiKey] = true
+						if selection.QuotaGroup != "" {
+							failedQuotaGroups[selection.QuotaGroup] = true
+						}
+						for i := len(releases) - 1; i >= 0; i-- {
+							releases[i]()
+						}
+						continue
+					}
+					releases = append(releases, release)
+				}
+				activeRateLimitRelease = func() {
+					for i := len(releases) - 1; i >= 0; i-- {
+						releases[i]()
+					}
 				}
 			}
 
@@ -306,8 +330,14 @@ func TryUpstreamWithAllKeys(
 
 			// 学习上游限流头：动态调整限速器状态（cooldown 等）
 			if rateLimitMgr := channelScheduler.GetRateLimitManager(); rateLimitMgr != nil {
+				now := time.Now()
 				if limiter := rateLimitMgr.Get(apiType, channelIndex); limiter != nil {
-					limiter.ApplyUpstreamHints(resp.Header, resp.StatusCode, time.Now())
+					limiter.ApplyUpstreamHints(resp.Header, resp.StatusCode, now)
+				}
+				if selection.LimiterScope != "" {
+					if limiter := rateLimitMgr.GetScoped(apiType, channelIndex, selection.LimiterScope); limiter != nil {
+						limiter.ApplyUpstreamHints(resp.Header, resp.StatusCode, now)
+					}
 				}
 			}
 
@@ -361,6 +391,9 @@ func TryUpstreamWithAllKeys(
 
 					if isQuotaRelated {
 						deprioritizeCandidates[apiKey] = true
+						if selection.QuotaGroup != "" {
+							failedQuotaGroups[selection.QuotaGroup] = true
+						}
 					}
 					if IsUpstreamAccountPoolUnavailable(respBodyBytes) {
 						channelScheduler.MarkChannelCooldown(kind, channelIndex, upstreamAccountPoolCooldown)
@@ -482,4 +515,34 @@ func BuildDefaultURLResults(urls []string) []warmup.URLLatencyResult {
 		}
 	}
 	return results
+}
+
+func selectAttemptAPIKey(upstream *config.UpstreamConfig, failedKeys map[string]bool, failedQuotaGroups map[string]bool, fallback NextAPIKeyFunc) (keypool.Selection, string, error) {
+	if !keypool.HasEffectiveConfig(upstream) {
+		if fallback == nil {
+			return keypool.Selection{}, "", fmt.Errorf("上游 %s 没有可用的API密钥", upstream.Name)
+		}
+		apiKey, err := fallback(upstream, failedKeys)
+		if err != nil {
+			return keypool.Selection{}, "", err
+		}
+		return keypool.Selection{APIKey: apiKey}, apiKey, nil
+	}
+
+	for _, candidate := range keypool.Candidates(upstream, failedKeys) {
+		if candidate.QuotaGroup != "" && failedQuotaGroups[candidate.QuotaGroup] {
+			continue
+		}
+		selection := keypool.Selection{
+			APIKey:         candidate.APIKey,
+			CredentialID:   candidate.Scope,
+			CredentialName: candidate.Config.Name,
+			QuotaGroup:     candidate.QuotaGroup,
+			LimiterScope:   candidate.Scope,
+			Config:         candidate.Config,
+		}
+		return selection, candidate.APIKey, nil
+	}
+
+	return keypool.Selection{}, "", fmt.Errorf("上游 %s 没有可用的API密钥", upstream.Name)
 }

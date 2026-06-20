@@ -110,6 +110,7 @@ func (cm *ConfigManager) AddImagesUpstream(upstream UpstreamConfig) error {
 
 	// 去重 API Keys 和 Base URLs
 	upstream.APIKeys = deduplicateStrings(upstream.APIKeys)
+	upstream.APIKeyConfigs = normalizeAPIKeyConfigs(upstream.APIKeys, upstream.APIKeyConfigs)
 	upstream.BaseURL = utils.CanonicalBaseURL(upstream.BaseURL, upstream.ServiceType)
 	upstream.BaseURLs = deduplicateBaseURLs(upstream.BaseURLs, upstream.ServiceType)
 
@@ -217,6 +218,11 @@ func (cm *ConfigManager) UpdateImagesUpstream(index int, updates UpstreamUpdate)
 			}
 		}
 		upstream.APIKeys = deduplicateStrings(updates.APIKeys)
+	}
+	if updates.APIKeyConfigs != nil {
+		upstream.APIKeyConfigs = normalizeAPIKeyConfigs(upstream.APIKeys, updates.APIKeyConfigs)
+	} else if updates.APIKeys != nil {
+		upstream.APIKeyConfigs = normalizeAPIKeyConfigs(upstream.APIKeys, upstream.APIKeyConfigs)
 	}
 	if updates.ModelMapping != nil {
 		upstream.ModelMapping = updates.ModelMapping

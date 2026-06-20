@@ -20,6 +20,7 @@ type UpstreamConfig struct {
 	BaseURL             string                             `json:"baseUrl"`
 	BaseURLs            []string                           `json:"baseUrls,omitempty"` // 多 BaseURL 支持（failover 模式）
 	APIKeys             []string                           `json:"apiKeys"`
+	APIKeyConfigs       []APIKeyConfig                     `json:"apiKeyConfigs,omitempty"`     // API Key 附加配置（限速、权重、配额组等），通过 Key 关联 APIKeys
 	HistoricalAPIKeys   []string                           `json:"historicalApiKeys,omitempty"` // 历史 API Key（用于统计聚合，换 Key 后保留旧 Key 的统计数据）
 	DisabledAPIKeys     []DisabledKeyInfo                  `json:"disabledApiKeys,omitempty"`   // 被拉黑的 API Key（持久化，需手动恢复）
 	ServiceType         string                             `json:"serviceType"`                 // gemini, openai, claude
@@ -101,13 +102,28 @@ type UpstreamConfig struct {
 	CompactModel string `json:"compactModel,omitempty"` // 本地 compact 时使用的上游模型名（不经过 modelMapping，为空则使用原始请求的模型）
 }
 
+// APIKeyConfig 描述单个 API Key 的附加调度配置。
+type APIKeyConfig struct {
+	Key                      string   `json:"key"`
+	Name                     string   `json:"name,omitempty"`
+	Enabled                  *bool    `json:"enabled,omitempty"`
+	QuotaGroup               string   `json:"quotaGroup,omitempty"`
+	RateLimitRPM             int      `json:"rateLimitRpm,omitempty"`
+	RateLimitWindowMinutes   int      `json:"rateLimitWindowMinutes,omitempty"`
+	RateLimitMaxConcurrent   int      `json:"rateLimitMaxConcurrent,omitempty"`
+	RateLimitAutoFromHeaders *bool    `json:"rateLimitAutoFromHeaders,omitempty"`
+	Weight                   int      `json:"weight,omitempty"`
+	Models                   []string `json:"models,omitempty"`
+}
+
 // DisabledKeyInfo 被拉黑的 API Key 信息
 type DisabledKeyInfo struct {
-	Key        string `json:"key"`
-	Reason     string `json:"reason"`              // "authentication_error" / "permission_error" / "insufficient_balance"
-	Message    string `json:"message"`             // 原始错误信息
-	DisabledAt string `json:"disabledAt"`          // ISO8601 时间戳
-	RecoverAt  string `json:"recoverAt,omitempty"` // 自动恢复时间（可选）
+	Key        string        `json:"key"`
+	Reason     string        `json:"reason"`              // "authentication_error" / "permission_error" / "insufficient_balance"
+	Message    string        `json:"message"`             // 原始错误信息
+	DisabledAt string        `json:"disabledAt"`          // ISO8601 时间戳
+	RecoverAt  string        `json:"recoverAt,omitempty"` // 自动恢复时间（可选）
+	Config     *APIKeyConfig `json:"config,omitempty"`    // 拉黑前的 key 配置快照，restore 时恢复
 }
 
 // AgentModelProfile 描述下游 agent 模型的上下文管理语义。
@@ -158,6 +174,95 @@ type ContextRoutingConfig struct {
 }
 
 // IsAutoRecoverableDisabledReason 判断是否属于可自动恢复的拉黑原因。
+func normalizeAPIKeyConfigs(apiKeys []string, configs []APIKeyConfig) []APIKeyConfig {
+	keys := deduplicateStrings(apiKeys)
+	if len(keys) == 0 && len(configs) == 0 {
+		return nil
+	}
+
+	byKey := make(map[string]APIKeyConfig, len(configs))
+	for _, cfg := range configs {
+		key := strings.TrimSpace(cfg.Key)
+		if key == "" {
+			continue
+		}
+		cfg.Key = key
+		cfg.Name = strings.TrimSpace(cfg.Name)
+		cfg.QuotaGroup = strings.TrimSpace(cfg.QuotaGroup)
+		byKey[key] = cfg
+	}
+
+	normalized := make([]APIKeyConfig, 0, len(keys))
+	for _, key := range keys {
+		if cfg, ok := byKey[key]; ok {
+			normalized = append(normalized, cfg)
+		} else {
+			normalized = append(normalized, APIKeyConfig{Key: key})
+		}
+		delete(byKey, key)
+	}
+	// 保留已知但不在 active APIKeys 中的 key 配置，避免 blacklist/restore 丢失 quota/rpm 语义。
+	for _, cfg := range byKey {
+		normalized = append(normalized, cfg)
+	}
+	return normalized
+}
+
+// NormalizeAPIKeyConfigsForView 按 apiKeys 顺序返回规范化后的 Key 附加配置。
+// 注意：返回切片可能共享 upstream.APIKeyConfigs 的底层存储；调用方不应在可能并发修改上游配置的场景下使用。
+func NormalizeAPIKeyConfigsForView(upstream UpstreamConfig) []APIKeyConfig {
+	full := normalizeAPIKeyConfigs(upstream.APIKeys, upstream.APIKeyConfigs)
+	out := make([]APIKeyConfig, 0, len(full))
+	for _, cfg := range full {
+		if isAPIKeyConfigEffective(cfg) {
+			out = append(out, cfg)
+		}
+	}
+	return out
+}
+
+// isAPIKeyConfigEffective 判断 key 配置是否包含有效运行时语义，避免 view 层把默认空白配置一并返回。
+func isAPIKeyConfigEffective(cfg APIKeyConfig) bool {
+	if cfg.Enabled != nil {
+		return true
+	}
+	if cfg.Name != "" || cfg.QuotaGroup != "" {
+		return true
+	}
+	if cfg.RateLimitRPM > 0 || cfg.RateLimitWindowMinutes > 0 || cfg.RateLimitMaxConcurrent > 0 {
+		return true
+	}
+	if cfg.RateLimitAutoFromHeaders != nil {
+		return true
+	}
+	if cfg.Weight > 0 || len(cfg.Models) > 0 {
+		return true
+	}
+	return false
+}
+
+// restoreAPIKeyConfig 将已保存的 key 配置合并回 configs 列表，或用默认值补齐。
+func restoreAPIKeyConfig(configs []APIKeyConfig, key string, saved *APIKeyConfig) []APIKeyConfig {
+	if saved != nil {
+		found := false
+		for i, cfg := range configs {
+			if cfg.Key == key {
+				configs[i] = *saved
+				configs[i].Key = key
+				found = true
+				break
+			}
+		}
+		if !found {
+			copyCfg := *saved
+			copyCfg.Key = key
+			configs = append(configs, copyCfg)
+		}
+		return configs
+	}
+	return normalizeAPIKeyConfigs([]string{key}, configs)
+}
+
 func IsAutoRecoverableDisabledReason(reason string) bool {
 	reason = strings.ToLower(strings.TrimSpace(reason))
 	switch reason {
@@ -243,6 +348,7 @@ type UpstreamUpdate struct {
 	BaseURL                       *string                            `json:"baseUrl"`
 	BaseURLs                      []string                           `json:"baseUrls"`
 	APIKeys                       []string                           `json:"apiKeys"`
+	APIKeyConfigs                 []APIKeyConfig                     `json:"apiKeyConfigs"`
 	Description                   *string                            `json:"description"`
 	Website                       *string                            `json:"website"`
 	InsecureSkipVerify            *bool                              `json:"insecureSkipVerify"`
@@ -377,6 +483,7 @@ type ConfigManager struct {
 	keyRecoveryTime       time.Duration
 	maxFailureCount       int
 	stopChan              chan struct{} // 用于通知 goroutine 停止
+	reloadCh              chan struct{} // 配置文件变化信号，由 watcher 发送、单独 goroutine 消费
 	closeOnce             sync.Once     // 确保 Close 只执行一次
 	backgroundWG          sync.WaitGroup
 	configChangeCallbacks []func(Config)
@@ -797,6 +904,7 @@ func (cm *ConfigManager) BlacklistKey(apiType string, channelIndex int, apiKey s
 
 	// 从 APIKeys 中移除
 	upstream.APIKeys = append(upstream.APIKeys[:keyIdx], upstream.APIKeys[keyIdx+1:]...)
+	upstream.APIKeyConfigs = normalizeAPIKeyConfigs(upstream.APIKeys, upstream.APIKeyConfigs)
 
 	// 添加到 DisabledAPIKeys
 	disabledAt := time.Now().Format(time.RFC3339)
@@ -804,12 +912,21 @@ func (cm *ConfigManager) BlacklistKey(apiType string, channelIndex int, apiKey s
 	if IsAutoRecoverableDisabledReason(reason) {
 		recoverAt = time.Now().Add(time.Hour).Format(time.RFC3339)
 	}
+	var disabledCfg *APIKeyConfig
+	for _, cfg := range upstream.APIKeyConfigs {
+		if cfg.Key == apiKey {
+			copyCfg := cfg
+			disabledCfg = &copyCfg
+			break
+		}
+	}
 	upstream.DisabledAPIKeys = append(upstream.DisabledAPIKeys, DisabledKeyInfo{
 		Key:        apiKey,
 		Reason:     reason,
 		Message:    message,
 		DisabledAt: disabledAt,
 		RecoverAt:  recoverAt,
+		Config:     disabledCfg,
 	})
 
 	// 同时添加到 HistoricalAPIKeys（保留统计数据）
@@ -970,10 +1087,12 @@ func (cm *ConfigManager) RestoreKey(apiType string, channelIndex int, apiKey str
 		return fmt.Errorf("Key %s 不在拉黑列表中", utils.MaskAPIKey(apiKey))
 	}
 
+	savedCfg := upstream.DisabledAPIKeys[disabledIdx].Config
 	upstream.DisabledAPIKeys = append(upstream.DisabledAPIKeys[:disabledIdx], upstream.DisabledAPIKeys[disabledIdx+1:]...)
 	if !slices.Contains(upstream.APIKeys, apiKey) {
 		upstream.APIKeys = append(upstream.APIKeys, apiKey)
 	}
+	upstream.APIKeyConfigs = restoreAPIKeyConfig(upstream.APIKeyConfigs, apiKey, savedCfg)
 
 	// 从 HistoricalAPIKeys 移除，避免 active∩historical 重复导致统计重复计数
 	upstream.HistoricalAPIKeys = slices.DeleteFunc(upstream.HistoricalAPIKeys, func(k string) bool {
@@ -1008,9 +1127,14 @@ func (cm *ConfigManager) RestoreAllKeys(apiType string, channelIndex int) (int, 
 	}
 
 	// 将所有被拉黑的 Key 移回活跃列表
+	savedConfigs := make(map[string]*APIKeyConfig, restoredCount)
 	for _, dk := range upstream.DisabledAPIKeys {
 		if !slices.Contains(upstream.APIKeys, dk.Key) {
 			upstream.APIKeys = append(upstream.APIKeys, dk.Key)
+		}
+		if dk.Config != nil {
+			copyCfg := *dk.Config
+			savedConfigs[dk.Key] = &copyCfg
 		}
 		// 从 HistoricalAPIKeys 移除，避免 active∩historical 重复
 		upstream.HistoricalAPIKeys = slices.DeleteFunc(upstream.HistoricalAPIKeys, func(k string) bool {
@@ -1020,6 +1144,11 @@ func (cm *ConfigManager) RestoreAllKeys(apiType string, channelIndex int) (int, 
 		cacheKey := failedKeyCacheKey(apiType, dk.Key)
 		delete(cm.failedKeysCache, cacheKey)
 	}
+
+	for _, cfg := range savedConfigs {
+		upstream.APIKeyConfigs = restoreAPIKeyConfig(upstream.APIKeyConfigs, cfg.Key, cfg)
+	}
+	upstream.APIKeyConfigs = normalizeAPIKeyConfigs(upstream.APIKeys, upstream.APIKeyConfigs)
 
 	log.Printf("[%s-Blacklist] 渠道 [%d] %s 的 %d 个 Key 已全部恢复", apiType, channelIndex, upstream.Name, restoredCount)
 	upstream.DisabledAPIKeys = nil
@@ -1074,6 +1203,7 @@ func (cm *ConfigManager) RestoreDisabledKeys(apiType string, channelIndex int, k
 	}
 
 	upstream.DisabledAPIKeys = newDisabled
+	upstream.APIKeyConfigs = normalizeAPIKeyConfigs(upstream.APIKeys, upstream.APIKeyConfigs)
 	log.Printf("[%s-Blacklist] 渠道 [%d] %s 自动恢复了 %d 个 Key", apiType, channelIndex, upstream.Name, len(restored))
 	if err := cm.saveConfigLocked(cm.config); err != nil {
 		return nil, err

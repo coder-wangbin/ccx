@@ -50,6 +50,19 @@ export interface DisabledKeyInfo {
   disabledAt: string  // ISO8601 时间戳
 }
 
+export interface APIKeyConfig {
+  key: string
+  name?: string
+  enabled?: boolean
+  quotaGroup?: string
+  rateLimitRpm?: number
+  rateLimitWindowMinutes?: number
+  rateLimitMaxConcurrent?: number
+  rateLimitAutoFromHeaders?: boolean
+  weight?: number
+  models?: string[]
+}
+
 export interface UpstreamModelCapability {
   contextWindowTokens?: number
   maxOutputTokens?: number
@@ -80,6 +93,7 @@ export interface Channel {
   baseUrl: string
   baseUrls?: string[]                // 多 BaseURL 支持（failover 模式）
   apiKeys: string[]
+  apiKeyConfigs?: APIKeyConfig[]
   disabledApiKeys?: DisabledKeyInfo[]  // 被拉黑的 API Key
   historicalApiKeys?: string[]
   description?: string

@@ -24,6 +24,10 @@ func limiterKey(apiType string, channelIndex int) string {
 	return fmt.Sprintf("%s:%d", apiType, channelIndex)
 }
 
+func scopedLimiterKey(apiType string, channelIndex int, scope string) string {
+	return fmt.Sprintf("%s:%d:%s", apiType, channelIndex, scope)
+}
+
 // GetOrCreate 获取或创建指定渠道的 limiter。如果已存在则更新配置。
 func (m *Manager) GetOrCreate(apiType string, channelIndex int, cfg Config) *ChannelLimiter {
 	key := limiterKey(apiType, channelIndex)
@@ -63,6 +67,56 @@ func (m *Manager) Get(apiType string, channelIndex int) *ChannelLimiter {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	return m.limiters[key]
+}
+
+// GetOrCreateScoped 获取或创建指定渠道下某个 scope 的 limiter。scope 应使用 credential ID/hash 或 quota group，不能使用明文 API Key。
+func (m *Manager) GetOrCreateScoped(apiType string, channelIndex int, scope string, cfg Config) *ChannelLimiter {
+	if scope == "" {
+		return m.GetOrCreate(apiType, channelIndex, cfg)
+	}
+	key := scopedLimiterKey(apiType, channelIndex, scope)
+
+	m.mu.RLock()
+	if l, ok := m.limiters[key]; ok {
+		m.mu.RUnlock()
+		l.UpdateConfig(cfg)
+		return l
+	}
+	m.mu.RUnlock()
+
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if l, ok := m.limiters[key]; ok {
+		l.UpdateConfig(cfg)
+		return l
+	}
+
+	l := NewChannelLimiter(cfg, time.Now())
+	m.limiters[key] = l
+	if cfg.RPM > 0 || cfg.MaxConcurrent > 0 {
+		log.Printf("[RateLimit-Manager] 创建 scoped 限速器: %s [%d] scope=%s (RPM=%d, burst=%d, concurrent=%d, autoHeaders=%v)",
+			apiType, channelIndex, scope, cfg.RPM, cfg.Burst, cfg.MaxConcurrent, cfg.AutoFromHeaders)
+	}
+	return l
+}
+
+// GetScoped 获取指定渠道下某个 scope 的 limiter。不存在返回 nil。
+func (m *Manager) GetScoped(apiType string, channelIndex int, scope string) *ChannelLimiter {
+	if scope == "" {
+		return m.Get(apiType, channelIndex)
+	}
+	key := scopedLimiterKey(apiType, channelIndex, scope)
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.limiters[key]
+}
+
+// SetCooldownScoped 将指定 scoped limiter 置入短期冷却。
+func (m *Manager) SetCooldownScoped(apiType string, channelIndex int, scope string, duration time.Duration, now time.Time) {
+	if m == nil || duration <= 0 {
+		return
+	}
+	m.GetOrCreateScoped(apiType, channelIndex, scope, Config{}).SetCooldown(now.Add(duration))
 }
 
 // SetCooldown 将指定渠道置入短期冷却；不存在 limiter 时创建一个不限速 limiter 承载运行态冷却。
