@@ -1,3 +1,77 @@
+/* 复古像素主题 - 全局样式 */
+.v-application {
+  font-family: 'Courier New', Consolas, 'Liberation Mono', monospace !important;
+}
+
+.text-body-1,
+.text-body-2 {
+  line-height: 1.6 !important;
+}
+
+.text-caption {
+  font-size: 0.8125rem !important;
+  line-height: 1.5 !important;
+}
+
+/* 所有按钮复古像素风格 */
+.v-btn:not(.v-btn--icon) {
+  border-radius: 0 !important;
+  text-transform: uppercase !important;
+  font-weight: 500 !important;
+  letter-spacing: 0 !important;
+}
+
+/* 所有卡片复古像素风格 */
+.v-card {
+  border-radius: 0 !important;
+}
+
+/* 所有 Chip 复古像素风格 */
+.v-chip {
+  border-radius: 0 !important;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+/* 输入框复古像素风格 */
+.v-text-field .v-field {
+  border-radius: 0 !important;
+}
+
+/* 对话框复古像素风格 */
+.v-dialog .v-card {
+  border: 2px solid currentColor !important;
+  box-shadow: 6px 6px 0 0 currentColor !important;
+}
+
+/* 菜单复古像素风格 */
+.v-menu > .v-overlay__content > .v-list {
+  border-radius: 0 !important;
+  border: 2px solid rgb(var(--v-theme-on-surface)) !important;
+  box-shadow: 4px 4px 0 0 rgb(var(--v-theme-on-surface)) !important;
+}
+
+.v-theme--dark .v-menu > .v-overlay__content > .v-list {
+  border-color: rgba(255, 255, 255, 0.7) !important;
+  box-shadow: 4px 4px 0 0 rgba(255, 255, 255, 0.7) !important;
+}
+
+/* Snackbar 复古像素风格 */
+.v-snackbar__wrapper {
+  border-radius: 0 !important;
+  border: 2px solid currentColor !important;
+  box-shadow: 4px 4px 0 0 currentColor !important;
+}
+
+/* 状态徽章复古像素风格 */
+.status-badge .badge-content {
+  border-radius: 0 !important;
+  border: 1px solid rgb(var(--v-theme-on-surface));
+}
+
+.v-theme--dark .status-badge .badge-content {
+  border-color: rgba(255, 255, 255, 0.6);
+}
 
 .v-theme--dark .version-badge.version-update {
   border-color: rgb(var(--v-theme-warning));
@@ -71,4 +145,3 @@
   flex: 1;
   min-width: 0;
 }
-

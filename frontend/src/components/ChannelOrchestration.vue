@@ -586,9 +586,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted, defineAsyncComponent, markRaw } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted, defineAsyncComponent } from 'vue'
 import draggable from 'vuedraggable'
-import { api, type Channel, type ChannelMetrics, type ChannelStatus, type TimeWindowStats, type ChannelRecentActivity, type SchedulerStatsResponse, type ActivitySegment, expandSparseSegments } from '../services/api'
+import { api, type Channel, type ChannelMetrics, type ChannelStatus, type TimeWindowStats, type ChannelRecentActivity, type SchedulerStatsResponse } from '../services/api'
 import { getChannelTypeApi } from '../utils/channelTypeApi'
 import { useI18n } from '../i18n'
 import { useGlobalTick } from '../composables/useGlobalTick'
@@ -1003,7 +1003,7 @@ const {
   formatRPM,
   formatTPM,
   hasActivityData,
-} = useChannelActivity(recentActivity)
+} = useChannelActivity(recentActivity, activityUpdateTick)
 
 // Refresh metrics
 const refreshMetrics = async () => {
@@ -1230,4 +1230,3 @@ defineExpose({
 </script>
 
 <style scoped src="./channel-orchestration/channel-orchestration.css"></style>
-

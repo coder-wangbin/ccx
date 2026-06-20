@@ -1828,4 +1828,3 @@ onUnmounted(() => {
 </script>
 
 <style scoped src="./edit-channel/edit-channel-modal.css"></style>
-

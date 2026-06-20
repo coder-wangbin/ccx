@@ -1010,8 +1010,6 @@ const pingChannel = async (channelId: number) => {
 }
 
 // ============== 能力测试 ==============
-
-// ============== 能力测试 ==============
 const {
   showCapabilityTestDialog, capabilityTestChannelName, capabilityTestChannelId,
   capabilityTestChannelType, capabilityTestSourceTab, capabilityTestDialogRef,
@@ -1669,7 +1667,5 @@ onUnmounted(() => {
 
 <style scoped src="./styles/app-retro.css"></style>
 
-
 <!-- 全局样式 - 复古像素主题 -->
 <style src="./styles/app-retro-global.css"></style>
-
