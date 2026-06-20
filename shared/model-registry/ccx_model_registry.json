@@ -3,7 +3,7 @@
   "pricingUnit": "per_1m_tokens_usd",
   "upstreamCapabilities": [
     {
-      "patterns": ["claude-haiku-4-5*"],
+      "patterns": ["(?:^|[-/])claude-haiku-4-5(?:-\\d{4}-\\d{2}-\\d{2}|-\\d{6,8})?(?=$|@)"],
       "provider": "anthropic",
       "displayName": "Claude Haiku 4.5",
       "contextWindowTokens": 200000,
@@ -11,7 +11,7 @@
       "thinkingMode": "extended"
     },
     {
-      "patterns": ["claude-sonnet-4-5*"],
+      "patterns": ["(?:^|[-/])claude-sonnet-4-5(?:-\\d{4}-\\d{2}-\\d{2}|-\\d{6,8})?(?=$|@)"],
       "provider": "anthropic",
       "displayName": "Claude Sonnet 4.5",
       "contextWindowTokens": 200000,
@@ -19,7 +19,7 @@
       "thinkingMode": "extended"
     },
     {
-      "patterns": ["claude-opus-4-5*"],
+      "patterns": ["(?:^|[-/])claude-opus-4-5(?:-\\d{4}-\\d{2}-\\d{2}|-\\d{6,8})?(?=$|@)"],
       "provider": "anthropic",
       "displayName": "Claude Opus 4.5",
       "contextWindowTokens": 200000,
@@ -28,7 +28,7 @@
       "reasoningEfforts": ["low", "medium", "high"]
     },
     {
-      "patterns": ["claude-sonnet-4-6*"],
+      "patterns": ["(?:^|[-/])claude-sonnet-4-6(?:-thinking)?(?:-\\d{4}-\\d{2}-\\d{2}|-\\d{6,8})?(?=$|@)"],
       "provider": "anthropic",
       "displayName": "Claude Sonnet 4.6",
       "contextWindowTokens": 1000000,
@@ -37,7 +37,7 @@
       "reasoningEfforts": ["low", "medium", "high", "max"]
     },
     {
-      "patterns": ["claude-opus-4-6*"],
+      "patterns": ["(?:^|[-/])claude-opus-4-6(?:-\\d{4}-\\d{2}-\\d{2}|-\\d{6,8})?(?=$|@)"],
       "provider": "anthropic",
       "displayName": "Claude Opus 4.6",
       "contextWindowTokens": 1000000,
@@ -46,7 +46,7 @@
       "reasoningEfforts": ["low", "medium", "high", "max"]
     },
     {
-      "patterns": ["claude-opus-4-7*"],
+      "patterns": ["(?:^|[-/])claude-opus-4-7(?:-\\d{4}-\\d{2}-\\d{2}|-\\d{6,8})?(?=$|@)"],
       "provider": "anthropic",
       "displayName": "Claude Opus 4.7",
       "contextWindowTokens": 1000000,
@@ -55,7 +55,7 @@
       "reasoningEfforts": ["low", "medium", "high", "xhigh", "max"]
     },
     {
-      "patterns": ["claude-opus-4-8*"],
+      "patterns": ["(?:^|[-/])claude-opus-4-8(?:-\\d{4}-\\d{2}-\\d{2}|-\\d{6,8})?(?=$|@)"],
       "provider": "anthropic",
       "displayName": "Claude Opus 4.8",
       "contextWindowTokens": 1000000,
@@ -64,7 +64,7 @@
       "reasoningEfforts": ["low", "medium", "high", "xhigh", "max"]
     },
     {
-      "patterns": ["claude-fable-5*"],
+      "patterns": ["(?:^|[-/])claude-fable-5(?:-\\d{4}-\\d{2}-\\d{2}|-\\d{6,8})?(?=$|@)"],
       "provider": "anthropic",
       "displayName": "Claude Fable 5",
       "contextWindowTokens": 1000000,
@@ -73,7 +73,7 @@
       "reasoningEfforts": ["low", "medium", "high", "xhigh", "max"]
     },
     {
-      "patterns": ["claude-mythos-5*"],
+      "patterns": ["(?:^|[-/])claude-mythos-5(?:-\\d{4}-\\d{2}-\\d{2}|-\\d{6,8})?(?=$|@)"],
       "provider": "anthropic",
       "displayName": "Claude Mythos 5",
       "contextWindowTokens": 1000000,
@@ -82,7 +82,7 @@
       "reasoningEfforts": ["low", "medium", "high", "xhigh", "max"]
     },
     {
-      "patterns": ["claude-mythos-preview*"],
+      "patterns": ["(?:^|[-/])claude-mythos-preview(?:-\\d{4}-\\d{2}-\\d{2}|-\\d{6,8})?(?=$|@)"],
       "provider": "anthropic",
       "displayName": "Claude Mythos Preview",
       "contextWindowTokens": 1000000,
@@ -90,7 +90,11 @@
       "reasoningEfforts": ["max"]
     },
     {
-      "patterns": ["gpt-5.2", "gpt-5.5", "gpt-5.3-codex"],
+      "patterns": [
+        "(?:^|[-/])gpt-5\\.2(?=$|@)",
+        "(?:^|[-/])gpt-5\\.5(?=$|@)",
+        "(?:^|[-/])gpt-5\\.3-codex(?=$|@)"
+      ],
       "provider": "openai",
       "displayName": "Codex 272K models",
       "contextWindowTokens": 272000,
@@ -98,7 +102,7 @@
       "reasoningEfforts": ["low", "medium", "high", "xhigh"]
     },
     {
-      "patterns": ["gpt-5.4"],
+      "patterns": ["(?:^|[-/])gpt-5\\.4(?:-openai-compact)?(?=$|@)"],
       "provider": "openai",
       "displayName": "gpt-5.4",
       "contextWindowTokens": 1000000,
@@ -106,7 +110,7 @@
       "reasoningEfforts": ["low", "medium", "high", "xhigh"]
     },
     {
-      "patterns": ["gpt-5.4-mini"],
+      "patterns": ["(?:^|[-/])gpt-5\\.4-mini(?=$|@)"],
       "provider": "openai",
       "displayName": "gpt-5.4-mini",
       "contextWindowTokens": 272000,
@@ -114,7 +118,7 @@
       "reasoningEfforts": ["low", "medium", "high", "xhigh"]
     },
     {
-      "patterns": ["*glm-5.2*", "*glm-5p2*"],
+      "patterns": ["(?:^|[-/])glm-5\\.2(?:-\\d{4}-\\d{2}-\\d{2}|-\\d{6,8})?(?=$|@)", "(?:^|[-/])glm-5p2(?=$|@)"],
       "provider": "zai",
       "displayName": "GLM-5.2",
       "contextWindowTokens": 1048576,
@@ -128,7 +132,7 @@
       "sources": ["https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json"]
     },
     {
-      "patterns": ["*glm-5.1*", "*glm-5p1*"],
+      "patterns": ["(?:^|[-/])glm-5\\.1(?:-\\d{4}-\\d{2}-\\d{2}|-\\d{6,8})?(?=$|@)", "(?:^|[-/])glm-5p1(?=$|@)"],
       "provider": "zai",
       "displayName": "GLM-5.1",
       "contextWindowTokens": 202800,
@@ -142,7 +146,7 @@
       "sources": ["https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json"]
     },
     {
-      "patterns": ["*glm-5*"],
+      "patterns": ["(?:^|[-/])glm-5(?=$|@)"],
       "provider": "zai",
       "displayName": "GLM-5",
       "description": "Zhipu GLM-5 family fallback. Pricing comes from LiteLLM zai/glm-5.",
@@ -158,7 +162,7 @@
       "sources": ["https://docs.z.ai/guides/overview/pricing"]
     },
     {
-      "patterns": ["*qwen3.5*"],
+      "patterns": ["(?:^|[-/])qwen3\\.5(?:-\\d{4}-\\d{2}-\\d{2}|-\\d{6,8})?(?=$|@)"],
       "provider": "dashscope",
       "displayName": "Qwen3.5",
       "contextWindowTokens": 991808,
@@ -167,7 +171,7 @@
       "sources": ["https://www.alibabacloud.com/help/en/model-studio/models"]
     },
     {
-      "patterns": ["*qwen3-coder*"],
+      "patterns": ["(?:^|[-/])qwen3-coder(?:-\\d{4}-\\d{2}-\\d{2}|-\\d{6,8})?(?=$|@)"],
       "provider": "dashscope",
       "displayName": "Qwen3 Coder",
       "contextWindowTokens": 997952,
@@ -176,7 +180,7 @@
       "sources": ["https://www.alibabacloud.com/help/en/model-studio/models"]
     },
     {
-      "patterns": ["*qwen3-max*"],
+      "patterns": ["(?:^|[-/])qwen3-max(?:-\\d{4}-\\d{2}-\\d{2}|-\\d{6,8})?(?=$|@)"],
       "provider": "dashscope",
       "displayName": "Qwen3 Max",
       "contextWindowTokens": 258048,
@@ -185,7 +189,10 @@
       "sources": ["https://www.alibabacloud.com/help/en/model-studio/models"]
     },
     {
-      "patterns": ["deepseek-v4-flash", "*deepseek-v4-flash*", "deepseek-chat"],
+      "patterns": [
+        "(?:^|[-/])deepseek-v4-flash(?:-\\d{4}-\\d{2}-\\d{2}|-\\d{6,8})?(?=$|@)",
+        "(?:^|[-/])deepseek-chat(?=$|@)"
+      ],
       "provider": "deepseek",
       "displayName": "DeepSeek V4 Flash",
       "description": "Supports thinking and non-thinking modes. deepseek-chat is a deprecated compatibility alias for the non-thinking mode.",
@@ -213,7 +220,10 @@
       ]
     },
     {
-      "patterns": ["deepseek-v4-pro", "*deepseek-v4-pro*", "deepseek-reasoner"],
+      "patterns": [
+        "(?:^|[-/])deepseek-v4-pro(?:-\\d{4}-\\d{2}-\\d{2}|-\\d{6,8})?(?=$|@)",
+        "(?:^|[-/])deepseek-reasoner(?=$|@)"
+      ],
       "provider": "deepseek",
       "displayName": "DeepSeek V4 Pro",
       "description": "Supports thinking and non-thinking modes. deepseek-reasoner is a deprecated compatibility alias for the thinking mode.",
@@ -241,7 +251,7 @@
       ]
     },
     {
-      "patterns": ["*deepseek-v3.2*"],
+      "patterns": ["(?:^|[-/])deepseek-v3\\.2(?:-think|-terminus)?(?:-\\d{4}-\\d{2}-\\d{2}|-\\d{6,8})?(?=$|@)"],
       "provider": "deepseek",
       "displayName": "DeepSeek V3.2",
       "contextWindowTokens": 163840,
@@ -254,41 +264,13 @@
       "sources": ["https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json"]
     },
     {
-      "patterns": ["*kimi-k2.7-code-highspeed*"],
-      "provider": "moonshot",
-      "displayName": "Kimi K2.7 Code HighSpeed",
-      "description": "High-speed version of Kimi K2.7 Code with text, image and video input plus thinking mode.",
-      "contextWindowTokens": 262144,
-      "maxOutputTokens": 262144,
-      "defaultOutputTokens": 32768,
-      "recommendedOutputTokens": 262144,
-      "thinkingMode": "thinking",
-      "reasoningEfforts": ["high", "max"],
-      "capabilities": {
-        "vision": true,
-        "videoInput": true,
-        "toolCalls": true,
-        "jsonMode": true,
-        "partialMode": true,
-        "contextCaching": true
-      },
-      "pricing": {
-        "inputCacheHitPrice": 0.38,
-        "inputCacheMissPrice": 1.9,
-        "outputPrice": 8
-      },
-      "sources": [
-        "https://platform.kimi.com/docs/pricing/chat-k27-code",
-        "https://platform.kimi.com/docs/guide/kimi-k2-7-code-quickstart",
-        "https://platform.kimi.com/docs/api/models-overview",
-        "https://platform.kimi.com/docs/guide/benchmark-best-practice"
-      ]
-    },
-    {
-      "patterns": ["*kimi-k2.7*"],
+      "patterns": [
+        "(?:^|[-/])kimi-k2\\.7-code(?:-highspeed)?(?:-\\d{4}-\\d{2}-\\d{2}|-\\d{6,8})?(?=$|@)",
+        "(?:^|[-/])kimi-for-coding(?=$|@)"
+      ],
       "provider": "moonshot",
       "displayName": "Kimi K2.7 Code",
-      "description": "Kimi coding model with text, image and video input plus thinking mode.",
+      "description": "Kimi coding model with text, image and video input plus thinking mode. kimi-for-coding token plan alias falls back to this model.",
       "contextWindowTokens": 262144,
       "maxOutputTokens": 262144,
       "defaultOutputTokens": 32768,
@@ -316,7 +298,7 @@
       ]
     },
     {
-      "patterns": ["*kimi-k2.6*"],
+      "patterns": ["(?:^|[-/])kimi-k2\\.6(?:-\\d{4}-\\d{2}-\\d{2}|-\\d{6,8})?(?=$|@)"],
       "provider": "moonshot",
       "displayName": "Kimi K2.6",
       "description": "Multimodal Kimi model with text, image and video input, thinking/non-thinking modes, tool calls and JSON mode.",
@@ -346,7 +328,7 @@
       ]
     },
     {
-      "patterns": ["*kimi-k2.5*"],
+      "patterns": ["(?:^|[-/])kimi-k2\\.5(?:-\\d{4}-\\d{2}-\\d{2}|-\\d{6,8})?(?=$|@)"],
       "provider": "moonshot",
       "displayName": "Kimi K2.5",
       "description": "Multimodal Kimi model with text, image and video input, thinking/non-thinking modes, tool calls and JSON mode.",
@@ -375,7 +357,7 @@
       ]
     },
     {
-      "patterns": ["*kimi-k2-thinking*"],
+      "patterns": ["(?:^|[-/])kimi-k2-thinking(?:-\\d{4}-\\d{2}-\\d{2}|-\\d{6,8})?(?=$|@)"],
       "provider": "moonshot",
       "displayName": "Kimi K2 Thinking",
       "contextWindowTokens": 262144,
@@ -387,7 +369,7 @@
       "sources": ["https://platform.kimi.com/docs/guide/benchmark-best-practice"]
     },
     {
-      "patterns": ["*minimax-m3*"],
+      "patterns": ["(?:^|[-/])minimax-m3(?:-highspeed)?(?:-\\d{4}-\\d{2}-\\d{2}|-\\d{6,8})?(?=$|@)"],
       "provider": "minimax",
       "displayName": "MiniMax M3",
       "contextWindowTokens": 1000000,
@@ -395,7 +377,21 @@
       "reasoningEfforts": ["low", "medium", "high", "max"]
     },
     {
-      "patterns": ["*minimax-m2.5*"],
+      "patterns": ["(?:^|[-/])minimax-m2\\.7(?:-highspeed)?(?:-\\d{4}-\\d{2}-\\d{2}|-\\d{6,8})?(?=$|@)"],
+      "provider": "minimax",
+      "displayName": "MiniMax M2.7",
+      "contextWindowTokens": 1000000,
+      "maxOutputTokens": 8192,
+      "reasoningEfforts": ["low", "medium", "high", "max"],
+      "pricing": {
+        "inputCacheHitPrice": 0.03,
+        "inputCacheMissPrice": 0.3,
+        "outputPrice": 1.2
+      },
+      "sources": ["https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json"]
+    },
+    {
+      "patterns": ["(?:^|[-/])minimax-m2\\.5(?:-highspeed)?(?:-\\d{4}-\\d{2}-\\d{2}|-\\d{6,8})?(?=$|@)"],
       "provider": "minimax",
       "displayName": "MiniMax M2.5",
       "contextWindowTokens": 1000000,
@@ -409,7 +405,7 @@
       "sources": ["https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json"]
     },
     {
-      "patterns": ["*minimax-m2.1*"],
+      "patterns": ["(?:^|[-/])minimax-m2\\.1(?:-highspeed)?(?:-\\d{4}-\\d{2}-\\d{2}|-\\d{6,8})?(?=$|@)"],
       "provider": "minimax",
       "displayName": "MiniMax M2.1",
       "contextWindowTokens": 1000000,
@@ -423,7 +419,7 @@
       "sources": ["https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json"]
     },
     {
-      "patterns": ["*mimo-v2.5*"],
+      "patterns": ["(?:^|[-/])mimo-v2\\.5(?=$|@)"],
       "provider": "xiaomi",
       "displayName": "MiMo V2.5",
       "contextWindowTokens": 1048576,
@@ -431,7 +427,7 @@
       "reasoningEfforts": ["low", "medium", "high", "max"]
     },
     {
-      "patterns": ["*mimo-v2-flash*"],
+      "patterns": ["(?:^|[-/])mimo-v2-flash(?=$|@)"],
       "provider": "xiaomi",
       "displayName": "MiMo V2 Flash",
       "contextWindowTokens": 262144,
@@ -445,7 +441,7 @@
       "sources": ["https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json"]
     },
     {
-      "patterns": ["*doubao-seed-2-0*"],
+      "patterns": ["(?:^|[-/])doubao-seed-2-0(?:-\\d{4}-\\d{2}-\\d{2}|-\\d{6,8})?(?=$|@)"],
       "provider": "volcengine",
       "displayName": "Doubao Seed 2.0",
       "contextWindowTokens": 256000,
@@ -458,7 +454,7 @@
       "sources": ["https://www.volcengine.com/docs/82379/1330310"]
     },
     {
-      "patterns": ["*ernie-4.5*"],
+      "patterns": ["(?:^|[-/])ernie-4\\.5(?=$|@)"],
       "provider": "baidu",
       "displayName": "ERNIE 4.5",
       "contextWindowTokens": 131072,
@@ -471,7 +467,7 @@
       "sources": ["https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json"]
     },
     {
-      "patterns": ["*baichuan-m2*"],
+      "patterns": ["(?:^|[-/])baichuan-m2(?=$|@)"],
       "provider": "baichuan",
       "displayName": "Baichuan M2",
       "contextWindowTokens": 131072,
@@ -483,7 +479,7 @@
       "sources": ["https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json"]
     },
     {
-      "patterns": ["*yi-34b-200k*"],
+      "patterns": ["(?:^|[-/])yi-34b-200k(?=$|@)"],
       "provider": "01-ai",
       "displayName": "Yi 34B 200K",
       "contextWindowTokens": 200000,

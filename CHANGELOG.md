@@ -1,8 +1,13 @@
 ## [Unreleased]
 
-### 新增
+### 变更
 
-- **/v1/models 纳入 images 渠道多渠道并行聚合** - ModelsHandler 从 4 类协议串行改为 5 类协议（messages/responses/chat/gemini/images）并发采集，每协议最多收集 5 个成功渠道的模型列表；ModelsDetailHandler fallback 顺序追加 images；保留 X-Channel pinned、disabled-key fallback 语义
+- **内置模型预设匹配改用正则表达式** - builtin model registry 的 patterns 从简单通配符（`claude-opus-4-7*`）改为显式正则，精确控制前后边界，避免 `gpt-5.4-mini` 被 `gpt-5.4` 误吃、`glm-5.1` 被 `glm-5` 误吃等歧义；支持厂商前缀（`bedrock/claude-opus-4-7`、`xxx-claude-opus-4-7`）和日期版本号后缀（`-20260101`），同时拒绝 `claude-haiku-4-5-with-claude-opus-4-7-fallback` 这类异常组合名
+  - 一个 entry 支持多个 pattern（如 `kimi-for-coding` 别名回退到 `kimi-k2.7-code`），未来 Kimi 升级到 K2.8 只需把别名移到新 entry
+  - 前端 `channelPayload.ts`、桌面端 `channel-payload.ts` 匹配函数改用 `new RegExp(pattern, 'i')`
+  - 后端 `model_registry.go` 新增 `builtinPatternCache` 预编译缓存，RE2 兼容剥离 `(?=$|@)` lookahead 后手动检查边界；`resolvePatternValueFold` 先正则再通配符
+  - generator 加构建时正则校验
+  - **用户路由级 supportedModels 配置不受影响**，继续用通配符语义
 
 ## [v2.9.12] - 2026-06-19
 

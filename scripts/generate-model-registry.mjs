@@ -44,6 +44,12 @@ function expandedPatternMap() {
   for (const entry of entries) {
     const capability = compactCapability(entry)
     for (const pattern of entry.patterns || []) {
+      // 构建时校验：每个 pattern 必须是合法正则（加 i flag 校验，pattern 本身不含 (?i)）
+      try {
+        new RegExp(pattern, 'i')
+      } catch (err) {
+        throw new Error(`Invalid regex pattern for ${entry.displayName || entry.provider}: ${pattern}\n  ${err.message}`)
+      }
       result[pattern] = capability
     }
   }

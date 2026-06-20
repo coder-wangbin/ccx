@@ -1,9 +1,96 @@
 package config
 
 import (
+	"regexp"
 	"sort"
 	"strings"
+	"sync"
 )
+
+// builtinPatternCache 编译后的 builtin 正则，init 时填充
+var builtinPatternCache = map[string]*compiledBuiltinPattern{}
+
+type compiledBuiltinPattern struct {
+	regex               *regexp.Regexp
+	hasSuffixConstraint bool
+}
+
+func initBuiltinPatternCache(patterns []string) {
+	for _, p := range patterns {
+		if _, ok := builtinPatternCache[p]; ok {
+			continue
+		}
+		compiled, err := compileBuiltinPattern(p)
+		if err != nil {
+			panic("invalid builtin model pattern regex: " + p + ": " + err.Error())
+		}
+		builtinPatternCache[p] = compiled
+	}
+}
+
+// compileBuiltinPattern 将 pattern 编译为 Go RE2 兼容的正则。
+// 对于包含 (?=$|@) 等 lookahead 的模式，提取主正则并标记需要后缀检查。
+func compileBuiltinPattern(pattern string) (*compiledBuiltinPattern, error) {
+	// 分离主模式和后缀 lookahead
+	// 常见形式：^主模式(?:可选后缀)(?=$|@)
+	// 用前缀 (?i) 加强，Go RE2 支持 (?i)
+	rePattern := "(?i)" + pattern
+
+	// 去除所有 (?=...) / (?!) 等 lookahead，记录是否有后缀约束
+	// 正则：找到最后一个 (?=...) 部分
+	hasSuffixConstraint := false
+	if idx := strings.LastIndex(rePattern, "(?="); idx >= 0 {
+		suffix := rePattern[idx:]
+		if strings.HasSuffix(suffix, ")") {
+			// 去掉 (?=...)，但保留主模式
+			rePattern = rePattern[:idx]
+			// 检查 lookahead 内容是否包含 $（字符串结束断言）
+			hasSuffixConstraint = strings.Contains(suffix, "$") || strings.Contains(suffix, "@")
+		}
+	}
+
+	re, err := regexp.Compile(rePattern)
+	if err != nil {
+		return nil, err
+	}
+	return &compiledBuiltinPattern{regex: re, hasSuffixConstraint: hasSuffixConstraint}, nil
+}
+
+func matchBuiltinRegexPattern(pattern, model string) bool {
+	compiled, ok := builtinPatternCache[pattern]
+	if !ok {
+		var err error
+		compiled, err = compileBuiltinPattern(pattern)
+		if err != nil {
+			return false
+		}
+		builtinPatternCache[pattern] = compiled
+	}
+
+	if !compiled.regex.MatchString(model) {
+		return false
+	}
+
+	// 如果 pattern 有后缀约束（原始 lookahead 包含 $|@），
+	// 检查匹配位置后模型是否以合法结尾（字符串结束或 @）。
+	// 严格只允许 $ 或 @，不放行 `-` 等分隔符，避免 gpt-5.4 误吃 gpt-5.4-mini。
+	if compiled.hasSuffixConstraint {
+		loc := compiled.regex.FindStringIndex(model)
+		if loc == nil {
+			return false
+		}
+		endIdx := loc[1]
+		if endIdx < len(model) {
+			next := model[endIdx]
+			// 只允许 @（模型 hash/版本后缀，如 model@hash）或字符串结尾
+			if next != '@' {
+				return false
+			}
+		}
+	}
+
+	return true
+}
 
 const (
 	DefaultOutputReserveTokens     = 8192
@@ -214,8 +301,25 @@ func BuiltinAgentModelProfiles() map[string]AgentModelProfile {
 }
 
 // BuiltinUpstreamModelCapabilities 返回 CCX 内置的实际上游模型能力知识库。
+var (
+	builtinOnce             sync.Once
+	builtinCapabilitiesOnce map[string]UpstreamModelCapability
+)
+
 func BuiltinUpstreamModelCapabilities() map[string]UpstreamModelCapability {
-	return generatedBuiltinUpstreamModelCapabilities()
+	builtinOnce.Do(func() {
+		builtinCapabilitiesOnce = generatedBuiltinUpstreamModelCapabilities()
+		initBuiltinPatternCache(precisionKeys(builtinCapabilitiesOnce))
+	})
+	return builtinCapabilitiesOnce
+}
+
+func precisionKeys(m map[string]UpstreamModelCapability) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	return keys
 }
 
 // ResolveAgentModelProfile 解析下游 agent 模型语义。
@@ -328,9 +432,7 @@ func resolvePatternValueFold[T any](model string, values map[string]T) (T, strin
 		if strings.EqualFold(pattern, model) {
 			continue
 		}
-		if isValidSupportedModelPattern(pattern) {
-			patterns = append(patterns, pattern)
-		}
+		patterns = append(patterns, pattern)
 	}
 	sort.Slice(patterns, func(i, j int) bool {
 		if len(patterns[i]) == len(patterns[j]) {
@@ -340,6 +442,10 @@ func resolvePatternValueFold[T any](model string, values map[string]T) (T, strin
 	})
 
 	for _, pattern := range patterns {
+		// 优先用正则匹配（builtin 正则），失败再回退通配符
+		if matchBuiltinRegexPattern(pattern, model) {
+			return values[pattern], pattern, true
+		}
 		if matchSupportedModelPatternFold(pattern, model) {
 			return values[pattern], pattern, true
 		}

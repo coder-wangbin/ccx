@@ -183,17 +183,14 @@ export function parseModelCapabilitiesText(text?: string): Record<string, Upstre
 }
 
 function matchesModelPattern(pattern: string, model: string): boolean {
-  const normalizedPattern = pattern.trim().toLowerCase()
-  const normalizedModel = model.trim().toLowerCase()
-  if (!normalizedPattern || !normalizedModel) return false
-  if (normalizedPattern === normalizedModel) return true
-  if (!normalizedPattern.includes('*')) return false
-
-  const escaped = normalizedPattern
-    .split('*')
-    .map(part => part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
-    .join('.*')
-  return new RegExp(`^${escaped}$`).test(normalizedModel)
+  const trimmedPattern = pattern.trim()
+  const trimmedModel = model.trim()
+  if (!trimmedPattern || !trimmedModel) return false
+  try {
+    return new RegExp(trimmedPattern, 'i').test(trimmedModel)
+  } catch {
+    return false
+  }
 }
 
 export function resolveBuiltinUpstreamModelCapability(model: string): { capability: UpstreamModelCapability; pattern: string } | null {
@@ -204,7 +201,7 @@ export function resolveBuiltinUpstreamModelCapability(model: string): { capabili
   }
 
   const patterns = Object.keys(builtinUpstreamModelCapabilities)
-    .filter(pattern => pattern !== trimmed && pattern.includes('*'))
+    .filter(pattern => pattern !== trimmed)
     .sort((a, b) => b.length - a.length || a.localeCompare(b))
   for (const pattern of patterns) {
     if (matchesModelPattern(pattern, trimmed)) {

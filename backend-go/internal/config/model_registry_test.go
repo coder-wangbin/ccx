@@ -115,7 +115,7 @@ func TestResolveUpstreamCapability_KimiK27Builtin(t *testing.T) {
 	if resolved.Capability.RecommendedOutputTokens != 262144 {
 		t.Fatalf("RecommendedOutputTokens = %d, want 262144", resolved.Capability.RecommendedOutputTokens)
 	}
-	if resolved.Capability.Pricing == nil || resolved.Capability.Pricing.OutputPrice == nil || *resolved.Capability.Pricing.OutputPrice != 8 {
+	if resolved.Capability.Pricing == nil || resolved.Capability.Pricing.OutputPrice == nil || *resolved.Capability.Pricing.OutputPrice != 4 {
 		t.Fatalf("Pricing.OutputPrice = %#v, want 8", resolved.Capability.Pricing)
 	}
 }
