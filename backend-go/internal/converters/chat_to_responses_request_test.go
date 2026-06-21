@@ -73,6 +73,42 @@ func TestConvertResponsesToOpenAIChatRequest(t *testing.T) {
 			},
 		},
 		{
+			name: "Codex 兼容开启时转换 tool_search",
+			input: `{
+				"model": "gpt-4",
+				"input": "Find a tool",
+				"transformer_metadata": {"codex_tool_compat_enabled": true},
+				"tools": [
+					{
+						"type": "tool_search",
+						"execution": "client",
+						"description": "Search deferred tools",
+						"parameters": {"type": "object", "properties": {}}
+					},
+					{
+						"type": "function",
+						"name": "get_weather",
+						"parameters": {"type": "object", "properties": {}}
+					}
+				]
+			}`,
+			model:  "gpt-4o",
+			stream: true,
+			validate: func(t *testing.T, result []byte) {
+				root := gjson.ParseBytes(result)
+				tools := root.Get("tools").Array()
+				if len(tools) != 2 {
+					t.Fatalf("should have 2 tools, got %d: %s", len(tools), root.Get("tools").Raw)
+				}
+				if tools[0].Get("function.name").String() != "tool_search" {
+					t.Fatalf("first tool should be tool_search, got %s", tools[0].Raw)
+				}
+				if tools[1].Get("function.name").String() != "get_weather" {
+					t.Fatalf("second tool should be get_weather, got %s", tools[1].Raw)
+				}
+			},
+		},
+		{
 			name: "function_call 和 function_call_output",
 			input: `{
 				"model": "gpt-4",

@@ -78,9 +78,11 @@ func ConvertResponsesToOpenAIChatRequest(modelName string, inputRawJSON []byte, 
 		}
 	}
 
+	codexToolCompat := root.Get("transformer_metadata.codex_tool_compat_enabled").Bool()
+
 	// 转换 tools
 	if tools := root.Get("tools"); tools.Exists() && tools.IsArray() {
-		out = convertToolsToOpenAIFormat(tools, out)
+		out = convertToolsToOpenAIFormat(tools, out, codexToolCompat)
 	}
 
 	// 转换 reasoning.effort → reasoning_effort
@@ -328,9 +330,29 @@ func convertFunctionCallOutputItem(item gjson.Result, out string) string {
 //  1. Codex 新版 Responses 的 tool schema 可能省略 `required` 字段，部分严格
 //     校验 JSONSchema 的上游镜像会报 "None is not of type 'array'"。
 //     转换时统一补齐 `required: []`，并确保 `type: object` 与 `properties: {}`。
-//  2. Responses 的 custom / web_search / namespace 等非 function 工具
-//     在 Chat Completions 中没有对应概念，直接跳过，避免触发协议错误。
-func convertToolsToOpenAIFormat(tools gjson.Result, out string) string {
+//  2. codexToolCompat 开启时，将 custom / web_search / tool_search / namespace
+//     等 Codex 扩展工具映射为 function proxy。
+//  3. codexToolCompat 关闭时，Responses 的非 function 工具在 Chat Completions 中
+//     没有对应概念，直接跳过，避免触发协议错误。
+func convertToolsToOpenAIFormat(tools gjson.Result, out string, codexToolCompat bool) string {
+	if codexToolCompat {
+		rawTools := make([]interface{}, 0, len(tools.Array()))
+		for _, tool := range tools.Array() {
+			rawTools = append(rawTools, tool.Value())
+		}
+		converted := ConvertRawToolsToOpenAI(rawTools)
+		if len(converted) == 0 {
+			return out
+		}
+
+		chatCompletionsTools := make([]interface{}, 0, len(converted))
+		for _, tool := range converted {
+			chatCompletionsTools = append(chatCompletionsTools, tool)
+		}
+		out, _ = sjson.Set(out, "tools", chatCompletionsTools)
+		return out
+	}
+
 	var chatCompletionsTools []interface{}
 
 	tools.ForEach(func(_, tool gjson.Result) bool {

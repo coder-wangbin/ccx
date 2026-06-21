@@ -184,11 +184,12 @@ func (p *ResponsesProvider) buildProviderRequestBody(c *gin.Context, requestPath
 
 		originalModel := responsesReq.Model
 		responsesReq.Model = config.RedirectModel(responsesReq.Model, upstream)
-		// Inject codex_tool_compat_enabled into TransformerMetadata for the converter.
+		// codexToolCompat applies to Responses -> Chat/Claude/Gemini conversion.
+		// codexNativeToolPassthrough is handled only in the Responses passthrough branch above.
 		if responsesReq.TransformerMetadata == nil {
 			responsesReq.TransformerMetadata = make(map[string]interface{})
 		}
-		responsesReq.TransformerMetadata["codex_tool_compat_enabled"] = upstream.IsCodexToolCompatEnabled() || upstream.CodexNativeToolPassthrough
+		responsesReq.TransformerMetadata["codex_tool_compat_enabled"] = upstream.IsCodexToolCompatEnabled()
 		responsesReq.RawTools = extractRawToolsFromRequest(bodyBytes)
 		convertedReq, err := converter.ToProviderRequest(sess, &responsesReq)
 		if err != nil {

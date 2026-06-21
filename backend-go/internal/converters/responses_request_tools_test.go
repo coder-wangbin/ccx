@@ -163,6 +163,40 @@ func TestOpenAIChatConverter_SkipsNonFunctionTools(t *testing.T) {
 	assert.Equal(t, "do_thing", tools[0]["function"].(map[string]interface{})["name"])
 }
 
+func TestOpenAIChatConverter_ConvertsToolSearchWhenCodexCompatEnabled(t *testing.T) {
+	req := &types.ResponsesRequest{
+		Model: "gpt-5.5",
+		Input: "search",
+		RawTools: []interface{}{
+			map[string]interface{}{
+				"type":        "tool_search",
+				"execution":   "client",
+				"description": "Search over deferred tool metadata",
+				"parameters": map[string]interface{}{
+					"type":       "object",
+					"properties": map[string]interface{}{},
+				},
+			},
+			map[string]interface{}{
+				"type":       "function",
+				"name":       "do_thing",
+				"parameters": map[string]interface{}{"type": "object", "properties": map[string]interface{}{}},
+			},
+		},
+		TransformerMetadata: map[string]interface{}{
+			"codex_tool_compat_enabled": true,
+		},
+	}
+
+	converted, err := (&OpenAIChatConverter{}).ToProviderRequest(&session.Session{}, req)
+	assert.NoError(t, err)
+	requestMap := converted.(map[string]interface{})
+	tools := requestMap["tools"].([]map[string]interface{})
+	assert.Len(t, tools, 2)
+	assert.Equal(t, "tool_search", tools[0]["function"].(map[string]interface{})["name"])
+	assert.Equal(t, "do_thing", tools[1]["function"].(map[string]interface{})["name"])
+}
+
 func TestOpenAIChatConverter_PreservesStringToolsWhenCodexCompatDisabled(t *testing.T) {
 	req := &types.ResponsesRequest{
 		Model:    "gpt-5.5",

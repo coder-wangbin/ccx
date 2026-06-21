@@ -3,6 +3,8 @@ package providers
 import (
 	"encoding/json"
 	"testing"
+
+	"github.com/BenedictKing/ccx/internal/config"
 )
 
 func TestStripCodexClientOnlyTools(t *testing.T) {
@@ -633,6 +635,70 @@ func TestStripImageGenerationFromTools(t *testing.T) {
 		stripImageGenerationFromTools(req)
 		if _, ok := req["tools"]; ok {
 			t.Fatal("不应注入 tools")
+		}
+	})
+}
+
+func TestResponsesProviderCodexToolCompatDiffersFromNativePassthroughForOpenAI(t *testing.T) {
+	t.Run("OpenAI Chat 转换只由 codexToolCompat 启用 Codex proxy", func(t *testing.T) {
+		compat := true
+		upstream := &config.UpstreamConfig{
+			ServiceType:                   "openai",
+			CodexToolCompat:               &compat,
+			CodexNativeToolPassthrough:    false,
+			StripImageGenerationTool:      false,
+			NormalizeNonstandardChatRoles: false,
+		}
+		body := []byte(`{
+			"model": "gpt-5.5",
+			"input": "search",
+			"tools": [
+				{"type": "tool_search", "execution": "client", "description": "Search tools", "parameters": {"type": "object", "properties": {}}},
+				{"type": "function", "name": "do_thing", "parameters": {"type": "object", "properties": {}}}
+			]
+		}`)
+
+		providerReq, _, err := (&ResponsesProvider{}).buildProviderRequestBody(nil, "/v1/responses", body, upstream)
+		if err != nil {
+			t.Fatalf("buildProviderRequestBody 失败: %v", err)
+		}
+		reqMap := providerReq.(map[string]interface{})
+		tools := reqMap["tools"].([]map[string]interface{})
+		if len(tools) != 2 {
+			t.Fatalf("工具数量=%d，期望 2", len(tools))
+		}
+		if got := tools[0]["function"].(map[string]interface{})["name"]; got != "tool_search" {
+			t.Fatalf("第一个工具=%v，期望 tool_search", got)
+		}
+	})
+
+	t.Run("codexNativeToolPassthrough 不等价于 Chat 转换兼容", func(t *testing.T) {
+		compat := false
+		upstream := &config.UpstreamConfig{
+			ServiceType:                "openai",
+			CodexToolCompat:            &compat,
+			CodexNativeToolPassthrough: true,
+		}
+		body := []byte(`{
+			"model": "gpt-5.5",
+			"input": "search",
+			"tools": [
+				{"type": "tool_search", "execution": "client", "description": "Search tools", "parameters": {"type": "object", "properties": {}}},
+				{"type": "function", "name": "do_thing", "parameters": {"type": "object", "properties": {}}}
+			]
+		}`)
+
+		providerReq, _, err := (&ResponsesProvider{}).buildProviderRequestBody(nil, "/v1/responses", body, upstream)
+		if err != nil {
+			t.Fatalf("buildProviderRequestBody 失败: %v", err)
+		}
+		reqMap := providerReq.(map[string]interface{})
+		tools := reqMap["tools"].([]map[string]interface{})
+		if len(tools) != 1 {
+			t.Fatalf("工具数量=%d，期望 1；codexNativeToolPassthrough 不应启用 Chat proxy", len(tools))
+		}
+		if got := tools[0]["function"].(map[string]interface{})["name"]; got != "do_thing" {
+			t.Fatalf("保留工具=%v，期望 do_thing", got)
 		}
 	})
 }
