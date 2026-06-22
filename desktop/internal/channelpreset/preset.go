@@ -839,10 +839,10 @@ var channelTargetConfigs = map[string]map[string]channelTargetConfig{
 			NoVision:                      true,
 		},
 		ProviderMiMo: {
-			ModelMapping:          map[string]string{"codex": "mimo-v2.5", "gpt": "mimo-v2.5-pro"},
+			ModelMapping:          map[string]string{"codex": "mimo-v2.5-pro", "gpt": "mimo-v2.5-pro", "mini": "mimo-v2.5-pro"},
 			ReasoningParamStyle:   "reasoning",
-			CodexToolCompat:       boolRef(false),
-			StripCodexClientTools: boolRef(false),
+			CodexToolCompat:       boolRef(true),
+			StripCodexClientTools: boolRef(true),
 			NoVisionModels:        []string{"mimo-v2.5-pro"},
 			VisionFallbackModel:   "mimo-v2.5",
 			RateLimitRPM:          80,

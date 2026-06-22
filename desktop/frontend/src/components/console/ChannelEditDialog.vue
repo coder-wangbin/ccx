@@ -1077,13 +1077,14 @@ const codexResponsesPresets: Record<string, {
 }> = {
   mimo: {
     mapping: [
-      { source: 'codex', target: 'mimo-v2.5' },
+      { source: 'codex', target: 'mimo-v2.5-pro' },
       { source: 'gpt', target: 'mimo-v2.5-pro' },
+      { source: 'mini', target: 'mimo-v2.5-pro' },
     ],
     reasoningParamStyle: 'reasoning',
     codexNativeToolPassthrough: false,
-    codexToolCompat: false,
-    stripCodexClientTools: false,
+    codexToolCompat: true,
+    stripCodexClientTools: true,
     stripImageGenerationTool: false,
     normalizeNonstandardChatRoles: false,
     noVision: false,

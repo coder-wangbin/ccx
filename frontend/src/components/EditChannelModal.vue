@@ -710,14 +710,15 @@ const codexResponsesChannelPresets: Record<
 > = {
   mimo: {
     modelMapping: {
-      'codex': 'mimo-v2.5',
-      'gpt': 'mimo-v2.5-pro'
+      codex: 'mimo-v2.5-pro',
+      gpt: 'mimo-v2.5-pro',
+      mini: 'mimo-v2.5-pro'
     },
     reasoningMapping: {},
     reasoningParamStyle: 'reasoning',
     codexNativeToolPassthrough: false,
-    codexToolCompat: false,
-    stripCodexClientTools: false,
+    codexToolCompat: true,
+    stripCodexClientTools: true,
     stripImageGenerationTool: false,
     normalizeNonstandardChatRoles: false,
     noVision: false,
