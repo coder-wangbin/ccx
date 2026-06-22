@@ -224,7 +224,23 @@ function getFilteredSourceModels(filter: string): string[] {
   if (!value) return models.slice(0, 80)
 
   const lower = value.toLowerCase()
-  return models.filter(m => m.toLowerCase().includes(lower)).slice(0, 80)
+  const filtered = models.filter(m => m.toLowerCase().includes(lower))
+
+  // 如果只有一个匹配项且完全匹配当前值，返回该项周围的窗口
+  if (filtered.length === 1 && filtered[0].toLowerCase() === lower) {
+    const index = models.findIndex(m => m === filtered[0])
+    if (index >= 0) return getSourceModelWindow(index, models)
+  }
+
+  return filtered.slice(0, 80)
+}
+
+function getSourceModelWindow(index: number, models: string[]): string[] {
+  const limit = 80
+  const before = 30
+  const maxStart = Math.max(models.length - limit, 0)
+  const start = Math.min(Math.max(index - before, 0), maxStart)
+  return models.slice(start, start + limit)
 }
 
 const filteredSourceModels = computed(() => getFilteredSourceModels(sourceInputFilter.value))
@@ -232,7 +248,7 @@ const filteredSourceModels = computed(() => getFilteredSourceModels(sourceInputF
 function showSourceDropdown(inputId: string, currentValue: string) {
   activeSourceInputId.value = inputId
   sourceInputFilter.value = currentValue
-  showSourceSuggestions.value = sourceModelOptions.value.length > 0
+  showSourceSuggestions.value = true
 }
 
 function hideSourceDropdown() {
