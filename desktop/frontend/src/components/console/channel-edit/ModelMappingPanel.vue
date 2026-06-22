@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch, nextTick } from 'vue'
+import type { ComponentPublicInstance } from 'vue'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -76,7 +77,7 @@ const stableInputFocusClass = 'focus-visible:ring-0 focus-visible:ring-offset-0 
 const isSameModel = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase()
 
 const sourceDropdownRef = ref<HTMLDivElement | null>(null)
-const targetDropdownRef = ref<HTMLDivElement | null>(null)
+const targetDropdownRefs = ref<Record<string, HTMLDivElement | null>>({})
 
 // 当源模型下拉列表打开时，自动滚动到选中项
 watch(() => props.showSourceSuggestions && props.activeSourceInputId === 'new-source', (isOpen) => {
@@ -92,18 +93,20 @@ watch(() => props.showSourceSuggestions && props.activeSourceInputId === 'new-so
   }
 })
 
-// 当目标模型下拉列表打开时，自动滚动到选中项
+function setTargetDropdownRef(inputId: string, el: Element | ComponentPublicInstance | null) {
+  const element = el instanceof Element ? el : el?.$el
+  targetDropdownRefs.value[inputId] = element instanceof HTMLDivElement ? element : null
+}
+
+// 当目标模型下拉列表打开时，按当前输入框自动滚动到选中项。
 watch(() => props.showTargetSuggestions && props.activeTargetInputId, (inputId) => {
-  if (inputId && props.newModelMapping.target) {
-    nextTick(() => {
-      const container = targetDropdownRef.value
-      if (!container) return
-      const selectedButton = container.querySelector('[data-selected="true"]') as HTMLElement
-      if (selectedButton) {
-        selectedButton.scrollIntoView({ block: 'center', behavior: 'smooth' })
-      }
-    })
-  }
+  if (!inputId) return
+  nextTick(() => {
+    const container = targetDropdownRefs.value[inputId]
+    if (!container) return
+    const selectedButton = container.querySelector('[data-selected="true"]') as HTMLElement | null
+    selectedButton?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+  })
 })
 
 function toSelectValue(effort: ReasoningEffort | ''): string {
@@ -244,12 +247,14 @@ function fromSelectValue(value: string): ReasoningEffort | '' {
             />
             <div
               v-if="showTargetSuggestions && activeTargetInputId === `row-${index}` && filteredTargetModels.length"
+              :ref="el => setTargetDropdownRef(`row-${index}`, el)"
               class="absolute left-0 right-0 top-full z-30 mt-1 max-h-52 overflow-y-auto rounded-lg border border-border bg-popover p-1 shadow-lg"
             >
               <button
                 v-for="model in filteredTargetModels"
                 :key="model"
                 type="button"
+                :data-selected="isSameModel(model, row.target)"
                 class="flex w-full items-center rounded-md px-2 py-1.5 text-left font-mono text-xs text-popover-foreground hover:bg-accent hover:text-accent-foreground"
                 :class="isSameModel(model, row.target) ? 'bg-primary/10 text-primary' : ''"
                 @mousedown.prevent="emit('selectTargetModel', `row-${index}`, model)"
@@ -320,12 +325,14 @@ function fromSelectValue(value: string): ReasoningEffort | '' {
             />
             <div
               v-if="showTargetSuggestions && activeTargetInputId === 'vision-fallback' && filteredTargetModels.length"
+              :ref="el => setTargetDropdownRef('vision-fallback', el)"
               class="absolute left-0 right-0 top-full z-30 mt-1 max-h-52 overflow-y-auto rounded-lg border border-border bg-popover p-1 shadow-lg"
             >
               <button
                 v-for="model in filteredTargetModels"
                 :key="model"
                 type="button"
+                :data-selected="isSameModel(model, visionFallbackModel)"
                 class="flex w-full items-center rounded-md px-2 py-1.5 text-left font-mono text-xs text-popover-foreground hover:bg-accent hover:text-accent-foreground"
                 :class="isSameModel(model, visionFallbackModel) ? 'bg-primary/10 text-primary' : ''"
                 @mousedown.prevent="emit('update:visionFallbackModel', model); emit('hideTargetDropdown')"
@@ -413,7 +420,7 @@ function fromSelectValue(value: string): ReasoningEffort | '' {
           />
           <div
             v-if="showTargetSuggestions && activeTargetInputId === 'new' && filteredTargetModels.length"
-            ref="targetDropdownRef"
+            :ref="el => setTargetDropdownRef('new', el)"
             class="absolute left-0 right-0 top-full z-30 mt-1 max-h-52 overflow-y-auto rounded-lg border border-border bg-popover p-1 shadow-lg"
           >
             <button
