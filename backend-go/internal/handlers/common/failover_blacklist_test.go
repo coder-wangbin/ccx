@@ -143,6 +143,16 @@ func TestShouldBlacklistKey_BalanceMessages(t *testing.T) {
 			},
 		},
 		{
+			name:       "403 new api insufficient user quota should blacklist as insufficient balance",
+			statusCode: 403,
+			body:       `{"error":{"message":"用户额度不足, 剩余额度: ¥-0.136964 (request id: 202606221209254492365268268d9d6mwf4XMcd)","type":"new_api_error","param":"","code":"insufficient_user_quota"}}`,
+			want: BlacklistResult{
+				ShouldBlacklist: true,
+				Reason:          "insufficient_balance",
+				Message:         "用户额度不足, 剩余额度: ¥-0.136964 (request id: 202606221209254492365268268d9d6mwf4XMcd)",
+			},
+		},
+		{
 			name:       "429 insufficient quota message should blacklist as insufficient balance",
 			statusCode: 429,
 			body:       `{"error":{"message":"insufficient quota for current billing period"}}`,

@@ -1151,6 +1151,15 @@ data: {"type":"error","code":"USAGE_LIMIT_EXCEEDED","message":"error: code=429 r
 			wantMessage: "error: code=429 reason=\"DAILY_LIMIT_EXCEEDED\" message=\"daily usage limit exceeded\" metadata=map[]",
 		},
 		{
+			name: "nested insufficient user quota code",
+			event: `event: error
+data: {"type":"error","error":{"message":"用户额度不足, 剩余额度: ¥-0.136964 (request id: 202606221209254492365268268d9d6mwf4XMcd)","type":"new_api_error","param":"","code":"insufficient_user_quota"}}
+
+`,
+			wantReason:  "insufficient_balance",
+			wantMessage: "用户额度不足, 剩余额度: ¥-0.136964 (request id: 202606221209254492365268268d9d6mwf4XMcd)",
+		},
+		{
 			name: "string error field invalid api key",
 			event: `event: error
 data: {"type":"error","error":"无效的API Key"}
