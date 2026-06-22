@@ -30,6 +30,7 @@ COPY Makefile ./
 COPY scripts/ ./scripts/
 COPY frontend/ ./frontend/
 COPY backend-go/ ./backend-go/
+COPY shared/ ./shared/
 COPY VERSION ./
 
 # 构建：交叉编译目标平台，利用 Go build cache

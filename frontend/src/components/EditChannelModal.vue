@@ -756,7 +756,7 @@ const normalizeTargetModelNames = (models: string[]) => {
 }
 
 const toTargetModelOptions = (models: string[]) => {
-  return normalizeTargetModelNames(models).map(id => ({ title: id, value: id }))
+  return normalizeTargetModelNames(models).map((id: string) => ({ title: id, value: id }))
 }
 
 const resetTargetModelOptions = () => {
