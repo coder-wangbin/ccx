@@ -1,22 +1,24 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, ref, watch, type ComponentPublicInstance, type StyleValue } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { Alert } from '@/components/ui/alert'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
-import { MessageSquare, Search } from 'lucide-vue-next'
+import { MessageSquare, Search, RotateCcw } from 'lucide-vue-next'
 import { useAdminApi } from '@/composables/useAdminApi'
 import { useConversations } from '@/composables/useConversations'
 import { useDesktopActivity } from '@/composables/useDesktopActivity'
 import { useLanguage } from '@/composables/useLanguage'
 import { useStatus } from '@/composables/useStatus'
 import ConversationCard from './ConversationCard.vue'
-import type { ChannelSequenceEntry } from '@/services/admin-api'
+import type { ChannelSequenceEntry, ConversationInfo } from '@/services/admin-api'
 import { getChannelTypeApi, type ManagedChannelType } from '@/utils/channel-type-api'
+
+type BoardColumnKey = 'streaming' | 'subagents' | 'active' | 'idle'
 
 const api = useAdminApi()
 const { status } = useStatus()
-const { t } = useLanguage()
+const { t, tf } = useLanguage()
 const {
   conversations,
   channelsByKind,
@@ -32,26 +34,21 @@ const { isConsoleConversationsActive } = useDesktopActivity()
 
 const kindFilter = ref('')
 const searchQuery = ref('')
-const overrideDuration = ref('1800') // 默认 30min，启动后从后端加载
+const overrideDuration = ref('1800')
 const nowMs = ref(Date.now())
 const expandedCards = ref(new Set<string>())
-const masonryEl = ref<HTMLElement | null>(null)
-const masonryColumnCount = ref(1)
-const masonryHeight = ref(0)
-const masonryItemRects = ref<Record<string, { x: number; y: number; width: number }>>({})
 const notice = ref<{ variant: 'success' | 'destructive'; message: string } | null>(null)
-
-const MASONRY_MIN_COLUMN_WIDTH = 320
-const MASONRY_GAP = 16
-const MASONRY_MAX_COLUMNS = 3
-let masonryResizeObserver: ResizeObserver | undefined
-let masonryLayoutFrame = 0
+const settingsReady = ref(false)
 let noticeTimer: ReturnType<typeof setTimeout> | undefined
-let clockTimer: ReturnType<typeof setInterval> | undefined
-let hasLoadedSettings = false
-let isUnmounted = false
-const masonryItemElements = new Map<string, HTMLElement>()
-const masonryItemObservers = new Map<string, ResizeObserver>()
+let refreshTimer: ReturnType<typeof setInterval> | undefined
+let conversationTimer: ReturnType<typeof setInterval> | undefined
+
+const boardMeta = computed<Array<{ key: BoardColumnKey; label: string; hint: string; color: string }>>(() => [
+  { key: 'streaming', label: tf('cockpit.board.streaming', 'Streaming'), hint: tf('cockpit.board.streamingHint', 'Live streaming conversations'), color: '#ef4444' },
+  { key: 'subagents', label: tf('cockpit.board.subagents', 'Subagents'), hint: tf('cockpit.board.subagentsHint', 'Conversations with subagents'), color: '#f59e0b' },
+  { key: 'active', label: tf('cockpit.board.active', 'Active'), hint: tf('cockpit.board.activeHint', 'Active but not streaming'), color: '#6366f1' },
+  { key: 'idle', label: tf('cockpit.board.idle', 'Idle'), hint: tf('cockpit.board.idleHint', 'Idle conversations'), color: '#10b981' },
+])
 
 const kindFilterOptions = [
   { label: 'ALL', value: '' },
@@ -62,9 +59,21 @@ const kindFilterOptions = [
   { label: 'GEMINI', value: 'gemini', class: 'border-orange-500/50 text-orange-500 data-[active=true]:bg-orange-500/10' },
 ]
 
-const sortedConversations = computed(() => {
-  return [...conversations.value].sort((a, b) => new Date(b.lastActiveAt).getTime() - new Date(a.lastActiveAt).getTime())
-})
+const durationOptions = computed(() => [
+  { label: t('cockpit.durationDefault'), value: '1800' },
+  { label: t('cockpit.duration15min'), value: '900' },
+  { label: t('cockpit.duration1hour'), value: '3600' },
+  { label: t('cockpit.duration2hours'), value: '7200' },
+  { label: t('cockpit.duration4hours'), value: '14400' },
+  { label: t('cockpit.duration8hours'), value: '28800' },
+  { label: t('cockpit.duration12hours'), value: '43200' },
+  { label: t('cockpit.duration24hours'), value: '86400' },
+  { label: t('cockpit.durationNever'), value: '-1' },
+])
+
+const sortedConversations = computed(() =>
+  [...conversations.value].sort((a, b) => new Date(b.lastActiveAt).getTime() - new Date(a.lastActiveAt).getTime()),
+)
 
 const visibleConversations = computed(() => {
   let list = sortedConversations.value
@@ -86,18 +95,53 @@ const visibleConversations = computed(() => {
 
 const overrideCount = computed(() => Object.keys(overrides.value).length)
 const shouldRefresh = computed(() => status.value.running)
+const refreshState = computed(() => {
+  if (status.value.starting) return 'connecting'
+  if (status.value.running) return 'online'
+  return 'offline'
+})
 
-const durationOptions = computed(() => [
-  { label: t('cockpit.durationDefault'), value: '1800' },
-  { label: t('cockpit.duration15min'), value: '900' },
-  { label: t('cockpit.duration1hour'), value: '3600' },
-  { label: t('cockpit.duration2hours'), value: '7200' },
-  { label: t('cockpit.duration4hours'), value: '14400' },
-  { label: t('cockpit.duration8hours'), value: '28800' },
-  { label: t('cockpit.duration12hours'), value: '43200' },
-  { label: t('cockpit.duration24hours'), value: '86400' },
-  { label: t('cockpit.durationNever'), value: '-1' },
-])
+const boardStats = computed(() => {
+  const buckets = buildColumnBuckets(visibleConversations.value)
+  return boardMeta.value.map(item => ({
+    ...item,
+    count: buckets[item.key].length,
+  }))
+})
+
+const boardData = computed(() => {
+  const buckets = buildColumnBuckets(visibleConversations.value)
+  return boardMeta.value.map(item => ({
+    ...item,
+    items: buckets[item.key],
+  }))
+})
+
+function buildColumnBuckets(items: ConversationInfo[]): Record<BoardColumnKey, ConversationInfo[]> {
+  const buckets: Record<BoardColumnKey, ConversationInfo[]> = {
+    streaming: [],
+    subagents: [],
+    active: [],
+    idle: [],
+  }
+
+  for (const item of items) {
+    buckets[getBoardColumnKey(item)].push(item)
+  }
+
+  return buckets
+}
+
+function getBoardColumnKey(conversation: ConversationInfo): BoardColumnKey {
+  if (conversation.status === 'streaming') return 'streaming'
+  if (conversation.hasSubagents) return 'subagents'
+  if (conversation.status === 'idle') return 'idle'
+  return 'active'
+}
+
+function getChannelsForKind(kind: string) {
+  return channelsByKind.value[kind] || []
+}
 
 function overrideDurationAsNumber(): number {
   return Number(overrideDuration.value)
@@ -107,7 +151,6 @@ async function loadSettings() {
   try {
     const data = await api.get<{ overrideTtlMinutes: number }>('/api/conversations/settings')
     if (data.overrideTtlMinutes !== 0) {
-      // 将分钟转为秒（-1 保持为 -1）
       overrideDuration.value = data.overrideTtlMinutes === -1 ? '-1' : String(data.overrideTtlMinutes * 60)
     }
   } catch (e) {
@@ -115,52 +158,17 @@ async function loadSettings() {
   }
 }
 
-async function saveSettings(newDurationSeconds: number) {
-  try {
-    // 将秒转为分钟（-1 保持为 -1）
-    const minutes = newDurationSeconds === -1 ? -1 : Math.round(newDurationSeconds / 60)
-    await api.put('/api/conversations/settings', { overrideTtlMinutes: minutes })
-  } catch (e) {
-    showNotice('destructive', e instanceof Error ? e.message : String(e))
-    throw e
-  }
-}
-
 function showNotice(variant: 'success' | 'destructive', message: string) {
   notice.value = { variant, message }
-  if (noticeTimer) clearTimeout(noticeTimer)
-  noticeTimer = setTimeout(() => {
-    notice.value = null
-    noticeTimer = undefined
+  if (noticeTimer) window.clearTimeout(noticeTimer)
+  noticeTimer = window.setTimeout(() => {
+    if (notice.value?.message === message) notice.value = null
   }, 2400)
 }
 
-function getChannelsForKind(kind: string) {
-  return channelsByKind.value[kind] || []
-}
-
 async function refreshConversations() {
-  if (!shouldRefresh.value) return
+  if (!shouldRefresh.value || !isConsoleConversationsActive.value) return
   await fetchConversations()
-}
-
-function updateClockTimer() {
-  if (clockTimer) {
-    clearInterval(clockTimer)
-    clockTimer = undefined
-  }
-  if (!isConsoleConversationsActive.value) return
-  nowMs.value = Date.now()
-  clockTimer = setInterval(() => {
-    nowMs.value = Date.now()
-  }, 1000)
-}
-
-function toggleExpand(id: string) {
-  const next = new Set(expandedCards.value)
-  if (next.has(id)) next.delete(id)
-  else next.add(id)
-  expandedCards.value = next
 }
 
 async function handleSetOverride(conversationId: string, sequence: ChannelSequenceEntry[], subagentSequence?: ChannelSequenceEntry[]) {
@@ -175,10 +183,8 @@ async function handleSetOverride(conversationId: string, sequence: ChannelSequen
         try {
           await typeApi.resume(target.channelIndex)
         } catch {
-          // resume 可能已生效（幂等），继续尝试 setStatus
+          // 幂等
         }
-        // setStatus 不包 try/catch——失败时阻止 setOverride 执行，
-        // 避免 override 指向仍处于暂停/熔断状态的渠道
         await typeApi.setStatus(target.channelIndex, 'active')
       }
     }
@@ -213,179 +219,124 @@ function handleError(message: string) {
   showNotice('destructive', message)
 }
 
-function updateMasonryColumnCount(width = masonryEl.value?.clientWidth || 0) {
-  const fit = Math.floor((width + MASONRY_GAP) / (MASONRY_MIN_COLUMN_WIDTH + MASONRY_GAP))
-  masonryColumnCount.value = Math.max(1, Math.min(fit, MASONRY_MAX_COLUMNS))
+function toggleExpand(id: string) {
+  const next = new Set(expandedCards.value)
+  if (next.has(id)) next.delete(id)
+  else next.add(id)
+  expandedCards.value = next
 }
 
-function scheduleMasonryLayout() {
-  if (isUnmounted) return
-  if (masonryLayoutFrame) return
-  masonryLayoutFrame = window.requestAnimationFrame(() => {
-    masonryLayoutFrame = 0
-    if (isUnmounted) return
-    layoutMasonryItems()
-  })
-}
-
-function layoutMasonryItems() {
-  const container = masonryEl.value
-  if (isUnmounted || !container?.isConnected) return
-
-  const containerWidth = container.clientWidth || 0
-  if (!containerWidth) return
-
-  const columnCount = Math.max(1, masonryColumnCount.value)
-  const columnWidth = (containerWidth - MASONRY_GAP * (columnCount - 1)) / columnCount
-  const columnHeights = Array.from({ length: columnCount }, () => 0)
-  const nextRects: Record<string, { x: number; y: number; width: number }> = {}
-
-  for (const conversation of visibleConversations.value) {
-    let targetColumn = 0
-    for (let i = 1; i < columnHeights.length; i++) {
-      if (columnHeights[i] < columnHeights[targetColumn]) targetColumn = i
-    }
-
-    const element = masonryItemElements.get(conversation.id)
-    const itemHeight = element?.offsetHeight || 0
-    const x = targetColumn * (columnWidth + MASONRY_GAP)
-    const y = columnHeights[targetColumn]
-    nextRects[conversation.id] = { x, y, width: columnWidth }
-    columnHeights[targetColumn] += itemHeight + MASONRY_GAP
+function syncClockTimer() {
+  if (refreshTimer) {
+    window.clearInterval(refreshTimer)
+    refreshTimer = undefined
   }
-
-  masonryItemRects.value = nextRects
-  masonryHeight.value = Math.max(0, Math.max(...columnHeights) - MASONRY_GAP)
+  if (!isConsoleConversationsActive.value) return
+  nowMs.value = Date.now()
+  refreshTimer = window.setInterval(() => {
+    nowMs.value = Date.now()
+  }, 1000)
 }
 
-function pruneMasonryItemRefs() {
-  const visibleIds = new Set(visibleConversations.value.map(conversation => conversation.id))
-  for (const id of masonryItemElements.keys()) {
-    if (visibleIds.has(id)) continue
-    masonryItemObservers.get(id)?.disconnect()
-    masonryItemObservers.delete(id)
-    masonryItemElements.delete(id)
+function syncConversationTimer() {
+  if (conversationTimer) {
+    window.clearInterval(conversationTimer)
+    conversationTimer = undefined
   }
+  if (!shouldRefresh.value || !isConsoleConversationsActive.value) return
+  conversationTimer = window.setInterval(() => {
+    void refreshConversations()
+  }, 3000)
 }
 
-function getMasonryItemStyle(id: string): StyleValue {
-  const rect = masonryItemRects.value[id]
-  if (!rect) {
-    return {
-      width: masonryColumnCount.value > 1 ? `${MASONRY_MIN_COLUMN_WIDTH}px` : '100%',
-      transform: 'translate3d(0, 0, 0)',
-      visibility: 'hidden',
-    }
+onMounted(async () => {
+  await loadSettings()
+  settingsReady.value = true
+  syncClockTimer()
+  syncConversationTimer()
+  void refreshConversations()
+})
+
+watch([shouldRefresh, isConsoleConversationsActive], () => {
+  syncConversationTimer()
+  syncClockTimer()
+  if (shouldRefresh.value && isConsoleConversationsActive.value) {
+    void refreshConversations()
   }
-  return {
-    width: `${rect.width}px`,
-    transform: `translate3d(${rect.x}px, ${rect.y}px, 0)`,
+})
+
+watch(overrideDuration, async value => {
+  if (!settingsReady.value) return
+  const seconds = Number(value)
+  if (Number.isNaN(seconds) || seconds === 0) return
+  try {
+    const minutes = seconds === -1 ? -1 : Math.round(seconds / 60)
+    await api.put('/api/conversations/settings', { overrideTtlMinutes: minutes })
+  } catch (e) {
+    showNotice('destructive', e instanceof Error ? e.message : String(e))
   }
-}
-
-function setMasonryItemRef(id: string, el: Element | ComponentPublicInstance | null) {
-  if (isUnmounted) return
-
-  const element = el instanceof HTMLElement ? el : null
-  const existing = masonryItemElements.get(id)
-  if (existing === element) return
-
-  const existingObserver = masonryItemObservers.get(id)
-  existingObserver?.disconnect()
-  masonryItemObservers.delete(id)
-  masonryItemElements.delete(id)
-
-  if (!element) {
-    scheduleMasonryLayout()
-    return
-  }
-
-  masonryItemElements.set(id, element)
-  const observer = new ResizeObserver(() => scheduleMasonryLayout())
-  observer.observe(element)
-  masonryItemObservers.set(id, observer)
-  scheduleMasonryLayout()
-}
+})
 
 onBeforeUnmount(() => {
-  isUnmounted = true
-  if (clockTimer) clearInterval(clockTimer)
-  masonryResizeObserver?.disconnect()
-  for (const observer of masonryItemObservers.values()) observer.disconnect()
-  if (masonryLayoutFrame) window.cancelAnimationFrame(masonryLayoutFrame)
-  if (noticeTimer) clearTimeout(noticeTimer)
-})
-
-watch(masonryEl, (el, _prev, onCleanup) => {
-  if (isUnmounted) return
-  if (!el) return
-  updateMasonryColumnCount(el.clientWidth)
-  const observer = new ResizeObserver(entries => {
-    if (isUnmounted) return
-    const entry = entries[0]
-    if (!entry) return
-    updateMasonryColumnCount(entry.contentRect.width)
-  })
-  observer.observe(el)
-  masonryResizeObserver = observer
-  nextTick(() => scheduleMasonryLayout())
-  onCleanup(() => {
-    observer.disconnect()
-    if (masonryResizeObserver === observer) masonryResizeObserver = undefined
-  })
-}, { flush: 'post' })
-
-watch(visibleConversations, async () => {
-  if (isUnmounted) return
-  pruneMasonryItemRefs()
-  await nextTick()
-  if (isUnmounted) return
-  scheduleMasonryLayout()
-})
-
-watch(masonryColumnCount, () => scheduleMasonryLayout())
-watch([shouldRefresh, isConsoleConversationsActive], ([running, active]) => {
-  if (!active) return
-  if (!hasLoadedSettings) {
-    hasLoadedSettings = true
-    loadSettings().catch(() => {})
-  }
-  if (running) refreshConversations().catch(() => {})
-}, { immediate: true })
-
-watch(isConsoleConversationsActive, updateClockTimer, { immediate: true })
-
-// 监听 overrideDuration 变化并保存到后端（包括 -1 永不恢复）
-watch(overrideDuration, async (newDuration) => {
-  const seconds = Number(newDuration)
-  if (!isNaN(seconds) && seconds !== 0) {
-    try {
-      await saveSettings(seconds)
-    } catch (e) {
-      // 错误已在 saveSettings 中显示
-    }
-  }
+  if (refreshTimer) window.clearInterval(refreshTimer)
+  if (conversationTimer) window.clearInterval(conversationTimer)
+  if (noticeTimer) window.clearTimeout(noticeTimer)
 })
 </script>
 
 <template>
-  <div class="conversation-dashboard mx-auto w-full max-w-[1400px]">
-    <Alert v-if="error" variant="destructive" class="mb-4">
+  <div class="mx-auto flex w-full max-w-[1680px] flex-col gap-4">
+    <div class="flex flex-wrap items-center gap-3">
+      <div class="flex items-center gap-2">
+        <div class="inline-flex items-center gap-2 text-sm font-semibold text-foreground">
+          <MessageSquare class="h-5 w-5 text-primary" />
+          <span>{{ t('tab.cockpitTitle') }}</span>
+        </div>
+      </div>
+
+      <div class="flex flex-wrap items-center gap-2">
+        <span
+          v-for="stat in boardStats"
+          :key="stat.key"
+          class="inline-flex items-center gap-2 border border-border bg-card px-3 py-1.5 text-xs font-medium text-muted-foreground"
+        >
+          <span class="h-2.5 w-2.5 rounded-full" :style="{ background: stat.color }" />
+          <span>{{ stat.label }}</span>
+          <strong class="ml-1 text-foreground">{{ stat.count }}</strong>
+        </span>
+      </div>
+
+      <div class="ml-auto flex flex-wrap items-center gap-2">
+        <span class="inline-flex items-center gap-2 border border-border bg-card px-3 py-1.5 text-xs text-muted-foreground">
+          <span class="h-2 w-2 rounded-full" :class="refreshState === 'online' ? 'bg-emerald-500' : refreshState === 'connecting' ? 'bg-amber-500' : 'bg-rose-500'" />
+          {{ refreshState === 'online' ? t('common.online') : refreshState === 'connecting' ? t('common.connecting') : t('common.offline') }}
+        </span>
+        <button
+          type="button"
+          class="inline-flex h-9 items-center gap-1.5 border border-border bg-card px-3 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          @click="refreshConversations"
+        >
+          <RotateCcw class="h-3.5 w-3.5" />
+          {{ t('cockpit.refresh') }}
+        </button>
+      </div>
+    </div>
+
+    <Alert v-if="error" variant="destructive">
       <p class="text-sm">{{ error }}</p>
     </Alert>
 
-    <Alert v-if="notice" :variant="notice.variant" class="mb-4">
+    <Alert v-if="notice" :variant="notice.variant">
       <p class="text-sm">{{ notice.message }}</p>
     </Alert>
 
-    <!-- 过滤栏：对齐 WebUI cockpit 顶部结构 -->
-    <div class="mb-4 flex flex-wrap items-center gap-2">
+    <div class="flex flex-wrap items-center gap-2">
       <div class="flex flex-wrap items-center gap-1.5">
         <button
           v-for="option in kindFilterOptions"
           :key="option.value"
           type="button"
-          class="filter-chip border border-border px-2.5 py-1 text-[10px] font-bold tracking-[0.08em] text-muted-foreground transition-colors hover:bg-accent/40"
+          class="border px-2.5 py-1 text-[10px] font-bold tracking-[0.08em] text-muted-foreground transition-colors hover:bg-accent/40"
           :class="[option.class, { 'border-primary bg-primary/10 text-primary': kindFilter === option.value }]"
           :data-active="kindFilter === option.value"
           @click="kindFilter = option.value"
@@ -396,7 +347,7 @@ watch(overrideDuration, async (newDuration) => {
 
       <div class="min-w-4 flex-1" />
 
-      <div class="relative w-full min-w-[180px] sm:w-64 lg:w-80">
+      <div class="relative w-full min-w-[180px] sm:w-72 lg:w-80">
         <Search class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input
           v-model="searchQuery"
@@ -406,7 +357,7 @@ watch(overrideDuration, async (newDuration) => {
       </div>
 
       <Select v-model="overrideDuration">
-        <SelectTrigger class="h-9 w-[160px] shrink-0">
+        <SelectTrigger class="h-9 w-[180px] shrink-0">
           <SelectValue :placeholder="t('cockpit.overrideDuration')" />
         </SelectTrigger>
         <SelectContent>
@@ -425,7 +376,7 @@ watch(overrideDuration, async (newDuration) => {
     </div>
 
     <div v-if="loading && !conversations.length" class="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-      <Skeleton v-for="i in 6" :key="i" class="h-32 w-full rounded-none" />
+      <Skeleton v-for="i in 8" :key="i" class="h-32 w-full rounded-none" />
     </div>
 
     <div v-else-if="!conversations.length" class="border border-border bg-card/60 px-6 py-12 text-center">
@@ -436,96 +387,51 @@ watch(overrideDuration, async (newDuration) => {
     </div>
 
     <template v-else>
-      <div v-if="!visibleConversations.length" class="mb-4 border border-border bg-card/60 px-6 py-8 text-center text-sm text-muted-foreground">
+      <div v-if="!visibleConversations.length" class="border border-border bg-card/60 px-6 py-8 text-center text-sm text-muted-foreground">
         {{ t('cockpit.noMatches') }}
       </div>
 
-      <div
-        ref="masonryEl"
-        class="conversation-masonry"
-        :style="{ height: `${masonryHeight}px` }"
-      >
-        <div
-          v-for="conversation in visibleConversations"
-          :key="conversation.id"
-          :ref="el => setMasonryItemRef(conversation.id, el)"
-          class="conversation-masonry-item"
-          :style="getMasonryItemStyle(conversation.id)"
+      <div v-else class="grid gap-3 xl:grid-cols-4">
+        <section
+          v-for="column in boardData"
+          :key="column.key"
+          :data-testid="`cockpit-column-${column.key}`"
+          class="min-w-0 border border-border bg-card/40"
         >
-          <ConversationCard
-            :conversation="conversation"
-            :override="overrides[conversation.id]"
-            :available-channels="getChannelsForKind(conversation.kind)"
-            :expanded="expandedCards.has(conversation.id)"
-            :now-ms="nowMs"
-            @toggle-expand="toggleExpand(conversation.id)"
-            @set-override="handleSetOverride"
-            @remove-override="handleRemoveOverride"
-            @feedback="handleFeedback"
-            @success="handleSuccess"
-            @error="handleError"
-          />
-        </div>
+          <div class="flex items-center justify-between gap-3 border-b border-border px-3 py-2.5">
+            <div class="flex items-center gap-2 min-w-0">
+              <span class="h-2.5 w-2.5 rounded-full" :style="{ background: column.color }" />
+              <div class="min-w-0">
+                <div class="text-xs font-semibold uppercase tracking-wide text-foreground">{{ column.label }}</div>
+                <div class="text-[10px] text-muted-foreground">{{ column.hint }}</div>
+              </div>
+            </div>
+            <span class="text-xs font-semibold text-muted-foreground">{{ column.items.length }}</span>
+          </div>
+
+          <div class="space-y-3 p-3">
+            <div v-if="!column.items.length" class="border border-dashed border-border px-4 py-10 text-center text-xs text-muted-foreground">
+              --
+            </div>
+
+            <ConversationCard
+              v-for="conversation in column.items"
+              :key="conversation.id"
+              :conversation="conversation"
+              :override="overrides[conversation.id]"
+              :available-channels="getChannelsForKind(conversation.kind)"
+              :expanded="expandedCards.has(conversation.id)"
+              :now-ms="nowMs"
+              @toggle-expand="toggleExpand(conversation.id)"
+              @set-override="handleSetOverride"
+              @remove-override="handleRemoveOverride"
+              @feedback="handleFeedback"
+              @success="handleSuccess"
+              @error="handleError"
+            />
+          </div>
+        </section>
       </div>
     </template>
   </div>
 </template>
-
-<style scoped>
-.filter-chip {
-  border-radius: 0;
-}
-
-.conversation-masonry {
-  position: relative;
-  box-sizing: border-box;
-  padding-right: 6px;
-  padding-bottom: 6px;
-  transition: height 0.16s ease;
-}
-
-.conversation-masonry-item {
-  position: absolute;
-  left: 0;
-  top: 0;
-  min-width: 0;
-  transition: transform 0.16s ease;
-  will-change: transform;
-}
-
-.system-status-indicator {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  border: 1px solid var(--color-border);
-  background: var(--color-card);
-  padding: 4px 10px;
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.system-status-indicator .status-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--color-muted-foreground);
-}
-
-.system-status-indicator.status-running .status-dot {
-  background: #10b981;
-  animation: dot-pulse 2s ease-in-out infinite;
-}
-
-.system-status-indicator.status-error .status-dot {
-  background: #ef4444;
-}
-
-.system-status-indicator.status-connecting .status-dot {
-  background: #f59e0b;
-}
-
-@keyframes dot-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.4; }
-}
-</style>

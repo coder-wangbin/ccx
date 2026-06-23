@@ -1,0 +1,353 @@
+import { createApp, defineComponent, h, nextTick, ref } from 'vue'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import ConversationDashboard from './ConversationDashboard.vue'
+import type { ConversationChannelInfo, ConversationInfo, SequenceOverrideInfo } from '@/services/admin-api'
+
+const status = ref({ running: true, starting: false })
+const isConsoleConversationsActive = ref(false)
+const conversations = ref<ConversationInfo[]>([])
+const channelsByKind = ref<Record<string, ConversationChannelInfo[]>>({})
+const overrides = ref<Record<string, SequenceOverrideInfo>>({})
+const loading = ref(false)
+const error = ref('')
+const fetchConversations = vi.fn().mockResolvedValue(undefined)
+const setOverride = vi.fn().mockResolvedValue(undefined)
+const removeOverride = vi.fn().mockResolvedValue(undefined)
+const addFeedback = vi.fn().mockResolvedValue(undefined)
+const apiGet = vi.fn().mockResolvedValue({ overrideTtlMinutes: 0 })
+const apiPut = vi.fn().mockResolvedValue(undefined)
+
+vi.mock('@/composables/useStatus', () => ({
+  useStatus: () => ({ status }),
+}))
+
+vi.mock('@/composables/useDesktopActivity', () => ({
+  useDesktopActivity: () => ({ isConsoleConversationsActive }),
+}))
+
+vi.mock('@/composables/useConversations', () => ({
+  useConversations: () => ({
+    conversations,
+    channelsByKind,
+    overrides,
+    loading,
+    error,
+    fetchConversations,
+    setOverride,
+    removeOverride,
+    addFeedback,
+  }),
+}))
+
+vi.mock('@/composables/useAdminApi', () => ({
+  useAdminApi: () => ({
+    get: apiGet,
+    put: apiPut,
+  }),
+}))
+
+vi.mock('@/composables/useLanguage', () => ({
+  useLanguage: () => ({
+    t: (key: string, params?: Record<string, string>) => formatText(key, params),
+    tf: (_key: string, fallback: string, params?: Record<string, string>) => formatText(fallback, params),
+  }),
+}))
+
+vi.mock('@/components/ui/alert', () => ({
+  Alert: defineComponent({
+    props: {
+      variant: { type: String, default: 'default' },
+    },
+    setup(_props, { slots }) {
+      return () => h('div', { role: 'alert' }, slots.default?.())
+    },
+  }),
+}))
+
+vi.mock('@/components/ui/input', () => ({
+  Input: defineComponent({
+    props: {
+      modelValue: { type: String, default: '' },
+      placeholder: { type: String, default: '' },
+    },
+    emits: ['update:modelValue'],
+    setup(props, { emit, attrs }) {
+      return () =>
+        h('input', {
+          ...attrs,
+          value: props.modelValue,
+          placeholder: props.placeholder,
+          onInput: (event: Event) => emit('update:modelValue', (event.target as HTMLInputElement).value),
+        })
+    },
+  }),
+}))
+
+vi.mock('@/components/ui/select', () => ({
+  Select: defineComponent({
+    props: {
+      modelValue: { type: String, default: '' },
+    },
+    emits: ['update:modelValue'],
+    setup(_props, { slots }) {
+      return () => h('div', { 'data-testid': 'select-root' }, slots.default?.())
+    },
+  }),
+  SelectContent: defineComponent({
+    setup(_props, { slots }) {
+      return () => h('div', { 'data-testid': 'select-content' }, slots.default?.())
+    },
+  }),
+  SelectItem: defineComponent({
+    props: {
+      value: { type: String, required: true },
+    },
+    setup(props, { slots }) {
+      return () => h('button', { type: 'button', 'data-value': props.value }, slots.default?.())
+    },
+  }),
+  SelectTrigger: defineComponent({
+    setup(_props, { slots }) {
+      return () => h('div', { 'data-testid': 'select-trigger' }, slots.default?.())
+    },
+  }),
+  SelectValue: defineComponent({
+    props: {
+      placeholder: { type: String, default: '' },
+    },
+    setup(props) {
+      return () => h('span', props.placeholder)
+    },
+  }),
+}))
+
+vi.mock('@/components/ui/skeleton', () => ({
+  Skeleton: defineComponent({
+    setup() {
+      return () => h('div', { 'data-testid': 'skeleton' })
+    },
+  }),
+}))
+
+vi.mock('./ConversationCard.vue', () => ({
+  default: defineComponent({
+    props: {
+      conversation: { type: Object, required: true },
+      override: { type: Object, default: undefined },
+      availableChannels: { type: Array, default: () => [] },
+      expanded: { type: Boolean, default: false },
+      nowMs: { type: Number, required: true },
+    },
+    setup(props) {
+      return () =>
+        h(
+          'article',
+          {
+            'data-testid': 'conversation-card',
+            'data-id': (props.conversation as ConversationInfo).id,
+            'data-kind': (props.conversation as ConversationInfo).kind,
+          },
+          (props.conversation as ConversationInfo).title || (props.conversation as ConversationInfo).userId,
+        )
+    },
+  }),
+}))
+
+describe('ConversationDashboard', () => {
+  let root: HTMLDivElement
+  let app: ReturnType<typeof createApp> | undefined
+  let errors: unknown[]
+
+  beforeEach(() => {
+    status.value = { running: true, starting: false }
+    isConsoleConversationsActive.value = false
+    conversations.value = []
+    channelsByKind.value = {}
+    overrides.value = {}
+    loading.value = false
+    error.value = ''
+    fetchConversations.mockClear()
+    setOverride.mockClear()
+    removeOverride.mockClear()
+    addFeedback.mockClear()
+    apiGet.mockResolvedValue({ overrideTtlMinutes: 0 })
+    apiPut.mockResolvedValue(undefined)
+    root = document.createElement('div')
+    document.body.append(root)
+    errors = []
+    window.addEventListener('unhandledrejection', captureUnhandledRejection)
+  })
+
+  afterEach(() => {
+    window.removeEventListener('unhandledrejection', captureUnhandledRejection)
+    app?.unmount()
+    app = undefined
+    document.body.innerHTML = ''
+    vi.clearAllMocks()
+  })
+
+  function captureUnhandledRejection(event: PromiseRejectionEvent) {
+    errors.push(event.reason)
+  }
+
+  function mountDashboard() {
+    const vueErrors: unknown[] = []
+    app = createApp(ConversationDashboard)
+    app.config.errorHandler = error => vueErrors.push(error)
+    app.mount(root)
+    return { vueErrors }
+  }
+
+  function createConversation(overrides: Partial<ConversationInfo>): ConversationInfo {
+    return {
+      id: overrides.id ?? `conv-${Math.random().toString(36).slice(2, 8)}`,
+      kind: overrides.kind ?? 'messages',
+      userId: overrides.userId ?? 'user-1',
+      rawUserId: overrides.rawUserId,
+      title: overrides.title,
+      currentChannel: overrides.currentChannel ?? 1,
+      status: overrides.status ?? 'active',
+      models: overrides.models ?? ['gpt-4.1'],
+      lastModel: overrides.lastModel ?? 'gpt-4.1',
+      requestCount: overrides.requestCount ?? 1,
+      channelName: overrides.channelName ?? 'Channel 1',
+      lastRequestId: overrides.lastRequestId ?? 'req-1',
+      createdAt: overrides.createdAt ?? '2026-06-23T08:00:00.000Z',
+      lastActiveAt: overrides.lastActiveAt ?? '2026-06-23T08:00:00.000Z',
+      latestFeedback: overrides.latestFeedback,
+      latestFeedbackAt: overrides.latestFeedbackAt,
+      hasSubagents: overrides.hasSubagents,
+      subagentCount: overrides.subagentCount,
+      mainChannel: overrides.mainChannel,
+      subagentChannel: overrides.subagentChannel,
+    }
+  }
+
+  function getVisibleTitles(columnKey: 'streaming' | 'subagents' | 'active' | 'idle') {
+    const column = root.querySelector(`[data-testid="cockpit-column-${columnKey}"]`)
+    expect(column).toBeTruthy()
+    return [...column!.querySelectorAll('[data-testid="conversation-card"]')]
+      .map(node => node.textContent?.trim() || '')
+  }
+
+  function getAllColumnCards() {
+    return [...root.querySelectorAll('[data-testid^="cockpit-column-"] [data-testid="conversation-card"]')]
+      .map(node => node.textContent?.trim() || '')
+  }
+
+  function clickButton(text: string) {
+    const button = [...root.querySelectorAll('button')]
+      .find(node => node.textContent?.trim() === text)
+    expect(button).toBeTruthy()
+    ;(button as HTMLButtonElement).click()
+  }
+
+  function setSearch(value: string) {
+    const input = root.querySelector('input')
+    expect(input).toBeTruthy()
+    ;(input as HTMLInputElement).value = value
+    input!.dispatchEvent(new Event('input', { bubbles: true }))
+  }
+
+  it('groups conversations into task-board columns', async () => {
+    conversations.value = [
+      createConversation({
+        id: 'stream',
+        title: 'Streaming One',
+        kind: 'messages',
+        status: 'streaming',
+        lastActiveAt: '2026-06-23T10:00:00.000Z',
+      }),
+      createConversation({
+        id: 'subagents',
+        title: 'Subagent One',
+        kind: 'chat',
+        status: 'active',
+        hasSubagents: true,
+        lastActiveAt: '2026-06-23T09:00:00.000Z',
+      }),
+      createConversation({
+        id: 'active',
+        title: 'Active One',
+        kind: 'images',
+        status: 'active',
+        lastActiveAt: '2026-06-23T08:00:00.000Z',
+      }),
+      createConversation({
+        id: 'idle',
+        title: 'Idle One',
+        kind: 'gemini',
+        status: 'idle',
+        lastActiveAt: '2026-06-23T07:00:00.000Z',
+      }),
+    ]
+
+    const { vueErrors } = mountDashboard()
+    await nextTick()
+
+    expect(getVisibleTitles('streaming')).toEqual(['Streaming One'])
+    expect(getVisibleTitles('subagents')).toEqual(['Subagent One'])
+    expect(getVisibleTitles('active')).toEqual(['Active One'])
+    expect(getVisibleTitles('idle')).toEqual(['Idle One'])
+    expect(vueErrors).toEqual([])
+    expect(errors).toEqual([])
+  })
+
+  it('filters conversations by kind and search query', async () => {
+    conversations.value = [
+      createConversation({
+        id: 'alpha',
+        title: 'Alpha Stream',
+        kind: 'messages',
+        status: 'streaming',
+        lastActiveAt: '2026-06-23T10:00:00.000Z',
+      }),
+      createConversation({
+        id: 'beta',
+        title: 'Beta Chat',
+        kind: 'chat',
+        status: 'active',
+        lastActiveAt: '2026-06-23T09:00:00.000Z',
+      }),
+    ]
+
+    const { vueErrors } = mountDashboard()
+    await nextTick()
+
+    expect(getAllColumnCards()).toEqual(['Alpha Stream', 'Beta Chat'])
+
+    clickButton('MESSAGES')
+    await nextTick()
+    expect(getAllColumnCards()).toEqual(['Alpha Stream'])
+
+    clickButton('ALL')
+    await nextTick()
+    setSearch('Beta')
+    await nextTick()
+    expect(getAllColumnCards()).toEqual(['Beta Chat'])
+
+    setSearch('Nope')
+    await nextTick()
+    expect(root.textContent).toContain('cockpit.noMatches')
+    expect(root.querySelectorAll('[data-testid^="cockpit-column-"]').length).toBe(0)
+    expect(vueErrors).toEqual([])
+    expect(errors).toEqual([])
+  })
+
+  it('shows the empty state when there are no conversations', async () => {
+    conversations.value = []
+
+    const { vueErrors } = mountDashboard()
+    await nextTick()
+
+    expect(root.textContent).toContain('cockpit.empty')
+    expect(root.querySelectorAll('[data-testid^="cockpit-column-"]').length).toBe(0)
+    expect(vueErrors).toEqual([])
+    expect(errors).toEqual([])
+  })
+})
+
+function formatText(template: string, params?: Record<string, string>) {
+  if (!params) return template
+  return Object.entries(params).reduce((acc, [key, value]) => acc.replaceAll(`{${key}}`, value), template)
+}
