@@ -2,6 +2,7 @@
 package messages
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -366,6 +367,7 @@ func handleNormalResponse(
 		common.RequestLogf(c, "[Messages-Timing] 响应完成: %dms, 状态: %d", responseTime, resp.StatusCode)
 		common.LogUpstreamResponse(c, resp, bodyBytes, envCfg, "Messages")
 	}
+	logNormalProtocolDebug(c, resp, bodyBytes, envCfg)
 
 	providerResp := &types.ProviderResponse{
 		StatusCode: resp.StatusCode,
@@ -377,11 +379,8 @@ func handleNormalResponse(
 	claudeResp, err := provider.ConvertToClaudeResponse(providerResp)
 	if err != nil {
 		// JSON 解析失败（如上游返回 HTML 错误页面）：不写 Header，返回可 failover 的错误
-		preview := bodyBytes
-		if len(preview) > 100 {
-			preview = preview[:100]
-		}
-		common.RequestLogf(c, "[Messages-InvalidBody] 响应体解析失败: %v, body前100字节: %s", err, preview)
+		common.RequestLogf(c, "[Messages-InvalidBody] 响应体解析失败: %v, body_len=%d, json_valid=%t, looks_sse=%t, body前100字节=%q, body后300字节=%q",
+			err, len(bodyBytes), json.Valid(bodyBytes), looksLikeSSEPayload(bodyBytes), previewPrefix(bodyBytes, 100), previewSuffix(bodyBytes, 300))
 		return nil, fmt.Errorf("%w: %v", common.ErrInvalidResponseBody, err)
 	}
 
@@ -445,8 +444,14 @@ func handleNormalResponse(
 
 	// 转发上游响应头
 	utils.ForwardResponseHeaders(resp.Header, c.Writer)
+	if normalProtocolDebugEnabled(envCfg) {
+		common.RequestLogf(c, "[Messages-Protocol-Debug] 写回前响应头: client_content_type=%q", c.Writer.Header().Get("Content-Type"))
+	}
 
 	c.JSON(200, claudeResp)
+	if normalProtocolDebugEnabled(envCfg) {
+		common.RequestLogf(c, "[Messages-Protocol-Debug] 写回后响应头: client_content_type=%q, written=%t", c.Writer.Header().Get("Content-Type"), c.Writer.Written())
+	}
 
 	if envCfg.EnableResponseLogs {
 		responseTime := time.Since(startTime).Milliseconds()
@@ -454,6 +459,56 @@ func handleNormalResponse(
 	}
 
 	return claudeResp.Usage, nil
+}
+
+func logNormalProtocolDebug(c *gin.Context, resp *http.Response, bodyBytes []byte, envCfg *config.EnvConfig) {
+	if !normalProtocolDebugEnabled(envCfg) || resp == nil {
+		return
+	}
+
+	upstreamAccept := ""
+	if resp.Request != nil {
+		upstreamAccept = resp.Request.Header.Get("Accept")
+	}
+
+	common.RequestLogf(c, "[Messages-Protocol-Debug] stream=false, client_accept=%q, upstream_accept=%q, upstream_content_type=%q, status=%d, body_len=%d, json_valid=%t, looks_sse=%t, body前300字节=%q, body后300字节=%q",
+		c.GetHeader("Accept"),
+		upstreamAccept,
+		resp.Header.Get("Content-Type"),
+		resp.StatusCode,
+		len(bodyBytes),
+		json.Valid(bodyBytes),
+		looksLikeSSEPayload(bodyBytes),
+		previewPrefix(bodyBytes, 300),
+		previewSuffix(bodyBytes, 300),
+	)
+}
+
+func normalProtocolDebugEnabled(envCfg *config.EnvConfig) bool {
+	return envCfg != nil && envCfg.EnableResponseLogs && envCfg.IsDevelopment() && envCfg.ShouldLog("debug")
+}
+
+func looksLikeSSEPayload(bodyBytes []byte) bool {
+	trimmed := bytes.TrimSpace(bodyBytes)
+	return bytes.HasPrefix(trimmed, []byte("data:")) ||
+		bytes.HasPrefix(trimmed, []byte("event:")) ||
+		bytes.Contains(trimmed, []byte("\ndata:")) ||
+		bytes.Contains(trimmed, []byte("\nevent:")) ||
+		bytes.Contains(trimmed, []byte("[DONE]"))
+}
+
+func previewPrefix(bodyBytes []byte, limit int) string {
+	if limit <= 0 || len(bodyBytes) <= limit {
+		return string(bodyBytes)
+	}
+	return string(bodyBytes[:limit])
+}
+
+func previewSuffix(bodyBytes []byte, limit int) string {
+	if limit <= 0 || len(bodyBytes) <= limit {
+		return string(bodyBytes)
+	}
+	return string(bodyBytes[len(bodyBytes)-limit:])
 }
 
 func isClaudeCodeTitleRequest(bodyBytes []byte) bool {
