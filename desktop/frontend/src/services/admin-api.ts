@@ -615,6 +615,8 @@ export interface ConversationInfo {
   lastRequestId: string
   createdAt: string
   lastActiveAt: string
+  latestFeedback?: string
+  latestFeedbackAt?: string
 
   // subagent 观测（仅展示）
   hasSubagents?: boolean

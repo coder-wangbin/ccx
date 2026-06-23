@@ -26,6 +26,7 @@ const {
   fetchConversations,
   setOverride,
   removeOverride,
+  addFeedback,
 } = useConversations()
 const { isConsoleConversationsActive } = useDesktopActivity()
 
@@ -190,6 +191,15 @@ async function handleSetOverride(conversationId: string, sequence: ChannelSequen
 async function handleRemoveOverride(conversationId: string) {
   try {
     await removeOverride(conversationId)
+  } catch (e) {
+    showNotice('destructive', e instanceof Error ? e.message : String(e))
+  }
+}
+
+async function handleFeedback(payload: { conversationId: string; message: string }) {
+  try {
+    await addFeedback(payload.conversationId, payload.message)
+    showNotice('success', t('cockpit.feedbackQueued', { id: payload.conversationId.slice(0, 8) }))
   } catch (e) {
     showNotice('destructive', e instanceof Error ? e.message : String(e))
   }
@@ -451,6 +461,7 @@ watch(overrideDuration, async (newDuration) => {
             @toggle-expand="toggleExpand(conversation.id)"
             @set-override="handleSetOverride"
             @remove-override="handleRemoveOverride"
+            @feedback="handleFeedback"
             @success="handleSuccess"
             @error="handleError"
           />

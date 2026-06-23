@@ -943,6 +943,13 @@ export class ApiService {
     })
   }
 
+  async addConversationFeedback(id: string, message: string): Promise<void> {
+    await this.request(`/conversations/${id}/feedback`, {
+      method: 'POST',
+      body: JSON.stringify({ message })
+    })
+  }
+
 }
 
 export const api = new ApiService()

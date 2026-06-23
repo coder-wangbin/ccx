@@ -311,8 +311,15 @@ async function handleRemoveOverride(convId: string) {
   }
 }
 
-function handleFeedback(payload: { conversationId: string; message: string }) {
-  emit('success', t('cockpit.feedbackQueued', { id: payload.conversationId.slice(0, 8) }))
+async function handleFeedback(payload: { conversationId: string; message: string }) {
+  try {
+    await api.addConversationFeedback(payload.conversationId, payload.message)
+    emit('success', t('cockpit.feedbackQueued', { id: payload.conversationId.slice(0, 8) }))
+    await fetchConversations()
+  } catch (e) {
+    console.error('[ConversationDashboard] add feedback error:', e)
+    emit('error', e instanceof Error ? e.message : 'Feedback failed')
+  }
 }
 
 const tick = useGlobalTick(3000, 'ConversationDashboard')

@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { Button } from '@/components/ui/button'
-import { ArrowDown, Check, Copy } from 'lucide-vue-next'
+import { Textarea } from '@/components/ui/textarea'
+import { ArrowDown, Check, Copy, MessageSquareReply, Send } from 'lucide-vue-next'
 import { useLanguage } from '@/composables/useLanguage'
 import type {
   ChannelSequenceEntry,
@@ -30,12 +31,14 @@ const emit = defineEmits<{
   toggleExpand: []
   setOverride: [conversationId: string, sequence: ChannelSequenceEntry[], subagentSequence?: ChannelSequenceEntry[]]
   removeOverride: [conversationId: string]
+  feedback: [payload: { conversationId: string; message: string }]
   success: [message: string]
   error: [message: string]
 }>()
 
 const { t } = useLanguage()
 const MAX_VISIBLE = 6
+const feedbackText = ref('')
 
 const conversation = computed(() => props.conversation)
 const hasOverride = computed(() => !!props.override)
@@ -287,6 +290,13 @@ async function copyRawUserId() {
     emit('error', t('cockpit.rawUserIdCopyFailed'))
   }
 }
+
+function sendFeedback() {
+  const message = feedbackText.value.trim()
+  if (!message) return
+  emit('feedback', { conversationId: props.conversation.id, message })
+  feedbackText.value = ''
+}
 </script>
 
 <template>
@@ -318,6 +328,14 @@ async function copyRawUserId() {
       >
         SA{{ conversation.subagentCount ? ` ${conversation.subagentCount}` : '' }}
       </span>
+    </div>
+
+    <div
+      v-if="conversation.latestFeedback"
+      class="feedback-latest mb-3 flex items-start gap-1.5 border border-border/70 bg-muted/25 px-2 py-1.5 text-xs text-muted-foreground"
+    >
+      <MessageSquareReply class="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />
+      <span class="feedback-latest-text min-w-0">{{ conversation.latestFeedback }}</span>
     </div>
 
     <!-- Row 2: Model + Channel chips (collapsed) -->
@@ -456,6 +474,28 @@ async function copyRawUserId() {
         <Button variant="ghost" size="sm" class="h-6 px-2 text-xs" @click.stop="emit('toggleExpand')">
           Collapse
         </Button>
+      </div>
+
+      <div class="feedback-panel mt-3 border-t border-dashed border-border pt-3" @click.stop>
+        <Textarea
+          v-model="feedbackText"
+          :placeholder="t('cockpit.feedbackPlaceholder')"
+          class="min-h-16 resize-y rounded-none text-xs"
+          @keydown.meta.enter.prevent="sendFeedback"
+          @keydown.ctrl.enter.prevent="sendFeedback"
+        />
+        <div class="mt-2 flex justify-end">
+          <Button
+            variant="secondary"
+            size="sm"
+            class="h-7 px-2 text-xs"
+            :disabled="!feedbackText.trim()"
+            @click.stop="sendFeedback"
+          >
+            <Send class="h-3.5 w-3.5" />
+            {{ t('cockpit.feedbackSend') }}
+          </Button>
+        </div>
       </div>
     </div>
 
@@ -650,6 +690,11 @@ async function copyRawUserId() {
 
 .raw-user-id {
   opacity: 0.65;
+}
+
+.feedback-latest-text {
+  overflow-wrap: anywhere;
+  line-height: 1.45;
 }
 
 .raw-user-id:hover {

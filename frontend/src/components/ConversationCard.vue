@@ -53,6 +53,11 @@
         <span class="task-card-channel">{{ conversation.channelName || `Channel ${conversation.currentChannel}` }}</span>
       </div>
 
+      <div v-if="conversation.latestFeedback" class="feedback-latest">
+        <v-icon size="14">mdi-message-reply-text</v-icon>
+        <span>{{ conversation.latestFeedback }}</span>
+      </div>
+
       <!-- Row 2: Model + Channel chips (collapsed) -->
       <div v-if="!expanded" class="d-flex align-center ga-2 flex-wrap">
         <v-tooltip v-for="ch in visibleChannels" :key="ch.index" :text="getChannelTooltip(ch)" location="top" :open-delay="150" content-class="ccx-tooltip">
@@ -770,6 +775,24 @@ function sendFeedback() {
 .feedback-panel {
   border-top: 1px dashed rgba(var(--v-border-color), var(--v-border-opacity));
   padding-top: 10px;
+}
+
+.feedback-latest {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin-top: 8px;
+  padding: 7px 8px;
+  border: 1px solid rgba(var(--v-theme-info), 0.36);
+  background: rgba(var(--v-theme-info), 0.08);
+  color: rgb(var(--v-theme-on-surface) / 72%);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.feedback-latest span {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .feedback-actions {

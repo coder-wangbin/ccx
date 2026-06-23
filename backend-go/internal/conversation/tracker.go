@@ -11,23 +11,25 @@ import (
 )
 
 type Conversation struct {
-	ID             string    `json:"id"`
-	Kind           string    `json:"kind"`
-	UserID         string    `json:"userId"`
-	RawUserID      string    `json:"rawUserId,omitempty"`
-	Title          string    `json:"title,omitempty"`
-	GeneratedTitle string    `json:"-"`
-	FallbackTitle  string    `json:"-"`
-	SessionID      string    `json:"-"`
-	CreatedAt      time.Time `json:"createdAt"`
-	LastActiveAt   time.Time `json:"lastActiveAt"`
-	RequestCount   int       `json:"requestCount"`
-	Models         []string  `json:"models"`
-	CurrentChannel int       `json:"currentChannel"`
-	ChannelName    string    `json:"channelName"`
-	Status         string    `json:"status"`
-	LastModel      string    `json:"lastModel"`
-	LastRequestID  string    `json:"lastRequestId"`
+	ID               string     `json:"id"`
+	Kind             string     `json:"kind"`
+	UserID           string     `json:"userId"`
+	RawUserID        string     `json:"rawUserId,omitempty"`
+	Title            string     `json:"title,omitempty"`
+	GeneratedTitle   string     `json:"-"`
+	FallbackTitle    string     `json:"-"`
+	SessionID        string     `json:"-"`
+	CreatedAt        time.Time  `json:"createdAt"`
+	LastActiveAt     time.Time  `json:"lastActiveAt"`
+	RequestCount     int        `json:"requestCount"`
+	Models           []string   `json:"models"`
+	CurrentChannel   int        `json:"currentChannel"`
+	ChannelName      string     `json:"channelName"`
+	Status           string     `json:"status"`
+	LastModel        string     `json:"lastModel"`
+	LastRequestID    string     `json:"lastRequestId"`
+	LatestFeedback   string     `json:"latestFeedback,omitempty"`
+	LatestFeedbackAt *time.Time `json:"latestFeedbackAt,omitempty"`
 
 	// subagent 观测（仅展示，不影响路由）
 	HasSubagents    bool `json:"hasSubagents,omitempty"`
@@ -237,6 +239,31 @@ func (ct *ConversationTracker) SetLastRequestID(kind, userID, requestID string) 
 	ct.dirty = true
 }
 
+func (ct *ConversationTracker) AddFeedback(kind, userID, feedback string) bool {
+	if userID == "" || strings.TrimSpace(feedback) == "" {
+		return false
+	}
+
+	ct.mu.Lock()
+	defer ct.mu.Unlock()
+
+	compositeKey := kind + ":" + userID
+	convID, ok := ct.userMapping[compositeKey]
+	if !ok {
+		return false
+	}
+	conv, ok := ct.conversations[convID]
+	if !ok {
+		return false
+	}
+	now := time.Now()
+	conv.LatestFeedback = strings.TrimSpace(feedback)
+	conv.LatestFeedbackAt = &now
+	conv.LastActiveAt = time.Now()
+	ct.dirty = true
+	return true
+}
+
 func (ct *ConversationTracker) GetActiveConversations(kindFilter string) []*Conversation {
 	ct.mu.RLock()
 	defer ct.mu.RUnlock()
@@ -315,23 +342,25 @@ func (ct *ConversationTracker) loadFromDisk() {
 		}
 
 		conv := &Conversation{
-			ID:             item.ID,
-			Kind:           item.Kind,
-			UserID:         item.UserID,
-			RawUserID:      item.RawUserID,
-			Title:          item.Title,
-			GeneratedTitle: item.GeneratedTitle,
-			FallbackTitle:  item.FallbackTitle,
-			SessionID:      item.SessionID,
-			RequestCount:   item.RequestCount,
-			Models:         models,
-			CurrentChannel: item.CurrentChannel,
-			ChannelName:    item.ChannelName,
-			LastModel:      item.LastModel,
-			LastRequestID:  item.LastRequestID,
-			CreatedAt:      item.CreatedAt,
-			LastActiveAt:   item.LastActiveAt,
-			Status:         "idle",
+			ID:               item.ID,
+			Kind:             item.Kind,
+			UserID:           item.UserID,
+			RawUserID:        item.RawUserID,
+			Title:            item.Title,
+			GeneratedTitle:   item.GeneratedTitle,
+			FallbackTitle:    item.FallbackTitle,
+			SessionID:        item.SessionID,
+			RequestCount:     item.RequestCount,
+			Models:           models,
+			CurrentChannel:   item.CurrentChannel,
+			ChannelName:      item.ChannelName,
+			LastModel:        item.LastModel,
+			LastRequestID:    item.LastRequestID,
+			LatestFeedback:   item.LatestFeedback,
+			LatestFeedbackAt: item.LatestFeedbackAt,
+			CreatedAt:        item.CreatedAt,
+			LastActiveAt:     item.LastActiveAt,
+			Status:           "idle",
 		}
 		ct.conversations[item.ID] = conv
 

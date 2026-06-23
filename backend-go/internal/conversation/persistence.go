@@ -10,22 +10,24 @@ import (
 )
 
 type persistedConversation struct {
-	ID             string    `json:"id"`
-	Kind           string    `json:"kind"`
-	UserID         string    `json:"userId"`
-	RawUserID      string    `json:"rawUserId"`
-	Title          string    `json:"title,omitempty"`
-	GeneratedTitle string    `json:"generatedTitle,omitempty"`
-	FallbackTitle  string    `json:"fallbackTitle,omitempty"`
-	SessionID      string    `json:"sessionId,omitempty"`
-	RequestCount   int       `json:"requestCount"`
-	CurrentChannel int       `json:"currentChannel"`
-	ChannelName    string    `json:"channelName,omitempty"`
-	Models         []string  `json:"models,omitempty"`
-	LastModel      string    `json:"lastModel,omitempty"`
-	LastRequestID  string    `json:"lastRequestId,omitempty"`
-	CreatedAt      time.Time `json:"createdAt"`
-	LastActiveAt   time.Time `json:"lastActiveAt"`
+	ID               string     `json:"id"`
+	Kind             string     `json:"kind"`
+	UserID           string     `json:"userId"`
+	RawUserID        string     `json:"rawUserId"`
+	Title            string     `json:"title,omitempty"`
+	GeneratedTitle   string     `json:"generatedTitle,omitempty"`
+	FallbackTitle    string     `json:"fallbackTitle,omitempty"`
+	SessionID        string     `json:"sessionId,omitempty"`
+	RequestCount     int        `json:"requestCount"`
+	CurrentChannel   int        `json:"currentChannel"`
+	ChannelName      string     `json:"channelName,omitempty"`
+	Models           []string   `json:"models,omitempty"`
+	LastModel        string     `json:"lastModel,omitempty"`
+	LastRequestID    string     `json:"lastRequestId,omitempty"`
+	LatestFeedback   string     `json:"latestFeedback,omitempty"`
+	LatestFeedbackAt *time.Time `json:"latestFeedbackAt,omitempty"`
+	CreatedAt        time.Time  `json:"createdAt"`
+	LastActiveAt     time.Time  `json:"lastActiveAt"`
 }
 
 type persistedState struct {
@@ -70,22 +72,24 @@ func savePersistedState(path string, conversations map[string]*Conversation) err
 	items := make([]persistedConversation, 0, len(conversations))
 	for _, conv := range conversations {
 		items = append(items, persistedConversation{
-			ID:             conv.ID,
-			Kind:           conv.Kind,
-			UserID:         conv.UserID,
-			RawUserID:      conv.RawUserID,
-			Title:          conv.Title,
-			GeneratedTitle: conv.GeneratedTitle,
-			FallbackTitle:  conv.FallbackTitle,
-			SessionID:      conv.SessionID,
-			RequestCount:   conv.RequestCount,
-			CurrentChannel: conv.CurrentChannel,
-			ChannelName:    conv.ChannelName,
-			Models:         conv.Models,
-			LastModel:      conv.LastModel,
-			LastRequestID:  conv.LastRequestID,
-			CreatedAt:      conv.CreatedAt,
-			LastActiveAt:   conv.LastActiveAt,
+			ID:               conv.ID,
+			Kind:             conv.Kind,
+			UserID:           conv.UserID,
+			RawUserID:        conv.RawUserID,
+			Title:            conv.Title,
+			GeneratedTitle:   conv.GeneratedTitle,
+			FallbackTitle:    conv.FallbackTitle,
+			SessionID:        conv.SessionID,
+			RequestCount:     conv.RequestCount,
+			CurrentChannel:   conv.CurrentChannel,
+			ChannelName:      conv.ChannelName,
+			Models:           conv.Models,
+			LastModel:        conv.LastModel,
+			LastRequestID:    conv.LastRequestID,
+			LatestFeedback:   conv.LatestFeedback,
+			LatestFeedbackAt: conv.LatestFeedbackAt,
+			CreatedAt:        conv.CreatedAt,
+			LastActiveAt:     conv.LastActiveAt,
 		})
 	}
 	sort.Slice(items, func(i, j int) bool {

@@ -579,6 +579,8 @@ export interface ConversationInfo {
   status: 'active' | 'streaming' | 'idle'
   lastModel: string
   lastRequestId: string
+  latestFeedback?: string
+  latestFeedbackAt?: string
 
   // subagent 观测（仅展示，不影响路由）
   hasSubagents?: boolean
