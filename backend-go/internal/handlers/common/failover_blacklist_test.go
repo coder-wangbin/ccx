@@ -22,6 +22,9 @@ func TestIsInsufficientBalanceMessage_HighConfidenceVariants(t *testing.T) {
 		{name: "english token quota not enough", msg: "token quota is not enough, token remain quota: ¥0.100000, need quota: ¥0.300000", want: true},
 		{name: "english daily usage limit exceeded", msg: "daily usage limit exceeded", want: true},
 		{name: "english daily limit exceeded", msg: "reason=\"DAILY_LIMIT_EXCEEDED\" message=\"daily usage limit exceeded\"", want: true},
+		{name: "english monthly call limit", msg: "Monthly call limit exceeded for your plan", want: true},
+		{name: "english monthly limit exceeded", msg: "monthly limit exceeded", want: true},
+		{name: "english call limit exceeded for your plan", msg: "call limit exceeded for your plan", want: true},
 		{name: "chinese balance exhausted", msg: "账户余额已用尽，请充值", want: true},
 		{name: "chinese quota used up", msg: "账户额度已用完", want: true},
 		{name: "chinese quota exhausted", msg: "当前额度耗尽", want: true},
@@ -347,6 +350,27 @@ func TestShouldBlacklistKey_BalanceMessages(t *testing.T) {
 			statusCode: 429,
 			body:       `{"error":{"message":"Upstream rate limit exceeded, please retry later","type":"rate_limit_error"}}`,
 			want:       BlacklistResult{},
+		},
+		// Compshare 月度额度耗尽：大写字段 + 数字 RetCode，应拉黑
+		{
+			name:       "429 compshare monthly call limit uppercase RetCode should blacklist",
+			statusCode: 429,
+			body:       `{"RetCode":226615,"Message":"Monthly call limit exceeded for your plan"}`,
+			want: BlacklistResult{
+				ShouldBlacklist: true,
+				Reason:          "insufficient_balance",
+				Message:         "Monthly call limit exceeded for your plan",
+			},
+		},
+		{
+			name:       "429 compshare monthly call limit lowercase retCode should blacklist",
+			statusCode: 429,
+			body:       `{"retCode":226615,"message":"Monthly call limit exceeded for your plan"}`,
+			want: BlacklistResult{
+				ShouldBlacklist: true,
+				Reason:          "insufficient_balance",
+				Message:         "Monthly call limit exceeded for your plan",
+			},
 		},
 		{
 			name:       "429 too many requests should not blacklist",

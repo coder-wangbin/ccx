@@ -3,6 +3,7 @@ package common
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -973,6 +974,21 @@ func toStringField(m map[string]interface{}, key string) string {
 	return ""
 }
 
+// findNumericCode 从 map 中查找数字类型的错误码字段，返回字符串表示
+// 兼容 {"RetCode": 226615} 等非标准格式
+func findNumericCode(m map[string]interface{}, keys ...string) string {
+	for _, key := range keys {
+		if v, ok := m[key].(float64); ok {
+			// 整数不带小数点: 226615 → "226615"
+			if v == float64(int64(v)) {
+				return fmt.Sprintf("%d", int64(v))
+			}
+			return fmt.Sprintf("%v", v)
+		}
+	}
+	return ""
+}
+
 func firstStringField(m map[string]interface{}, keys ...string) (string, bool) {
 	for _, key := range keys {
 		if value := strings.TrimSpace(toStringField(m, key)); value != "" {
@@ -1138,6 +1154,9 @@ func isInsufficientBalanceMessage(msg string) bool {
 		"quota used up",
 		"daily limit exceeded",
 		"daily usage limit exceeded",
+		"monthly limit exceeded",
+		"monthly call limit",
+		"call limit exceeded for your plan",
 		"tokenstatusexhausted",
 		"no active subscription found",
 	}
@@ -1287,6 +1306,8 @@ func extractErrorInfo(bodyBytes []byte) (errType string, errMessage string) {
 		}
 		if m, ok := errObj["message"].(string); ok {
 			errMessage = m
+		} else if m, ok := errObj["Message"].(string); ok {
+			errMessage = m
 		}
 		return
 	}
@@ -1297,12 +1318,18 @@ func extractErrorInfo(bodyBytes []byte) (errType string, errMessage string) {
 	}
 
 	// fallback: 扁平格式 {"type": "...", "code": "...", "message": "..."}
+	// 兼容大小写混合: {"RetCode": 226615, "Message": "..."}
+	// 兼容数字错误码: RetCode/retCode 为 float64 类型
 	if t, ok := resp["type"].(string); ok {
 		errType = t
 	} else if c, ok := resp["code"].(string); ok {
 		errType = c
+	} else if rc := findNumericCode(resp, "RetCode", "retCode"); rc != "" {
+		errType = rc
 	}
 	if m, ok := resp["message"].(string); ok {
+		errMessage = m
+	} else if m, ok := resp["Message"].(string); ok {
 		errMessage = m
 	}
 	return
@@ -1320,6 +1347,10 @@ func extractErrorCode(bodyBytes []byte) string {
 	}
 	if code, ok := firstStringField(resp, "code"); ok {
 		return code
+	}
+	// 兼容大写数字字段: {"RetCode": 226615}
+	if rc := findNumericCode(resp, "RetCode", "retCode"); rc != "" {
+		return rc
 	}
 	return ""
 }
