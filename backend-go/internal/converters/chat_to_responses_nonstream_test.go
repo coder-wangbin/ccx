@@ -74,6 +74,40 @@ func TestConvertOpenAIChatToResponsesNonStream(t *testing.T) {
 	}
 }
 
+func TestConvertOpenAIChatToResponsesNonStream_VLLMReasoning(t *testing.T) {
+	ctx := context.Background()
+	chatResponse := `{
+		"id": "chatcmpl-vllm",
+		"object": "chat.completion",
+		"created": 1234567890,
+		"model": "glm-5.2",
+		"choices": [{
+			"index": 0,
+			"message": {
+				"role": "assistant",
+				"reasoning": "vllm reasoning",
+				"content": "final answer"
+			},
+			"finish_reason": "stop"
+		}],
+		"usage": {
+			"prompt_tokens": 10,
+			"completion_tokens": 8,
+			"total_tokens": 18
+		}
+	}`
+
+	result := ConvertOpenAIChatToResponsesNonStream(ctx, "glm-5.2", []byte(`{"model":"glm-5.2","input":"Hi"}`), nil, []byte(chatResponse), nil)
+	parsed := gjson.Parse(result)
+
+	if got := parsed.Get(`output.#(type=="reasoning").summary.0.text`).String(); got != "vllm reasoning" {
+		t.Fatalf("reasoning summary = %q, want vllm reasoning; result=%s", got, result)
+	}
+	if got := parsed.Get(`output.#(type=="message").content.0.text`).String(); got != "final answer" {
+		t.Fatalf("message text = %q, want final answer; result=%s", got, result)
+	}
+}
+
 func TestConvertOpenAIChatToResponsesNonStream_ToolCalls(t *testing.T) {
 	ctx := context.Background()
 

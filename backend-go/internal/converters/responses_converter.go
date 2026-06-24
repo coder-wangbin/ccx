@@ -842,6 +842,9 @@ func OpenAIChatResponseToResponses(openaiResp map[string]interface{}, sessionID 
 		if ok {
 			message, _ := choice["message"].(map[string]interface{})
 			reasoningFromField, _ := message["reasoning_content"].(string)
+			if reasoningFromField == "" {
+				reasoningFromField, _ = message["reasoning"].(string)
+			}
 			contentRaw, _ := message["content"].(string)
 			remainingContent, extractedThinking, hasThink := extractThinkTag(contentRaw)
 			// 合并：原生 reasoning_content 优先，再追加从 <think> 提取出的内容

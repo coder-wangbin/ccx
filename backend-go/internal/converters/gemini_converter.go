@@ -274,7 +274,11 @@ func OpenAIResponseToGemini(openaiResp map[string]interface{}) (*types.GeminiRes
 
 	// 处理 message
 	if message, ok := choice["message"].(map[string]interface{}); ok {
-		if reasoning, ok := message["reasoning_content"].(string); ok && reasoning != "" {
+		reasoning, _ := message["reasoning_content"].(string)
+		if reasoning == "" {
+			reasoning, _ = message["reasoning"].(string)
+		}
+		if reasoning != "" {
 			parts = append(parts, types.GeminiPart{
 				Text:    reasoning,
 				Thought: true,

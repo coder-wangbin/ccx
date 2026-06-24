@@ -242,8 +242,12 @@ func ConvertOpenAIChatToResponses(ctx context.Context, modelName string, origina
 
 		finishReason := choice.Get("finish_reason").String()
 
-		// 处理 reasoning_content（OpenAI o1 模型的原生 reasoning 字段）
-		if reasoning := delta.Get("reasoning_content"); reasoning.Exists() && reasoning.String() != "" {
+		// 处理推理内容：优先 reasoning_content（OpenAI/DeepSeek），回退 reasoning（vLLM）
+		reasoning := delta.Get("reasoning_content")
+		if !reasoning.Exists() || reasoning.String() == "" {
+			reasoning = delta.Get("reasoning")
+		}
+		if reasoning.Exists() && reasoning.String() != "" {
 			out = append(out, st.handleReasoningPart(reasoning.String(), nextSeq)...)
 		}
 
@@ -1086,8 +1090,12 @@ func ConvertOpenAIChatToResponsesNonStream(_ context.Context, _ string, original
 			continue
 		}
 
-		// 处理 reasoning_content
-		if reasoning := message.Get("reasoning_content"); reasoning.Exists() && reasoning.String() != "" {
+		// 处理推理内容：优先 reasoning_content（OpenAI/DeepSeek），回退 reasoning（vLLM）
+		reasoning := message.Get("reasoning_content")
+		if !reasoning.Exists() || reasoning.String() == "" {
+			reasoning = message.Get("reasoning")
+		}
+		if reasoning.Exists() && reasoning.String() != "" {
 			reasoningBuf.WriteString(reasoning.String())
 		}
 

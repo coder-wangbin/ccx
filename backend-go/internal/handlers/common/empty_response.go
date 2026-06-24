@@ -128,8 +128,12 @@ func isChatMessageEmpty(msg map[string]interface{}) bool {
 		return allMalformed
 	}
 
-	// 3. reasoning_content / refusal 非空也视为有效
-	if rc, ok := msg["reasoning_content"].(string); ok && !IsEffectivelyEmptyStreamText(rc) {
+	// 3. reasoning_content（或 vLLM 的 reasoning）/ refusal 非空也视为有效
+	rc, _ := msg["reasoning_content"].(string)
+	if rc == "" {
+		rc, _ = msg["reasoning"].(string)
+	}
+	if !IsEffectivelyEmptyStreamText(rc) {
 		return false
 	}
 	if refusal, ok := msg["refusal"].(string); ok && strings.TrimSpace(refusal) != "" {

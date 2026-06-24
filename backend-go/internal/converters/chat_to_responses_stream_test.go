@@ -96,6 +96,34 @@ func TestConvertOpenAIChatToResponses_StreamReasoningContent(t *testing.T) {
 	}
 }
 
+func TestConvertOpenAIChatToResponses_StreamVLLMReasoning(t *testing.T) {
+	ctx := context.Background()
+	sseLines := []string{
+		`data: {"id":"chatcmpl-vllm","object":"chat.completion.chunk","created":1234567890,"model":"glm-5.2","choices":[{"index":0,"delta":{"reasoning":"vllm reasoning"},"finish_reason":null}]}`,
+		`data: {"id":"chatcmpl-vllm","object":"chat.completion.chunk","created":1234567890,"model":"glm-5.2","choices":[{"index":0,"delta":{"content":"chat text"},"finish_reason":null}]}`,
+		`data: {"id":"chatcmpl-vllm","object":"chat.completion.chunk","created":1234567890,"model":"glm-5.2","choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}`,
+		`data: [DONE]`,
+	}
+
+	var state any
+	var allEvents []string
+	for _, line := range sseLines {
+		events := ConvertOpenAIChatToResponses(ctx, "glm-5.2", []byte(`{"model":"glm-5.2","input":"hello"}`), nil, []byte(line), &state)
+		allEvents = append(allEvents, events...)
+	}
+
+	joined := strings.Join(allEvents, "\n")
+	if !strings.Contains(joined, `"type":"reasoning"`) {
+		t.Fatalf("expected reasoning item, got %v", allEvents)
+	}
+	if !strings.Contains(joined, `"text":"vllm reasoning"`) {
+		t.Fatalf("expected reasoning summary text from vLLM reasoning, got %v", allEvents)
+	}
+	if !strings.Contains(joined, `"delta":"chat text"`) {
+		t.Fatalf("expected text delta after reasoning, got %v", allEvents)
+	}
+}
+
 func TestConvertOpenAIChatToResponses_ToolCall(t *testing.T) {
 	ctx := context.Background()
 

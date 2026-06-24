@@ -846,6 +846,11 @@ func TestHasOpenAIChatSemanticContent(t *testing.T) {
 			want:  true,
 		},
 		{
+			name:  "vllm reasoning delta",
+			event: `data: {"choices":[{"delta":{"reasoning":"thinking"}}]}` + "\n\n",
+			want:  true,
+		},
+		{
 			name:  "legacy function call name",
 			event: `data: {"choices":[{"delta":{"function_call":{"name":"Read"}}}]}` + "\n\n",
 			want:  true,

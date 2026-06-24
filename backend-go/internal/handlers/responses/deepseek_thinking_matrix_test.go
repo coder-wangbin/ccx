@@ -53,6 +53,33 @@ func TestResponsesHandler_DeepSeekChatAndMessagesThinkingMatrix(t *testing.T) {
 			},
 		},
 		{
+			name:         "responses_to_vllm_chat_reasoning",
+			serviceType:  "openai",
+			responseBody: `{"id":"chatcmpl_vllm","object":"chat.completion","choices":[{"message":{"role":"assistant","reasoning":"vllm reasoning","content":"chat text"},"finish_reason":"stop"}],"usage":{"prompt_tokens":1,"completion_tokens":2,"total_tokens":3}}`,
+			wantUpstream: func(t *testing.T, body []byte) {
+				var req map[string]interface{}
+				if err := json.Unmarshal(body, &req); err != nil {
+					t.Fatalf("unmarshal upstream request: %v", err)
+				}
+				messages, ok := req["messages"].([]interface{})
+				if !ok || len(messages) < 2 {
+					t.Fatalf("messages shape invalid: %s", string(body))
+				}
+				assistant, ok := messages[0].(map[string]interface{})
+				if !ok {
+					t.Fatalf("assistant reasoning message shape invalid: %s", string(body))
+				}
+				if got := assistant["reasoning_content"]; got != "previous reasoning" {
+					t.Fatalf("reasoning_content = %v, want previous reasoning; body=%s", got, string(body))
+				}
+			},
+			wantDownstream: func(t *testing.T, body []byte) {
+				if !bytes.Contains(body, []byte(`"type":"reasoning"`)) || !bytes.Contains(body, []byte(`"text":"vllm reasoning"`)) {
+					t.Fatalf("expected Responses reasoning item from vLLM reasoning, got %s", string(body))
+				}
+			},
+		},
+		{
 			name:         "responses_to_deepseek_messages",
 			serviceType:  "claude",
 			responseBody: `{"id":"msg_ds","type":"message","role":"assistant","content":[{"type":"thinking","thinking":"messages thinking","signature":"sig_ds"},{"type":"text","text":"messages text"}],"stop_reason":"end_turn","usage":{"input_tokens":1,"output_tokens":2}}`,
@@ -158,6 +185,23 @@ func TestResponsesHandler_DeepSeekChatAndMessagesStreamThinkingMatrix(t *testing
 			want: []string{
 				`response.reasoning_summary_text.delta`,
 				`"text":"chat reasoning"`,
+				`"delta":"chat text"`,
+				`"type":"response.completed"`,
+			},
+		},
+		{
+			name:        "responses_stream_to_vllm_chat_reasoning",
+			serviceType: "openai",
+			responseBody: strings.Join([]string{
+				`data: {"id":"chatcmpl_vllm","object":"chat.completion.chunk","created":123,"model":"glm-5.2","choices":[{"index":0,"delta":{"reasoning":"vllm reasoning"},"finish_reason":null}]}`,
+				`data: {"id":"chatcmpl_vllm","object":"chat.completion.chunk","created":123,"model":"glm-5.2","choices":[{"index":0,"delta":{"content":"chat text"},"finish_reason":null}]}`,
+				`data: {"id":"chatcmpl_vllm","object":"chat.completion.chunk","created":123,"model":"glm-5.2","choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}`,
+				`data: [DONE]`,
+				``,
+			}, "\n"),
+			want: []string{
+				`response.reasoning_summary_text.delta`,
+				`"text":"vllm reasoning"`,
 				`"delta":"chat text"`,
 				`"type":"response.completed"`,
 			},

@@ -344,10 +344,10 @@ func (p *OpenAIProvider) ConvertToClaudeResponse(providerResp *types.ProviderRes
 		msg := choice.Message
 
 		// 添加文本内容
-		if msg.ReasoningContent != "" {
+		if reasoning := msg.GetReasoningContent(); reasoning != "" {
 			claudeResp.Content = append(claudeResp.Content, types.ClaudeContent{
 				Type:     "thinking",
-				Thinking: msg.ReasoningContent,
+				Thinking: reasoning,
 			})
 		}
 
@@ -498,8 +498,12 @@ func (p *OpenAIProvider) HandleStreamResponse(body io.ReadCloser) (<-chan string
 				model = m
 			}
 
-			// 处理 reasoning_content（DeepSeek Chat / OpenAI 兼容推理内容）
-			if reasoning, ok := delta["reasoning_content"].(string); ok && reasoning != "" {
+			// 处理推理内容：优先 reasoning_content（DeepSeek/OpenAI），回退 reasoning（vLLM）
+			reasoning, _ := delta["reasoning_content"].(string)
+			if reasoning == "" {
+				reasoning, _ = delta["reasoning"].(string)
+			}
+			if reasoning != "" {
 				if !messageStartSent {
 					eventChan <- buildMessageStartEvent(model)
 					messageStartSent = true

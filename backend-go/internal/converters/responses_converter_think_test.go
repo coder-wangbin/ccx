@@ -103,6 +103,29 @@ func TestOpenAIChatResponseToResponses_ThinkMergesWithReasoningContent(t *testin
 	assert.Equal(t, "visible", firstContentText(t, resp.Output[1]))
 }
 
+func TestOpenAIChatResponseToResponses_VLLMReasoningField(t *testing.T) {
+	openaiResp := map[string]interface{}{
+		"model": "glm-5.2",
+		"choices": []interface{}{
+			map[string]interface{}{
+				"message": map[string]interface{}{
+					"role":      "assistant",
+					"reasoning": "vllm reasoning",
+					"content":   "visible",
+				},
+			},
+		},
+	}
+
+	resp, err := OpenAIChatResponseToResponses(openaiResp, "sess_test")
+	assert.NoError(t, err)
+	assert.Len(t, resp.Output, 2)
+	assert.Equal(t, "reasoning", resp.Output[0].Type)
+	assert.Equal(t, "vllm reasoning", summaryText(t, resp.Output[0]))
+	assert.Equal(t, "message", resp.Output[1].Type)
+	assert.Equal(t, "visible", firstContentText(t, resp.Output[1]))
+}
+
 // TestOpenAIChatResponseToResponses_ThinkInMiddleNotStripped 验证 content 非起始位置出现
 // 的 <think> 字面不应被剥离。
 func TestOpenAIChatResponseToResponses_ThinkInMiddleNotStripped(t *testing.T) {

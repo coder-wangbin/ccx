@@ -141,3 +141,26 @@ func TestOpenAIResponseToGemini_WithThoughtSignature(t *testing.T) {
 		}
 	})
 }
+
+func TestOpenAIResponseToGemini_VLLMReasoningField(t *testing.T) {
+	openaiResp := map[string]interface{}{
+		"choices": []interface{}{
+			map[string]interface{}{
+				"message": map[string]interface{}{
+					"reasoning": "vllm reasoning",
+					"content":   "final answer",
+				},
+			},
+		},
+	}
+
+	geminiResp, err := OpenAIResponseToGemini(openaiResp)
+	assert.NoError(t, err)
+	assert.NotNil(t, geminiResp)
+	assert.Len(t, geminiResp.Candidates, 1)
+	assert.NotNil(t, geminiResp.Candidates[0].Content)
+	assert.Len(t, geminiResp.Candidates[0].Content.Parts, 2)
+	assert.True(t, geminiResp.Candidates[0].Content.Parts[0].Thought)
+	assert.Equal(t, "vllm reasoning", geminiResp.Candidates[0].Content.Parts[0].Text)
+	assert.Equal(t, "final answer", geminiResp.Candidates[0].Content.Parts[1].Text)
+}

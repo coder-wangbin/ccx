@@ -110,6 +110,15 @@ func TestIsChatResponseEmpty(t *testing.T) {
 				}},
 			},
 		}, false},
+		{"vllm reasoning", map[string]interface{}{
+			"choices": []interface{}{
+				map[string]interface{}{"message": map[string]interface{}{
+					"role":      "assistant",
+					"content":   "",
+					"reasoning": "thinking...",
+				}},
+			},
+		}, false},
 		{"refusal", map[string]interface{}{
 			"choices": []interface{}{
 				map[string]interface{}{"message": map[string]interface{}{

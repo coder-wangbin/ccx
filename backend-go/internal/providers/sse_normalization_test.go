@@ -4,6 +4,8 @@ import (
 	"io"
 	"strings"
 	"testing"
+
+	"github.com/BenedictKing/ccx/internal/types"
 )
 
 func TestNormalizeSSEFieldLine(t *testing.T) {
@@ -133,6 +135,74 @@ func TestOpenAIProvider_HandleStreamResponse_MapsReasoningContentToThinkingDelta
 	}
 	if !strings.Contains(joined, `"type":"text_delta"`) || !strings.Contains(joined, `"text":"answer"`) {
 		t.Fatalf("expected text delta after reasoning, got %v", events)
+	}
+}
+
+// TestOpenAIProvider_HandleStreamResponse_MapsVLLMReasoningToThinkingDelta 验证 vLLM 的
+// reasoning 字段（非 reasoning_content）也能正确映射为 Claude thinking 事件
+func TestOpenAIProvider_HandleStreamResponse_MapsVLLMReasoningToThinkingDelta(t *testing.T) {
+	body := strings.Join([]string{
+		`data: {"id":"chatcmpl-vllm","model":"glm-5.2","choices":[{"delta":{"reasoning":"让我思考"},"finish_reason":null}]}`,
+		`data: {"id":"chatcmpl-vllm","model":"glm-5.2","choices":[{"delta":{"reasoning":"一下"},"finish_reason":null}]}`,
+		`data: {"id":"chatcmpl-vllm","model":"glm-5.2","choices":[{"delta":{"content":"你好！"},"finish_reason":null}]}`,
+		`data: {"id":"chatcmpl-vllm","model":"glm-5.2","choices":[{"delta":{},"finish_reason":"stop"}]}`,
+		`data: [DONE]`,
+		"",
+	}, "\n")
+
+	provider := &OpenAIProvider{}
+	eventChan, errChan, err := provider.HandleStreamResponse(io.NopCloser(strings.NewReader(body)))
+	if err != nil {
+		t.Fatalf("HandleStreamResponse returned error: %v", err)
+	}
+
+	events := collectStreamEvents(eventChan)
+	select {
+	case streamErr := <-errChan:
+		if streamErr != nil {
+			t.Fatalf("unexpected stream error: %v", streamErr)
+		}
+	default:
+	}
+
+	joined := strings.Join(events, "\n")
+	if !strings.Contains(joined, `"type":"thinking"`) {
+		t.Fatalf("expected thinking content block from vLLM reasoning field, got %v", events)
+	}
+	if !strings.Contains(joined, `"type":"thinking_delta"`) || !strings.Contains(joined, `"thinking":"让我思考"`) {
+		t.Fatalf("expected thinking_delta from vLLM reasoning, got %v", events)
+	}
+	if !strings.Contains(joined, `"type":"text_delta"`) || !strings.Contains(joined, `"text":"你好！"`) {
+		t.Fatalf("expected text delta after reasoning, got %v", events)
+	}
+}
+
+func TestOpenAIProvider_ConvertToClaudeResponse_MapsVLLMReasoningToThinking(t *testing.T) {
+	provider := &OpenAIProvider{}
+	claudeResp, err := provider.ConvertToClaudeResponse(&types.ProviderResponse{
+		Body: []byte(`{
+			"id": "chatcmpl-vllm",
+			"choices": [{
+				"message": {
+					"role": "assistant",
+					"reasoning": "vllm reasoning",
+					"content": "final answer"
+				},
+				"finish_reason": "stop"
+			}]
+		}`),
+	})
+	if err != nil {
+		t.Fatalf("ConvertToClaudeResponse() error = %v", err)
+	}
+	if len(claudeResp.Content) != 2 {
+		t.Fatalf("Content len = %d, want 2: %#v", len(claudeResp.Content), claudeResp.Content)
+	}
+	if claudeResp.Content[0].Type != "thinking" || claudeResp.Content[0].Thinking != "vllm reasoning" {
+		t.Fatalf("expected vLLM reasoning mapped to thinking block, got %#v", claudeResp.Content[0])
+	}
+	if claudeResp.Content[1].Type != "text" || claudeResp.Content[1].Text != "final answer" {
+		t.Fatalf("expected text block after thinking, got %#v", claudeResp.Content[1])
 	}
 }
 

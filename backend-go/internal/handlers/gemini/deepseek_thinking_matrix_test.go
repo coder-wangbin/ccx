@@ -42,6 +42,24 @@ func TestGeminiHandler_DeepSeekChatAndMessagesThinkingMatrix(t *testing.T) {
 			},
 		},
 		{
+			name:         "gemini_to_vllm_chat_reasoning",
+			serviceType:  "openai",
+			responseBody: `{"id":"chatcmpl_vllm","object":"chat.completion","choices":[{"message":{"role":"assistant","reasoning":"vllm reasoning","content":"chat text"},"finish_reason":"stop"}],"usage":{"prompt_tokens":1,"completion_tokens":2,"total_tokens":3}}`,
+			wantUpstream: func(t *testing.T, body []byte) {
+				if !bytes.Contains(body, []byte(`"reasoning_content":"previous reasoning"`)) {
+					t.Fatalf("expected upstream OpenAI reasoning_content, got %s", string(body))
+				}
+			},
+			wantDownstream: func(t *testing.T, body []byte) {
+				if !bytes.Contains(body, []byte(`"text":"vllm reasoning"`)) || !bytes.Contains(body, []byte(`"thought":true`)) {
+					t.Fatalf("expected Gemini thought part from vLLM reasoning, got %s", string(body))
+				}
+				if !bytes.Contains(body, []byte(`"text":"chat text"`)) {
+					t.Fatalf("expected Gemini text part, got %s", string(body))
+				}
+			},
+		},
+		{
 			name:         "gemini_to_deepseek_messages",
 			serviceType:  "claude",
 			responseBody: `{"id":"msg_ds","type":"message","role":"assistant","content":[{"type":"thinking","thinking":"messages thinking","signature":"sig_ds"},{"type":"text","text":"messages text"}],"stop_reason":"end_turn","usage":{"input_tokens":1,"output_tokens":2}}`,
@@ -124,6 +142,18 @@ func TestGeminiHandler_DeepSeekChatAndMessagesStreamThinkingMatrix(t *testing.T)
 				``,
 			}, "\n"),
 			wantText: "chat reasoning",
+		},
+		{
+			name:        "gemini_stream_to_vllm_chat_reasoning",
+			serviceType: "openai",
+			responseBody: strings.Join([]string{
+				`data: {"id":"chatcmpl_vllm","model":"glm-5.2","choices":[{"delta":{"reasoning":"vllm reasoning"},"finish_reason":null}]}`,
+				`data: {"id":"chatcmpl_vllm","model":"glm-5.2","choices":[{"delta":{"content":"chat text"},"finish_reason":null}]}`,
+				`data: {"id":"chatcmpl_vllm","model":"glm-5.2","choices":[{"delta":{},"finish_reason":"stop"}]}`,
+				`data: [DONE]`,
+				``,
+			}, "\n"),
+			wantText: "vllm reasoning",
 		},
 		{
 			name:        "gemini_stream_to_deepseek_messages",

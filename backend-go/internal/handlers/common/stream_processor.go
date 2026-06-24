@@ -446,7 +446,11 @@ func HasOpenAIChatSemanticContent(event string) bool {
 			if content, _ := delta["content"].(string); !IsEffectivelyEmptyStreamText(content) {
 				return true
 			}
-			if reasoning, _ := delta["reasoning_content"].(string); !IsEffectivelyEmptyStreamText(reasoning) {
+			reasoning, _ := delta["reasoning_content"].(string)
+			if reasoning == "" {
+				reasoning, _ = delta["reasoning"].(string)
+			}
+			if !IsEffectivelyEmptyStreamText(reasoning) {
 				return true
 			}
 			if functionCall, ok := delta["function_call"].(map[string]interface{}); ok && len(functionCall) > 0 {

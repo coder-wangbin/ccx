@@ -750,7 +750,11 @@ func streamOpenAIToGemini(
 		}
 
 		// 提取文本内容
-		if reasoning, _ := delta["reasoning_content"].(string); reasoning != "" {
+		reasoning, _ := delta["reasoning_content"].(string)
+		if reasoning == "" {
+			reasoning, _ = delta["reasoning"].(string)
+		}
+		if reasoning != "" {
 			geminiChunk := types.GeminiStreamChunk{
 				Candidates: []types.GeminiCandidate{
 					{

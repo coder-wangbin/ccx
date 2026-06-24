@@ -83,8 +83,17 @@ type OpenAIMessage struct {
 	Role             string           `json:"role"`
 	Content          interface{}      `json:"content"` // string 或 null
 	ReasoningContent string           `json:"reasoning_content,omitempty"`
+	Reasoning        string           `json:"reasoning,omitempty"` // vLLM 兼容：新版 vLLM 使用 reasoning 而非 reasoning_content
 	ToolCalls        []OpenAIToolCall `json:"tool_calls,omitempty"`
 	ToolCallID       string           `json:"tool_call_id,omitempty"`
+}
+
+// GetReasoningContent 返回推理内容，优先 reasoning_content，回退 reasoning（vLLM 兼容）
+func (m *OpenAIMessage) GetReasoningContent() string {
+	if m.ReasoningContent != "" {
+		return m.ReasoningContent
+	}
+	return m.Reasoning
 }
 
 // OpenAIToolCall OpenAI 工具调用
