@@ -278,7 +278,29 @@
                 {{ copilotDiagnoseError }}
               </v-alert>
               <v-alert v-if="copilotDiagnoseResult" color="info" variant="tonal" density="compact" class="text-caption">
-                <pre class="mb-0" style="white-space: pre-wrap; word-break: break-all;">{{ JSON.stringify(copilotDiagnoseResult, null, 2) }}</pre>
+                <div class="d-flex flex-column ga-2">
+                  <div class="d-flex align-center ga-2">
+                    <v-chip :color="copilotDiagnoseResult.githubUser ? 'success' : 'warning'" size="small" variant="tonal">
+                      GitHub
+                    </v-chip>
+                    <span v-if="copilotDiagnoseResult.githubUser">{{ copilotDiagnoseResult.githubUser.login }}</span>
+                    <span v-else>{{ copilotDiagnoseResult.githubUserError }}</span>
+                  </div>
+                  <div class="d-flex align-center ga-2">
+                    <v-chip :color="copilotDiagnoseResult.tokenError ? 'error' : 'success'" size="small" variant="tonal">
+                      Token
+                    </v-chip>
+                    <span v-if="copilotDiagnoseResult.tokenError">{{ copilotDiagnoseResult.tokenError }}</span>
+                    <span v-else>{{ copilotDiagnoseResult.copilotBaseUrl }}</span>
+                  </div>
+                  <div class="d-flex align-center ga-2">
+                    <v-chip :color="copilotDiagnoseResult.modelsError ? 'error' : (copilotDiagnoseResult.modelsStatus && copilotDiagnoseResult.modelsStatus < 400 ? 'success' : 'warning')" size="small" variant="tonal">
+                      Models
+                    </v-chip>
+                    <span v-if="copilotDiagnoseResult.modelsError">{{ copilotDiagnoseResult.modelsError }}</span>
+                    <span v-else>{{ copilotDiagnoseResult.modelsStatus }} {{ copilotDiagnoseResult.modelsUrl }}</span>
+                  </div>
+                </div>
               </v-alert>
             </div>
           </div>
@@ -375,6 +397,21 @@ const newApiKey = ref('')
 const apiKeyError = ref('')
 const duplicateKeyIndex = ref<number | null>(null)
 const copiedKeyIndex = ref<number | null>(null)
+interface CopilotDiagnoseResponse {
+  githubUser?: {
+    login?: string
+    id?: number
+  }
+  githubUserError?: string
+  copilotBaseUrl?: string
+  tokenError?: string
+  tokenErrorKind?: string
+  modelsUrl?: string
+  modelsStatus?: number
+  modelsError?: string
+  modelsBodyPrefix?: string
+}
+
 const copilotOAuthLoading = ref(false)
 const copilotPolling = ref(false)
 const copilotOAuthError = ref('')
@@ -383,7 +420,7 @@ const copilotDeviceCode = ref('')
 const copilotUserCode = ref('')
 const copilotVerificationUri = ref('')
 const copilotDiagnoseLoading = ref(false)
-const copilotDiagnoseResult = ref<Record<string, unknown> | null>(null)
+const copilotDiagnoseResult = ref<CopilotDiagnoseResponse | null>(null)
 const copilotDiagnoseError = ref('')
 let copilotPollTimer: number | null = null
 
@@ -534,7 +571,7 @@ const diagnoseCopilotChannel = async () => {
   copilotDiagnoseResult.value = null
   try {
     const latestKey = props.apiKeys[0]
-    copilotDiagnoseResult.value = await apiService.diagnoseCopilotChannel(props.channelId, latestKey)
+    copilotDiagnoseResult.value = await apiService.diagnoseCopilotChannel(props.channelId, latestKey) as unknown as CopilotDiagnoseResponse
   } catch (err) {
     copilotDiagnoseError.value = err instanceof Error ? err.message : String(err)
   } finally {
