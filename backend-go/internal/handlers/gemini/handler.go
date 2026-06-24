@@ -12,6 +12,7 @@ import (
 
 	"github.com/BenedictKing/ccx/internal/config"
 	"github.com/BenedictKing/ccx/internal/converters"
+	"github.com/BenedictKing/ccx/internal/copilot"
 	"github.com/BenedictKing/ccx/internal/handlers/common"
 	"github.com/BenedictKing/ccx/internal/middleware"
 	"github.com/BenedictKing/ccx/internal/scheduler"
@@ -472,8 +473,8 @@ func buildProviderRequest(
 		}
 		url = fmt.Sprintf("%s/v1/chat/completions", strings.TrimRight(baseURL, "/"))
 
-	case "responses":
-		// Responses 上游：需要转换
+	case "responses", "copilot":
+		// Responses/Copilot 上游：需要转换
 		responsesReq, err := converters.GeminiToResponsesRequest(geminiReq, mappedModel)
 		if err != nil {
 			return nil, err
@@ -483,7 +484,12 @@ func buildProviderRequest(
 		if err != nil {
 			return nil, err
 		}
-		url = fmt.Sprintf("%s/v1/responses", strings.TrimRight(baseURL, "/"))
+		// copilot 不自动补 /v1 前缀
+		if upstream.ServiceType == "copilot" {
+			url = fmt.Sprintf("%s/responses", strings.TrimRight(baseURL, "/"))
+		} else {
+			url = fmt.Sprintf("%s/v1/responses", strings.TrimRight(baseURL, "/"))
+		}
 
 	default:
 		// 默认当作 Gemini 处理，保持与 Gemini 上游一致的透传语义。
@@ -515,6 +521,12 @@ func buildProviderRequest(
 
 	// 设置认证头
 	switch upstream.ServiceType {
+	case "copilot":
+		copilotToken, _, err := copilot.ResolveToken(c.Request.Context(), apiKey)
+		if err != nil {
+			return nil, fmt.Errorf("Copilot token 交换失败: %w", err)
+		}
+		copilot.ApplyRuntimeHeaders(req.Header, copilotToken)
 	case "gemini":
 		if utils.HasAuthenticationHeaderOverride(upstream.AuthHeader) {
 			utils.SetAuthenticationHeaderWithOverride(req.Header, apiKey, upstream.AuthHeader)

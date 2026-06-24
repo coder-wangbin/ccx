@@ -9,6 +9,7 @@ import (
 
 	"github.com/BenedictKing/ccx/internal/config"
 	"github.com/BenedictKing/ccx/internal/converters"
+	"github.com/BenedictKing/ccx/internal/copilot"
 	"github.com/BenedictKing/ccx/internal/utils"
 	"github.com/gin-gonic/gin"
 )
@@ -221,14 +222,15 @@ func buildProviderRequest(
 			url = fmt.Sprintf("%s/v1/chat/completions", strings.TrimRight(baseURL, "/"))
 		}
 
-	case "responses":
-		// Responses 上游：转换 Chat 格式为 Responses 格式，发送到 /v1/responses
+	case "responses", "copilot":
+		// Responses/Copilot 上游：转换 Chat 格式为 Responses 格式
 		chatBody, err := buildChatCompletionRequestBody(bodyBytes, effectiveModel, mappedModel, upstream, true)
 		if err != nil {
 			return nil, err
 		}
 		requestBody = converters.ConvertChatRequestToResponsesRequest(chatBody)
-		if skipVersionPrefix {
+		// copilot 不自动补 /v1 前缀
+		if upstream.ServiceType == "copilot" || skipVersionPrefix {
 			url = fmt.Sprintf("%s/responses", strings.TrimRight(baseURL, "/"))
 		} else {
 			url = fmt.Sprintf("%s/v1/responses", strings.TrimRight(baseURL, "/"))
@@ -298,6 +300,12 @@ func buildProviderRequest(
 
 	// 设置认证头
 	switch upstream.ServiceType {
+	case "copilot":
+		copilotToken, _, err := copilot.ResolveToken(c.Request.Context(), apiKey)
+		if err != nil {
+			return nil, fmt.Errorf("Copilot token 交换失败: %w", err)
+		}
+		copilot.ApplyRuntimeHeaders(req.Header, copilotToken)
 	case "claude":
 		utils.SetAuthenticationHeaderWithOverride(req.Header, apiKey, upstream.AuthHeader)
 		req.Header.Set("anthropic-version", "2023-06-01")

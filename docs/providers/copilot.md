@@ -34,6 +34,23 @@
 | Responses | `POST /responses` |
 | Models | `GET /models` |
 
+## 跨协议转换
+
+GitHub Copilot 上游实际只暴露 Responses 协议（`/responses`）。CCX 会把其它入口的请求统一转换后再发给 Copilot，因此你可以在以下入口都使用 `serviceType: "copilot"` 的渠道：
+
+| 客户端入口 | 客户端协议 | CCX 转换 | Copilot 上游 |
+|------------|------------|----------|--------------|
+| Responses | Responses | 透传 | `POST /responses` |
+| Chat | OpenAI Chat | Chat → Responses | `POST /responses` |
+| Messages | Anthropic Messages | Messages → Responses | `POST /responses` |
+| Gemini | Gemini generateContent | Gemini → Responses | `POST /responses` |
+
+无论从哪个入口进入，CCX 都会：
+
+1. 把客户端请求体转换成 Responses 格式
+2. 用渠道里保存的 GitHub OAuth token 换取短期 Copilot token
+3. 注入 Copilot 运行时请求头，请求 `https://api.githubcopilot.com/responses`
+
 说明：`serviceType: "copilot"` 会跳过默认 `/v1` 前缀，最终请求地址为 `https://api.githubcopilot.com/responses`。
 
 ## 模型映射建议
