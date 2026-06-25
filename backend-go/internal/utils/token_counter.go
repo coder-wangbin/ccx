@@ -46,13 +46,16 @@ func EstimateMessagesTokens(messages interface{}) int {
 		return 0
 	}
 
+	// 用 gjson 提取图片 token 并把 base64 字段替换成占位符，避免按字符数高估
+	cleaned, imageTokens := extractImageTokensAndStripBytes(data)
+
 	// 每条消息额外开销约 4 tokens
 	msgCount := 0
 	if arr, ok := messages.([]interface{}); ok {
 		msgCount = len(arr)
 	}
 
-	return EstimateTokens(string(data)) + msgCount*4
+	return EstimateTokens(string(cleaned)) + msgCount*4 + imageTokens
 }
 
 // EstimateRequestTokens 从请求体估算输入 token
@@ -61,12 +64,16 @@ func EstimateRequestTokens(bodyBytes []byte) int {
 		return 0
 	}
 
+	// 提取图片 token 并把 base64 字段替换成占位符，后续按 cleaned 估算文本，
+	// 图片 token 在此处一次性计入，下方不再走会二次提取的 EstimateMessagesTokens。
+	cleaned, imageTokens := extractImageTokensAndStripBytes(bodyBytes)
+
 	var req map[string]interface{}
-	if err := json.Unmarshal(bodyBytes, &req); err != nil {
-		return EstimateTokens(string(bodyBytes))
+	if err := json.Unmarshal(cleaned, &req); err != nil {
+		return EstimateTokens(string(cleaned)) + imageTokens
 	}
 
-	total := 0
+	total := imageTokens
 
 	// system prompt
 	if system, ok := req["system"]; ok {
@@ -83,9 +90,12 @@ func EstimateRequestTokens(bodyBytes []byte) int {
 		}
 	}
 
-	// messages
-	if messages, ok := req["messages"]; ok {
-		total += EstimateMessagesTokens(messages)
+	// messages：cleaned 里的 base64 已剥离，按文本估算即可，不再重复提取图片
+	if messages, ok := req["messages"].([]interface{}); ok {
+		data, err := json.Marshal(messages)
+		if err == nil {
+			total += EstimateTokens(string(data)) + len(messages)*4
+		}
 	}
 
 	// tools (每个工具约 100-200 tokens)
@@ -150,12 +160,15 @@ func EstimateResponsesRequestTokens(bodyBytes []byte) int {
 		return 0
 	}
 
+	// 先用 gjson 提取图片 token 并把 base64 字段清空
+	cleaned, imageTokens := extractImageTokensAndStripBytes(bodyBytes)
+
 	var req map[string]interface{}
-	if err := json.Unmarshal(bodyBytes, &req); err != nil {
-		return EstimateTokens(string(bodyBytes))
+	if err := json.Unmarshal(cleaned, &req); err != nil {
+		return EstimateTokens(string(cleaned)) + imageTokens
 	}
 
-	total := 0
+	total := imageTokens
 
 	// instructions (系统指令)
 	if instructions, ok := req["instructions"].(string); ok {
