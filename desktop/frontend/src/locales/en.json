@@ -808,6 +808,8 @@
   "cockpit.noChannelsForKind": "No channels available for this type",
   "cockpit.board.streaming": "Streaming",
   "cockpit.board.streamingHint": "Conversations currently streaming",
+  "cockpit.board.working": "Working",
+  "cockpit.board.workingHint": "Root conversations with active work",
   "cockpit.board.subagents": "Subagents",
   "cockpit.board.subagentsHint": "Conversations with subagents",
   "cockpit.board.active": "Active",

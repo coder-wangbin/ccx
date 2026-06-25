@@ -31,6 +31,7 @@
   "cockpit.active": "Active: {count}",
   "cockpit.override": "Override: {count}",
   "cockpit.column.streaming": "Streaming",
+  "cockpit.column.working": "Working",
   "cockpit.column.subagents": "Subagents",
   "cockpit.column.active": "Active",
   "cockpit.column.idle": "Idle",

@@ -808,6 +808,8 @@
   "cockpit.noChannelsForKind": "该类型暂无可用渠道",
   "cockpit.board.streaming": "流式中",
   "cockpit.board.streamingHint": "正在流式输出的会话",
+  "cockpit.board.working": "工作中",
+  "cockpit.board.workingHint": "存在活跃工作的主对话",
   "cockpit.board.subagents": "子代理",
   "cockpit.board.subagentsHint": "包含子代理的会话",
   "cockpit.board.active": "活跃",

@@ -151,10 +151,10 @@ const expandedCards = ref(new Set<string>())
 const pinnedConversationOrder = ref<string[]>([])
 const cardElements = new Map<string, HTMLElement>()
 
-const boardColumnMeta: Array<{ key: BoardColumnKey; label: string; color: string }> = [
-  { key: 'working', label: 'Working', color: '#6366f1' },
+const boardColumnMeta = computed<Array<{ key: BoardColumnKey; label: string; color: string }>>(() => [
+  { key: 'working', label: t('cockpit.column.working'), color: '#6366f1' },
   { key: 'idle', label: t('cockpit.column.idle'), color: '#10b981' },
-]
+])
 
 const kindFilterOptions = [
   { title: 'ALL', value: '' },
@@ -195,10 +195,9 @@ const boardStats = computed<CockpitStat[]>(() => {
   const subagentTotal = visibleBoardItems.value.reduce((total, item) => total + item.subagentSummary.total, 0)
   const streamingTotal = visibleBoardItems.value.reduce((total, item) => total + (item.conversation.status === 'streaming' ? 1 : 0) + item.subagentSummary.streaming, 0)
   return [
-    ...boardColumnMeta.map(column => ({
-    ...column,
-    label: column.label,
-    count: counts[column.key].length,
+    ...boardColumnMeta.value.map(column => ({
+      ...column,
+      count: counts[column.key].length,
     })),
     { key: 'subagents', label: t('cockpit.subagents'), color: '#f59e0b', count: subagentTotal },
     { key: 'streaming', label: t('cockpit.column.streaming'), color: '#ef4444', count: streamingTotal },
@@ -207,9 +206,8 @@ const boardStats = computed<CockpitStat[]>(() => {
 
 const boardColumns = computed(() => {
   const buckets = bucketBoardItems(visibleBoardItems.value)
-  return boardColumnMeta.map(column => ({
+  return boardColumnMeta.value.map(column => ({
     ...column,
-    label: column.label,
     items: buckets[column.key],
   }))
 })

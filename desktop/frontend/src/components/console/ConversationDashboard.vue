@@ -45,7 +45,7 @@ const cardElements = new Map<string, HTMLElement>()
 type CockpitStat = { key: string; label: string; hint: string; color: string; count: number }
 
 const boardMeta = computed<Array<{ key: BoardColumnKey; label: string; hint: string; color: string }>>(() => [
-  { key: 'working', label: 'Working', hint: 'Root conversations with active work', color: '#6366f1' },
+  { key: 'working', label: tf('cockpit.board.working', 'Working'), hint: tf('cockpit.board.workingHint', 'Root conversations with active work'), color: '#6366f1' },
   { key: 'idle', label: tf('cockpit.board.idle', 'Idle'), hint: tf('cockpit.board.idleHint', 'Idle conversations'), color: '#10b981' },
 ])
 

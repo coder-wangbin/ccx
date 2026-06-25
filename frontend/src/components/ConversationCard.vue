@@ -11,7 +11,6 @@
     @keydown.space.prevent="$emit('toggleExpand')"
   >
     <v-card-text class="pa-4">
-      <div class="task-card-id">{{ shortConversationId }}</div>
       <div class="task-card-title-row">
         <span :class="['status-led', `status-led--${conversation.status}`]"></span>
         <span class="task-card-title">
@@ -598,14 +597,6 @@ function shortId(value: string): string {
 .v-theme--dark .conversation-card:hover {
   border-color: var(--ccx-kind-color);
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.34);
-}
-
-.task-card-id {
-  margin-bottom: 4px;
-  color: rgb(var(--v-theme-on-surface) / 42%);
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 11px;
-  line-height: 1.2;
 }
 
 .task-card-title-row {
