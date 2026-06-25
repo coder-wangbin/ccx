@@ -177,6 +177,7 @@ import {
   mdiHistory,
   mdiFormatListBulleted,
   mdiFormatAlignJustify,
+  mdiStethoscope,
   mdiNetwork,
   mdiTagOff,
   mdiShieldLockOutline,
@@ -390,6 +391,7 @@ const iconMap: Record<string, string> = {
   'history': mdiHistory,
   'format-list-bulleted': mdiFormatListBulleted,
   'format-align-justify': mdiFormatAlignJustify,
+  'stethoscope': mdiStethoscope,
 
   // 计费头
   'tag-off': mdiTagOff,

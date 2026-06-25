@@ -163,9 +163,11 @@
                 :supports-open-a-i-advanced-options="supportsOpenAIAdvancedOptions"
                 :reasoning-param-style-options="reasoningParamStyleOptions"
                 :text-verbosity-options="textVerbosityOptions"
+                :diagnosing="diagnosingCompat"
                 :rules="rules"
                 @update:form="updateForm"
                 @menu-update="onMenuUpdate"
+                @diagnose="handleDiagnoseCompat"
               />
             </section>
 
@@ -272,6 +274,7 @@ const emit = defineEmits<{
   save: [channel: Omit<Channel, 'index' | 'latency' | 'status'>, options?: { isQuickAdd?: boolean; triggerCapabilityTest?: boolean }]
   testCapability: [channelId: number]
   error: [message: string]
+  success: [message: string]
 }>()
 const { t } = useI18n()
 const apiService = new ApiService()
@@ -1538,6 +1541,43 @@ const handleTestCapability = async () => {
     emit('save', channelData, { triggerCapabilityTest: true })
   } else {
     emit('testCapability', props.channel.index)
+  }
+}
+
+const diagnosingCompat = ref(false)
+
+const handleDiagnoseCompat = async () => {
+  if (props.channel?.index === undefined || props.channel?.index === null) return
+  if (props.channelType === 'images') return
+
+  diagnosingCompat.value = true
+  try {
+    const type = props.channelType as 'messages' | 'chat' | 'responses' | 'gemini'
+    const result = await apiService.diagnoseChannelCompat(type, props.channel.index)
+    const applied: string[] = []
+    for (const [key, val] of Object.entries(result.recommendations)) {
+      if (val !== undefined && (form as Record<string, unknown>)[key] !== val) {
+        updateForm({ [key]: val })
+        applied.push(key)
+      }
+    }
+    if (result.urlRecommendations?.recommended) {
+      const current = result.urlRecommendations.current
+      const recommended = result.urlRecommendations.recommended
+      const lines = baseUrlsText.value.split('\n').map(line => line.trim()).filter(Boolean)
+      const nextLines = lines.length > 0
+        ? lines.map((line, index) => (index === 0 || line === current) ? recommended : line)
+        : [recommended]
+      baseUrlsText.value = Array.from(new Set(nextLines)).join('\n')
+      applied.push('baseUrl')
+    }
+    emit('success', applied.length
+      ? t('channelEditor.compat.diagnoseApplied', { count: applied.length })
+      : t('channelEditor.compat.diagnoseNoChange'))
+  } catch (e) {
+    emit('error', e instanceof Error ? e.message : t('channelEditor.compat.diagnoseFailed'))
+  } finally {
+    diagnosingCompat.value = false
   }
 }
 

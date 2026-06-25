@@ -29,7 +29,8 @@ import type {
   PingResult,
   ResumeChannelResponse,
   SchedulerStatsResponse,
-  StartCapabilityTestOptions
+  StartCapabilityTestOptions,
+  CompatDiagnoseResult
 } from './api-types'
 
 export * from './api-helpers'
@@ -193,6 +194,15 @@ export class ApiService {
       method: 'PUT',
       body: JSON.stringify({ source_pattern: sourcePattern, target_model: targetModel, reasoning })
     })
+  }
+
+  // ============== 兼容性诊断 API ==============
+
+  async diagnoseChannelCompat(
+    type: 'messages' | 'chat' | 'gemini' | 'responses',
+    id: number
+  ): Promise<CompatDiagnoseResult> {
+    return this.request(`/${type}/channels/${id}/compat-diagnose`, { method: 'POST', body: '{}' })
   }
 
   // ============== 能力测试 API ==============

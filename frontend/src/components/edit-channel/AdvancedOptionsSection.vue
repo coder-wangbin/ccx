@@ -71,8 +71,10 @@
           :supports-open-a-i-advanced-options="supportsOpenAIAdvancedOptions"
           :reasoning-param-style-options="reasoningParamStyleOptions"
           :text-verbosity-options="textVerbosityOptions"
+          :diagnosing="diagnosing"
           @update:field="updateField"
           @menu-update="$emit('menu-update', $event)"
+          @diagnose="$emit('diagnose')"
         />
       </v-col>
 
@@ -142,6 +144,7 @@ interface Props {
   supportsOpenAIAdvancedOptions: boolean
   reasoningParamStyleOptions: Array<{ title: string; value: string }>
   textVerbosityOptions: Array<{ title: string; value: string }>
+  diagnosing?: boolean
   rules: {
     requestTimeoutMs: (_value: string | number | null) => boolean | string
     responseHeaderTimeoutMs: (_value: string | number | null) => boolean | string
@@ -153,6 +156,7 @@ defineProps<Props>()
 const emit = defineEmits<{
   'update:form': [Partial<FormData>]
   'menu-update': [boolean]
+  'diagnose': []
 }>()
 
 const { t } = useI18n()

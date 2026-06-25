@@ -640,3 +640,15 @@ export interface HealthResponse {
   uptime: number
   mode: string
 }
+
+export interface CompatDiagnoseResult {
+  recommendations: Partial<Record<string, boolean>>
+  urlRecommendations?: {
+    current: string
+    recommended: string
+    reason: string
+  }
+  evidence: Partial<Record<string, string>>
+  duration: number
+  cached: boolean
+}

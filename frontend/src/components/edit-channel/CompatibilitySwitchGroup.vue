@@ -1,8 +1,17 @@
 <template>
   <v-card variant="outlined" class="pa-4">
-    <div class="text-caption font-weight-bold text-uppercase text-medium-emphasis mb-3">
-      <v-icon size="small" color="primary" class="mr-1">mdi-format-align-justify</v-icon>
-      {{ t('channelEditor.compat.title') }}
+    <div class="d-flex align-center justify-space-between mb-3">
+      <div class="text-caption font-weight-bold text-uppercase text-medium-emphasis">
+        <v-icon size="small" color="primary" class="mr-1">mdi-format-align-justify</v-icon>
+        {{ t('channelEditor.compat.title') }}
+      </div>
+      <v-btn
+        size="x-small"
+        variant="tonal"
+        :loading="diagnosing"
+        prepend-icon="mdi-stethoscope"
+        @click="$emit('diagnose')"
+      >{{ t('channelEditor.compat.diagnose') }}</v-btn>
     </div>
 
     <div class="d-flex flex-column ga-3">
@@ -274,6 +283,7 @@ interface Props {
   supportsOpenAIAdvancedOptions: boolean
   reasoningParamStyleOptions: Array<{ title: string; value: string }>
   textVerbosityOptions: Array<{ title: string; value: string }>
+  diagnosing?: boolean
 }
 
 defineProps<Props>()
@@ -281,6 +291,7 @@ defineProps<Props>()
 const emit = defineEmits<{
   'update:field': [field: keyof FormData, value: unknown]
   'menu-update': [open: boolean]
+  'diagnose': []
 }>()
 
 const { t } = useI18n()
