@@ -39,3 +39,11 @@
 
 备注：该需求目前不确定是否有更多用户需要，先记录为待评估项。
 
+---
+
+> **上游版本变更**
+
+## [ ] Codex rust-v0.142.2 上游协议/工具变更评估
+
+发现协议/工具/用法变更：MCP tool search 默认启用、服务端 safety-buffering 可见性与 faster-model 元数据、ResponseItem metadata 新增 turn_id。请评估对 ccx Responses 渠道的影响。
+
