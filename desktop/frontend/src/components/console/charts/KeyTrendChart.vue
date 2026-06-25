@@ -109,6 +109,7 @@ import type { ApexOptions } from 'apexcharts'
 import { useTheme } from '@/composables/useTheme'
 import { useI18n } from '@/i18n'
 import type { KeyHistoryData, GlobalStatsSummary } from '@/services/admin-api'
+import { effectiveChartIntervalMs } from '@/utils/chart-sampling'
 
 const { t } = useI18n()
 const props = withDefaults(
@@ -118,11 +119,13 @@ const props = withDefaults(
     loading?: boolean
     duration?: string
     summary?: GlobalStatsSummary | null
+    chartInterval?: string
   }>(),
   {
     loading: false,
     duration: '1h',
     summary: null,
+    chartInterval: undefined,
   },
 )
 
@@ -218,10 +221,8 @@ const AGGREGATION_INTERVALS: Record<string, number> = {
 }
 
 const getAggregationInterval = (duration: string): number => {
-  const intervalSeconds = props.summary?.intervalSeconds
-  if (intervalSeconds && intervalSeconds > 0) {
-    return intervalSeconds * 1000
-  }
+  const interval = effectiveChartIntervalMs(props.summary?.intervalSeconds, props.chartInterval)
+  if (interval) return interval
   return AGGREGATION_INTERVALS[duration] || 60000
 }
 

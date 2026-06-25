@@ -18,6 +18,7 @@ import CircuitBreakerDialog from '@/components/console/CircuitBreakerDialog.vue'
 import GlobalStatsChart from '@/components/console/charts/GlobalStatsChart.vue'
 import KeyTrendChart from '@/components/console/charts/KeyTrendChart.vue'
 import type { ManagedChannelType } from '@/utils/channel-type-api'
+import { selectDenseSamplingInterval } from '@/utils/chart-sampling'
 import type { Channel, ChannelMetrics, ChannelRecentActivity, GlobalStatsHistoryResponse, KeyHistoryData, GlobalStatsSummary } from '@/services/admin-api'
 
 interface Props {
@@ -107,6 +108,7 @@ const showCbDialog = ref(false)
 const globalStatsChartRef = ref<InstanceType<typeof GlobalStatsChart> | null>(null)
 const statsLoading = ref(false)
 const showGlobalStats = ref(false)
+const globalStatsDuration = ref('6h')
 
 // 渠道级 Key 趋势图
 const expandedChannelId = ref<number | null>(null)
@@ -114,22 +116,86 @@ const keyMetricsDuration = ref('1h')
 const keyMetricsData = ref<KeyHistoryData[]>([])
 const keyMetricsSummary = ref<GlobalStatsSummary | null>(null)
 const keyMetricsLoading = ref(false)
+const globalStatsAdaptiveInterval = ref<{ key: string; interval: string } | null>(null)
+const keyMetricsAdaptiveInterval = ref<{ key: string; interval: string } | null>(null)
+const globalStatsChartInterval = computed(() => {
+  const interval = globalStatsAdaptiveInterval.value
+  return interval?.key === `${props.type}:${globalStatsDuration.value}` ? interval.interval : undefined
+})
+const keyMetricsChartInterval = computed(() => {
+  if (expandedChannelId.value === null) return undefined
+  const interval = keyMetricsAdaptiveInterval.value
+  return interval?.key === `${props.type}:${expandedChannelId.value}:${keyMetricsDuration.value}` ? interval.interval : undefined
+})
+
+watch(() => props.type, () => {
+  globalStatsDuration.value = '6h'
+  globalStatsAdaptiveInterval.value = null
+  keyMetricsAdaptiveInterval.value = null
+  keyMetricsData.value = []
+  keyMetricsSummary.value = null
+  expandedChannelId.value = null
+})
+
+type ChartDuration = '1h' | '6h' | '24h' | 'today' | '7d' | '30d' | '90d' | '180d' | '365d' | 'thisyear'
+
+function isChartDuration(duration: string): duration is ChartDuration {
+  return ['1h', '6h', '24h', 'today', '7d', '30d', '90d', '180d', '365d', 'thisyear'].includes(duration)
+}
+
+function historyQuery(duration: string, interval?: string): string {
+  const params = new URLSearchParams({ duration })
+  if (interval) {
+    params.set('interval', interval)
+  }
+  return params.toString()
+}
+
+function apiPathForType(type: ManagedChannelType): string {
+  const typeMap: Record<ManagedChannelType, string> = {
+    messages: 'messages',
+    chat: 'chat',
+    responses: 'responses',
+    gemini: 'gemini',
+    images: 'images'
+  }
+  return typeMap[type]
+}
 
 async function loadGlobalStats(duration?: string) {
   statsLoading.value = true
   globalStatsChartRef.value?.setLoading(true)
   try {
     const adminApi = useAdminApi()
-    const typeMap: Record<ManagedChannelType, string> = {
-      messages: 'messages',
-      chat: 'chat',
-      responses: 'responses',
-      gemini: 'gemini',
-      images: 'images'
-    }
-    const apiPath = typeMap[props.type]
+    const requestType = props.type
+    const apiPath = apiPathForType(requestType)
     const dur = duration || '6h'
-    const data = await adminApi.get<GlobalStatsHistoryResponse>(`/api/${apiPath}/global/stats/history?duration=${dur}`)
+    if (globalStatsDuration.value !== dur) {
+      globalStatsDuration.value = dur
+      globalStatsAdaptiveInterval.value = null
+    }
+    const samplingKey = `${requestType}:${dur}`
+    const interval = globalStatsAdaptiveInterval.value?.key === samplingKey
+      ? globalStatsAdaptiveInterval.value.interval
+      : undefined
+    let data = await adminApi.get<GlobalStatsHistoryResponse>(
+      `/api/${apiPath}/global/stats/history?${historyQuery(dur, interval)}`
+    )
+    if (!interval && isChartDuration(dur)) {
+      const denseInterval = selectDenseSamplingInterval(
+        dur,
+        data.dataPoints || [],
+        dp => dp.requestCount > 0 || dp.inputTokens > 0 || dp.outputTokens > 0 || dp.cacheReadTokens > 0 || dp.cacheCreationTokens > 0,
+        data.summary?.intervalSeconds
+      )
+      if (denseInterval) {
+        globalStatsAdaptiveInterval.value = { key: samplingKey, interval: denseInterval }
+        data = await adminApi.get<GlobalStatsHistoryResponse>(
+          `/api/${apiPath}/global/stats/history?${historyQuery(dur, denseInterval)}`
+        )
+      }
+    }
+    if (props.type !== requestType || globalStatsDuration.value !== dur) return
     globalStatsChartRef.value?.updateData(data.dataPoints, data.summary, data.modelDataPoints)
   } catch {
     // Silently fail
@@ -143,23 +209,38 @@ async function loadKeyMetrics(channelId: number, duration?: string) {
   keyMetricsLoading.value = true
   try {
     const adminApi = useAdminApi()
-    const typeMap: Record<ManagedChannelType, string> = {
-      messages: 'messages',
-      chat: 'chat',
-      responses: 'responses',
-      gemini: 'gemini',
-      images: 'images'
-    }
-    const apiPath = typeMap[props.type]
+    const requestType = props.type
+    const apiPath = apiPathForType(requestType)
     const dur = duration || keyMetricsDuration.value
     // 只在 duration 真正变化时更新 ref，避免触发子组件 KeyTrendChart 的 props.duration watcher
     // 产生 emit refresh → handleKeyMetricsRefresh → loadKeyMetrics 的 double-fetch 链式反应
     if (keyMetricsDuration.value !== dur) {
+      keyMetricsAdaptiveInterval.value = null
       keyMetricsDuration.value = dur
     }
-    const data = await adminApi.get<{ keys: KeyHistoryData[]; summary?: GlobalStatsSummary }>(
-      `/api/${apiPath}/channels/${channelId}/keys/metrics/history?duration=${dur}`
+    const samplingKey = `${requestType}:${channelId}:${dur}`
+    const interval = keyMetricsAdaptiveInterval.value?.key === samplingKey
+      ? keyMetricsAdaptiveInterval.value.interval
+      : undefined
+    let data = await adminApi.get<{ keys: KeyHistoryData[]; summary?: GlobalStatsSummary }>(
+      `/api/${apiPath}/channels/${channelId}/keys/metrics/history?${historyQuery(dur, interval)}`
     )
+    if (!interval && isChartDuration(dur)) {
+      const points = (data.keys || []).flatMap(keyData => keyData.dataPoints || [])
+      const denseInterval = selectDenseSamplingInterval(
+        dur,
+        points,
+        dp => dp.requestCount > 0 || dp.inputTokens > 0 || dp.outputTokens > 0 || dp.cacheReadTokens > 0 || dp.cacheCreationTokens > 0,
+        data.summary?.intervalSeconds
+      )
+      if (denseInterval) {
+        keyMetricsAdaptiveInterval.value = { key: samplingKey, interval: denseInterval }
+        data = await adminApi.get<{ keys: KeyHistoryData[]; summary?: GlobalStatsSummary }>(
+          `/api/${apiPath}/channels/${channelId}/keys/metrics/history?${historyQuery(dur, denseInterval)}`
+        )
+      }
+    }
+    if (props.type !== requestType || expandedChannelId.value !== channelId || keyMetricsDuration.value !== dur) return
     keyMetricsData.value = data.keys || []
     keyMetricsSummary.value = data.summary || null
   } catch {
@@ -175,8 +256,10 @@ function handleToggleChart(channelId: number) {
     expandedChannelId.value = null
     keyMetricsData.value = []
     keyMetricsSummary.value = null
+    keyMetricsAdaptiveInterval.value = null
   } else {
     expandedChannelId.value = channelId
+    keyMetricsAdaptiveInterval.value = null
     loadKeyMetrics(channelId, keyMetricsDuration.value)
   }
 }
@@ -531,6 +614,7 @@ watch(() => props.type, () => {
           <GlobalStatsChart
             ref="globalStatsChartRef"
             :api-type="props.type"
+            :chart-interval="globalStatsChartInterval"
             compact
             @refresh="loadGlobalStats"
           />
@@ -609,6 +693,7 @@ watch(() => props.type, () => {
                 :loading="keyMetricsLoading"
                 :duration="keyMetricsDuration"
                 :summary="keyMetricsSummary"
+                :chart-interval="keyMetricsChartInterval"
                 @refresh="handleKeyMetricsRefresh"
               />
             </div>

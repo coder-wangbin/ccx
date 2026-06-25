@@ -151,14 +151,17 @@ import type { ApexOptions } from 'apexcharts'
 import { useTheme } from '@/composables/useTheme'
 import { useI18n } from '@/i18n'
 import type { GlobalHistoryDataPoint, GlobalStatsSummary, ModelHistoryDataPoint } from '@/services/admin-api'
+import { effectiveChartIntervalMs } from '@/utils/chart-sampling'
 
 const props = withDefaults(
   defineProps<{
     apiType: 'messages' | 'chat' | 'responses' | 'gemini' | 'images'
     compact?: boolean
+    chartInterval?: string
   }>(),
   {
     compact: false,
+    chartInterval: undefined,
   },
 )
 
@@ -324,10 +327,8 @@ const AGGREGATION_INTERVALS: Record<Duration, number> = {
 }
 
 const getAggregationInterval = (duration: Duration): number => {
-  const intervalSeconds = summary.value?.intervalSeconds
-  if (intervalSeconds && intervalSeconds > 0) {
-    return intervalSeconds * 1000
-  }
+  const interval = effectiveChartIntervalMs(summary.value?.intervalSeconds, props.chartInterval)
+  if (interval) return interval
   return AGGREGATION_INTERVALS[duration] || 60000
 }
 
