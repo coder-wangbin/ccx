@@ -80,7 +80,6 @@
       <div v-if="expanded" class="main-conversation-detail">
         <div class="conversation-section-head">
           <span>{{ t('cockpit.mainConversation') }}</span>
-          <span :title="conversationDisplayId">{{ shortConversationId }}</span>
         </div>
         <div class="main-conversation-text">{{ mainConversationText }}</div>
         <div class="main-conversation-grid">
@@ -213,9 +212,13 @@
       <!-- Row 3: Raw User ID -->
       <div v-if="conversation.rawUserId" class="raw-user-id mt-2 d-flex align-center">
         <span class="text-caption text-medium-emphasis font-weight-mono raw-user-id-text" @click.stop="copyRawUserId">{{ conversation.rawUserId }}</span>
-        <v-btn icon size="x-small" variant="text" class="copy-btn" aria-label="Copy conversation ID" @click.stop="copyRawUserId">
-          <v-icon size="12">mdi-content-copy</v-icon>
-        </v-btn>
+        <v-tooltip :text="t('cockpit.copyRawUserId')" location="top" :open-delay="150" content-class="ccx-tooltip">
+          <template #activator="{ props: tooltipProps }">
+            <v-btn v-bind="tooltipProps" icon size="x-small" variant="text" class="copy-btn" :aria-label="t('cockpit.copyRawUserId')" @click.stop="copyRawUserId">
+              <v-icon size="12">mdi-content-copy</v-icon>
+            </v-btn>
+          </template>
+        </v-tooltip>
       </div>
     </v-card-text>
   </v-card>
@@ -293,8 +296,6 @@ const kindCssColor = computed(() => {
 
 const displayLabel = computed(() => props.conversation.title || props.conversation.userId)
 const mainConversationText = computed(() => props.conversation.lastUserMessage || displayLabel.value)
-const conversationDisplayId = computed(() => props.conversation.rawUserId || props.conversation.id)
-const shortConversationId = computed(() => conversationDisplayId.value.slice(0, 12))
 const childConversationCount = computed(() => props.conversation.childConversationIds?.length ?? 0)
 const firstChildConversationId = computed(() => props.conversation.childConversationIds?.[0])
 const parentThreadLabel = computed(() => props.conversation.parentThreadId ? shortId(props.conversation.parentThreadId) : '')

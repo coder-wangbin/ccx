@@ -800,6 +800,7 @@
   "cockpit.overrideSequence": "覆盖序列",
   "cockpit.overrideRequired": "请至少选择一个渠道",
   "cockpit.saveOverride": "保存覆盖",
+  "cockpit.copyRawUserId": "复制对话 ID",
   "cockpit.rawUserIdCopied": "对话 ID 已复制",
   "cockpit.rawUserIdCopyFailed": "复制失败",
   "cockpit.overrideActivePerpetual": "正在使用自定义渠道顺序（手动恢复前不会自动过期）",

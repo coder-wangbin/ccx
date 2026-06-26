@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { Button } from '@/components/ui/button'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { Check, Copy, CornerUpLeft, GitBranch } from 'lucide-vue-next'
 import { useLanguage } from '@/composables/useLanguage'
 import type {
@@ -66,8 +67,6 @@ const kindStyle = computed(() => {
 
 const displayLabel = computed(() => props.conversation.title || props.conversation.userId)
 const mainConversationText = computed(() => props.conversation.lastUserMessage || displayLabel.value)
-const conversationDisplayId = computed(() => props.conversation.rawUserId || props.conversation.id)
-const shortConversationId = computed(() => conversationDisplayId.value.slice(0, 12))
 const tooltipText = computed(() => props.conversation.title || props.conversation.userId)
 const childConversationCount = computed(() => props.conversation.childConversationIds?.length ?? 0)
 const firstChildConversationId = computed(() => props.conversation.childConversationIds?.[0])
@@ -424,9 +423,8 @@ function shortId(value: string): string {
     </div>
 
     <div v-if="expanded" class="main-conversation-detail mb-3 border border-border bg-background/60 p-2.5">
-      <div class="conversation-section-head flex items-center justify-between gap-2 text-[10px] font-bold uppercase tracking-[0.04em] text-muted-foreground">
+      <div class="conversation-section-head flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.04em] text-muted-foreground">
         <span>{{ t('cockpit.mainConversation') }}</span>
-        <span :title="conversationDisplayId">{{ shortConversationId }}</span>
       </div>
       <div class="main-conversation-text mt-1.5 text-xs font-semibold leading-relaxed text-foreground">
         {{ mainConversationText }}
@@ -584,9 +582,16 @@ function shortId(value: string): string {
       >
         {{ conversation.rawUserId }}
       </button>
-      <Button variant="ghost" size="icon-sm" class="copy-btn h-6 w-6" aria-label="Copy conversation ID" @click.stop="copyRawUserId">
-        <Copy class="h-3 w-3" />
-      </Button>
+      <Tooltip>
+        <TooltipTrigger as-child>
+          <Button variant="ghost" size="icon-sm" class="copy-btn h-6 w-6" :aria-label="t('cockpit.copyRawUserId')" @click.stop="copyRawUserId">
+            <Copy class="h-3 w-3" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent side="top">
+          {{ t('cockpit.copyRawUserId') }}
+        </TooltipContent>
+      </Tooltip>
     </div>
   </div>
 </template>

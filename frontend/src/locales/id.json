@@ -26,6 +26,7 @@
   "cockpit.empty": "Belum ada sesi aktif. Percakapan akan muncul di radar saat request melewati gateway.",
   "cockpit.noMatches": "Tidak ada percakapan yang cocok dengan filter.",
   "cockpit.searchPlaceholder": "Cari...",
+  "cockpit.copyRawUserId": "Salin ID percakapan",
   "cockpit.rawUserIdCopied": "ID percakapan disalin",
   "cockpit.rawUserIdCopyFailed": "Gagal menyalin",
   "cockpit.active": "Aktif: {count}",

@@ -26,6 +26,7 @@
   "cockpit.empty": "暂无活跃会话。请求经过网关后，会话会出现在驾驶舱雷达上。",
   "cockpit.noMatches": "没有匹配当前过滤条件的会话",
   "cockpit.searchPlaceholder": "搜索...",
+  "cockpit.copyRawUserId": "复制对话 ID",
   "cockpit.rawUserIdCopied": "对话 ID 已复制",
   "cockpit.rawUserIdCopyFailed": "复制失败",
   "cockpit.active": "活跃: {count}",

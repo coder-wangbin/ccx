@@ -800,6 +800,7 @@
   "cockpit.overrideSequence": "Override sequence",
   "cockpit.overrideRequired": "Please select at least one channel",
   "cockpit.saveOverride": "Save override",
+  "cockpit.copyRawUserId": "Copy conversation ID",
   "cockpit.rawUserIdCopied": "Conversation ID copied",
   "cockpit.rawUserIdCopyFailed": "Copy failed",
   "cockpit.overrideActivePerpetual": "Custom channel order is active and will not expire until restored manually",

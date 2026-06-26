@@ -26,6 +26,7 @@
   "cockpit.empty": "No active flights. Conversations will appear on radar when requests pass through the gateway.",
   "cockpit.noMatches": "No conversations match the current filter.",
   "cockpit.searchPlaceholder": "Search...",
+  "cockpit.copyRawUserId": "Copy conversation ID",
   "cockpit.rawUserIdCopied": "Conversation ID copied",
   "cockpit.rawUserIdCopyFailed": "Copy failed",
   "cockpit.active": "Active: {count}",
