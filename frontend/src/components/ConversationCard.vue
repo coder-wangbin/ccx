@@ -81,11 +81,11 @@
         <div class="conversation-section-head">
           <span>{{ t('cockpit.mainConversation') }}</span>
         </div>
-        <div class="main-conversation-turns">
+        <div ref="mainConversationTurnsRef" class="main-conversation-turns">
           <div
             v-for="(turn, index) in mainConversationTurns"
             :key="`${index}-${turn}`"
-            :class="['main-conversation-turn', { 'main-conversation-turn--single': mainConversationTurns.length === 1 }]"
+            class="main-conversation-turn"
           >
             {{ turn }}
           </div>
@@ -233,10 +233,11 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import type { ConversationInfo, SequenceOverrideInfo, ChannelSequenceEntry } from '@/services/api'
 import type { SubagentSummary } from '@/utils/conversationDashboard'
 import { useI18n } from '@/i18n'
+import { buildConversationTurnPreview, getConversationTurnFont } from '@/utils/conversationPreview'
 import ConversationChannelSequence from './ConversationChannelSequence.vue'
 
 const { t } = useI18n()
@@ -300,6 +301,26 @@ function splitConversationTurns(text: string): string[] {
   return turns.length > 0 ? turns : [text]
 }
 
+async function syncMainConversationTurnsWidth() {
+  await nextTick()
+  const element = mainConversationTurnsRef.value
+  if (!element) {
+    mainConversationTurnsWidth.value = 0
+    return
+  }
+
+  mainConversationTurnsWidth.value = element.clientWidth
+  mainConversationTurnsObserver?.disconnect()
+  mainConversationTurnsObserver = null
+
+  if (typeof window === 'undefined' || !('ResizeObserver' in window)) return
+
+  mainConversationTurnsObserver = new ResizeObserver(() => {
+    mainConversationTurnsWidth.value = mainConversationTurnsRef.value?.clientWidth ?? 0
+  })
+  mainConversationTurnsObserver.observe(element)
+}
+
 const kindCssColor = computed(() => {
   const map: Record<string, string> = {
     messages: 'var(--ccx-kind-messages)',
@@ -313,7 +334,27 @@ const kindCssColor = computed(() => {
 
 const displayLabel = computed(() => props.conversation.title || props.conversation.userId)
 const mainConversationText = computed(() => props.conversation.lastUserMessage || displayLabel.value)
-const mainConversationTurns = computed(() => splitConversationTurns(mainConversationText.value))
+const mainConversationTurnsRef = ref<HTMLElement | null>(null)
+const mainConversationTurnsWidth = ref(0)
+let mainConversationTurnsObserver: ResizeObserver | null = null
+const isSingleMainConversation = computed(() => props.conversation.requestCount <= 1)
+const mainConversationTurns = computed(() => {
+  if (!isSingleMainConversation.value) {
+    return splitConversationTurns(mainConversationText.value)
+  }
+
+  const element = mainConversationTurnsRef.value
+  const width = mainConversationTurnsWidth.value
+  if (!props.expanded || !element || width <= 0) return [mainConversationText.value]
+
+  return [
+    buildConversationTurnPreview(mainConversationText.value, {
+      width,
+      font: getConversationTurnFont(element),
+      maxLines: 5,
+    }),
+  ]
+})
 const childConversationCount = computed(() => props.conversation.childConversationIds?.length ?? 0)
 const firstChildConversationId = computed(() => props.conversation.childConversationIds?.[0])
 const parentThreadLabel = computed(() => props.conversation.parentThreadId ? shortId(props.conversation.parentThreadId) : '')
@@ -336,6 +377,25 @@ const mainDetailRows = computed(() => [
   { label: t('cockpit.detail.requests'), value: `${props.conversation.requestCount}x` },
   { label: t('cockpit.detail.duration'), value: duration.value },
 ])
+
+watch(
+  () => props.expanded,
+  (expanded) => {
+    mainConversationTurnsObserver?.disconnect()
+    mainConversationTurnsObserver = null
+    if (!expanded) {
+      mainConversationTurnsWidth.value = 0
+      return
+    }
+    void syncMainConversationTurnsWidth()
+  },
+  { immediate: true },
+)
+
+onBeforeUnmount(() => {
+  mainConversationTurnsObserver?.disconnect()
+  mainConversationTurnsObserver = null
+})
 
 const remainingTime = computed(() => {
   if (!props.override) return ''
@@ -744,6 +804,7 @@ function shortId(value: string): string {
   flex-direction: column;
   gap: 6px;
   margin-top: 6px;
+  min-width: 0;
 }
 
 .main-conversation-turn {
@@ -753,13 +814,7 @@ function shortId(value: string): string {
   line-height: 1.55;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-}
-
-.main-conversation-turn--single {
-  display: -webkit-box;
-  overflow: hidden;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 5;
+  word-break: break-word;
 }
 
 .main-conversation-grid {
