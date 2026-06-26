@@ -38,6 +38,7 @@ func GetConversations(deps *ConversationHandlerDeps) gin.HandlerFunc {
 		for id, override := range overrides {
 			overridesResponse[id] = gin.H{
 				"sequence":         override.Sequence,
+				"hasMainSequence":  override.HasMainSequence,
 				"subagentSequence": override.SubagentSequence,
 				"setAt":            override.SetAt,
 				"expiresAt":        override.ExpiresAt,
@@ -66,9 +67,10 @@ func GetConversations(deps *ConversationHandlerDeps) gin.HandlerFunc {
 }
 
 type SetOverrideRequest struct {
-	Sequence         []conversation.ChannelEntry `json:"sequence" binding:"required,min=1"`
-	SubagentSequence []conversation.ChannelEntry `json:"subagentSequence,omitempty"` // subagent 专用序列（可选）
-	Duration         *int                        `json:"duration,omitempty"`         // 秒；nil=系统默认；-1=永不恢复
+	Sequence              []conversation.ChannelEntry `json:"sequence"`
+	SubagentSequence      []conversation.ChannelEntry `json:"subagentSequence,omitempty"`      // subagent 专用序列（可选）
+	ClearSubagentSequence bool                        `json:"clearSubagentSequence,omitempty"` // 仅清除 subagent 专用序列
+	Duration              *int                        `json:"duration,omitempty"`              // 秒；nil=系统默认；-1=永不恢复
 }
 
 func SetConversationOverride(deps *ConversationHandlerDeps) gin.HandlerFunc {
@@ -101,25 +103,36 @@ func SetConversationOverride(deps *ConversationHandlerDeps) gin.HandlerFunc {
 			}
 		}
 
-		err := deps.OverrideManager.SetOverride(convID, conv.Kind, conv.RawUserID, req.Sequence, overrideDuration)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		if len(req.Sequence) == 0 && len(req.SubagentSequence) == 0 && !req.ClearSubagentSequence {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "sequence or subagentSequence is required"})
 			return
 		}
 
-		// 可选：设置 subagent 专用序列（复用主 override 的 TTL）
+		if len(req.Sequence) > 0 {
+			err := deps.OverrideManager.SetOverride(convID, conv.Kind, conv.RawUserID, req.Sequence, overrideDuration)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				return
+			}
+		}
+
 		if len(req.SubagentSequence) > 0 {
-			if saErr := deps.OverrideManager.SetSubagentOverride(convID, conv.Kind, conv.RawUserID, req.SubagentSequence); saErr != nil {
+			if saErr := deps.OverrideManager.SetSubagentOverride(convID, conv.Kind, conv.RawUserID, req.SubagentSequence, req.Sequence, overrideDuration); saErr != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": saErr.Error()})
 				return
 			}
 		}
 
+		if req.ClearSubagentSequence {
+			deps.OverrideManager.ClearSubagentOverride(convID)
+		}
+
 		c.JSON(http.StatusOK, gin.H{
-			"message":          "override set successfully",
-			"conversationId":   convID,
-			"sequence":         req.Sequence,
-			"subagentSequence": req.SubagentSequence,
+			"message":               "override set successfully",
+			"conversationId":        convID,
+			"sequence":              req.Sequence,
+			"subagentSequence":      req.SubagentSequence,
+			"clearSubagentSequence": req.ClearSubagentSequence,
 		})
 	}
 }

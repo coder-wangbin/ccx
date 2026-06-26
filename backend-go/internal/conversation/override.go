@@ -17,6 +17,7 @@ type ChannelSequenceOverride struct {
 	Kind             string         `json:"kind"`
 	UserID           string         `json:"userID"`
 	Sequence         []ChannelEntry `json:"sequence"`
+	HasMainSequence  bool           `json:"hasMainSequence,omitempty"`
 	SubagentSequence []ChannelEntry `json:"subagentSequence,omitempty"` // subagent 角色专用序列（为空时 fallback 到 Sequence）
 	SetAt            time.Time      `json:"setAt"`
 	ExpiresAt        time.Time      `json:"expiresAt"`
@@ -30,6 +31,10 @@ func (o *ChannelSequenceOverride) clone() *ChannelSequenceOverride {
 	if o.Sequence != nil {
 		c.Sequence = make([]ChannelEntry, len(o.Sequence))
 		copy(c.Sequence, o.Sequence)
+	}
+	if o.SubagentSequence != nil {
+		c.SubagentSequence = make([]ChannelEntry, len(o.SubagentSequence))
+		copy(c.SubagentSequence, o.SubagentSequence)
 	}
 	return &c
 }
@@ -53,6 +58,25 @@ func NewOverrideManager(ttl time.Duration) *OverrideManager {
 	return om
 }
 
+func applyOverrideDuration(override *ChannelSequenceOverride, now time.Time, overrideDuration, defaultTTL time.Duration) {
+	override.ExpiresAt = time.Time{}
+	override.IsPerpetual = false
+	override.ttlDuration = defaultTTL
+	switch {
+	case overrideDuration < 0:
+		override.IsPerpetual = true
+	case overrideDuration > 0:
+		override.ExpiresAt = now.Add(overrideDuration)
+		override.ttlDuration = overrideDuration
+	default:
+		if defaultTTL < 0 {
+			override.IsPerpetual = true
+			return
+		}
+		override.ExpiresAt = now.Add(defaultTTL)
+	}
+}
+
 // SetOverride 设置会话级渠道序列覆盖。
 // overrideDuration: 0=使用系统默认 TTL；<0（如 -1）=永不过期；>0=自定义时长。
 func (om *OverrideManager) SetOverride(conversationID, kind, userID string, sequence []ChannelEntry, overrideDuration time.Duration) error {
@@ -67,24 +91,21 @@ func (om *OverrideManager) SetOverride(conversationID, kind, userID string, sequ
 	defer om.mu.Unlock()
 
 	now := time.Now()
+	var subagentSequence []ChannelEntry
+	if existing, ok := om.overrides[conversationID]; ok && len(existing.SubagentSequence) > 0 {
+		subagentSequence = existing.SubagentSequence
+	}
 	override := &ChannelSequenceOverride{
-		ConversationID: conversationID,
-		Kind:           kind,
-		UserID:         userID,
-		Sequence:       sequence,
-		SetAt:          now,
+		ConversationID:   conversationID,
+		Kind:             kind,
+		UserID:           userID,
+		Sequence:         sequence,
+		HasMainSequence:  true,
+		SubagentSequence: subagentSequence,
+		SetAt:            now,
 	}
 
-	switch {
-	case overrideDuration < 0:
-		override.IsPerpetual = true
-	case overrideDuration > 0:
-		override.ExpiresAt = now.Add(overrideDuration)
-		override.ttlDuration = overrideDuration
-	default:
-		override.ExpiresAt = now.Add(om.ttl)
-		override.ttlDuration = om.ttl
-	}
+	applyOverrideDuration(override, now, overrideDuration, om.ttl)
 
 	om.overrides[conversationID] = override
 	compositeKey := kind + ":" + userID
@@ -132,6 +153,9 @@ func (om *OverrideManager) GetOverrideForUser(kind, userID string) ([]ChannelEnt
 	if !override.IsPerpetual && time.Now().After(override.ExpiresAt) {
 		return nil, false
 	}
+	if !override.HasMainSequence || len(override.Sequence) == 0 {
+		return nil, false
+	}
 	return override.Sequence, true
 }
 
@@ -158,12 +182,16 @@ func (om *OverrideManager) GetOverrideForUserWithRole(kind, userID, agentRole st
 	if agentRole == "subagent" && len(override.SubagentSequence) > 0 {
 		return override.SubagentSequence, true
 	}
+	if !override.HasMainSequence || len(override.Sequence) == 0 {
+		return nil, false
+	}
 	return override.Sequence, true
 }
 
-// SetSubagentOverride 在已有 override 上设置 subagent 专用序列（复用 TTL/过期时间）。
-// 若该会话尚无主 override，则一并创建（subagent 序列同时作为主序列，保证可用）。
-func (om *OverrideManager) SetSubagentOverride(conversationID, kind, userID string, subagentSequence []ChannelEntry) error {
+// SetSubagentOverride 设置 subagent 专用序列；不会隐式创建主对话 override。
+// fallbackSequence 仅用于界面展示 fallback，不参与主对话 override 判断。
+// overrideDuration: 0=使用系统默认 TTL；<0（如 -1）=永不过期；>0=自定义时长。
+func (om *OverrideManager) SetSubagentOverride(conversationID, kind, userID string, subagentSequence, fallbackSequence []ChannelEntry, overrideDuration time.Duration) error {
 	if len(subagentSequence) == 0 {
 		return fmt.Errorf("subagent sequence cannot be empty")
 	}
@@ -178,24 +206,51 @@ func (om *OverrideManager) SetSubagentOverride(conversationID, kind, userID stri
 	override, exists := om.overrides[conversationID]
 	if !exists {
 		override = &ChannelSequenceOverride{
-			ConversationID: conversationID,
-			Kind:           kind,
-			UserID:         userID,
-			Sequence:       subagentSequence, // 兜底主序列，避免 subagent 未命中时空覆盖
-			SetAt:          now,
-			ExpiresAt:      now.Add(om.ttl),
-			ttlDuration:    om.ttl,
+			ConversationID:  conversationID,
+			Kind:            kind,
+			UserID:          userID,
+			Sequence:        fallbackSequence,
+			HasMainSequence: false,
+			SetAt:           now,
 		}
+		applyOverrideDuration(override, now, overrideDuration, om.ttl)
 		om.overrides[conversationID] = override
 		compositeKey := kind + ":" + userID
 		om.userIndex[compositeKey] = conversationID
 	}
 	override.SubagentSequence = subagentSequence
 	override.SetAt = now
+	if !override.HasMainSequence && len(fallbackSequence) > 0 {
+		override.Sequence = fallbackSequence
+	}
+	applyOverrideDuration(override, now, overrideDuration, om.ttl)
 
 	log.Printf("[OverrideManager-SetSubagent] 设置 subagent 覆盖: conv=%s, kind=%s, 序列长度=%d",
 		conversationID, kind, len(subagentSequence))
 	return nil
+}
+
+func (om *OverrideManager) ClearSubagentOverride(conversationID string) bool {
+	om.mu.Lock()
+	defer om.mu.Unlock()
+
+	override, ok := om.overrides[conversationID]
+	if !ok || len(override.SubagentSequence) == 0 {
+		return false
+	}
+
+	override.SubagentSequence = nil
+	if !override.HasMainSequence {
+		compositeKey := override.Kind + ":" + override.UserID
+		delete(om.userIndex, compositeKey)
+		delete(om.overrides, conversationID)
+		log.Printf("[OverrideManager-ClearSubagent] 移除仅 subagent 覆盖: conv=%s", conversationID)
+		return true
+	}
+
+	override.SetAt = time.Now()
+	log.Printf("[OverrideManager-ClearSubagent] 清除 subagent 覆盖: conv=%s", conversationID)
+	return true
 }
 
 func (om *OverrideManager) RemoveOverride(conversationID string) bool {

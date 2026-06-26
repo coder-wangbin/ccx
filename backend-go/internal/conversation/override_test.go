@@ -290,3 +290,99 @@ func TestOverrideManager_SetDefaultTTL(t *testing.T) {
 		t.Errorf("expected ExpiresAt ~1h from now after SetDefaultTTL, got %v remaining", diff)
 	}
 }
+
+func TestOverrideManager_SubagentOverrideDoesNotAffectMainSequence(t *testing.T) {
+	om := NewOverrideManager(30 * time.Minute)
+	defer om.Stop()
+
+	subagentSeq := []ChannelEntry{
+		{ChannelIndex: 2, ChannelName: "subagent"},
+		{ChannelIndex: 0, ChannelName: "primary"},
+	}
+
+	if err := om.SetSubagentOverride("conv_abc", "chat", "user1", subagentSeq, nil, 0); err != nil {
+		t.Fatalf("SetSubagentOverride failed: %v", err)
+	}
+
+	if _, ok := om.GetOverrideForUser("chat", "user1"); ok {
+		t.Fatal("expected main conversation to ignore subagent-only override")
+	}
+
+	if _, ok := om.GetOverrideForUserWithRole("chat", "user1", "main"); ok {
+		t.Fatal("expected main role to ignore subagent-only override")
+	}
+
+	result, ok := om.GetOverrideForUserWithRole("chat", "user1", "subagent")
+	if !ok {
+		t.Fatal("expected subagent override to exist")
+	}
+	if len(result) != 2 || result[0].ChannelIndex != 2 {
+		t.Fatalf("unexpected subagent override sequence: %#v", result)
+	}
+
+	override, ok := om.GetOverride("conv_abc")
+	if !ok {
+		t.Fatal("expected override snapshot to exist for UI")
+	}
+	if override.HasMainSequence {
+		t.Fatal("expected subagent-only override to report hasMainSequence=false")
+	}
+}
+
+func TestOverrideManager_ClearSubagentOnlyOverrideRemovesSnapshot(t *testing.T) {
+	om := NewOverrideManager(30 * time.Minute)
+	defer om.Stop()
+
+	if err := om.SetSubagentOverride("conv_abc", "chat", "user1", []ChannelEntry{{ChannelIndex: 2}}, nil, 0); err != nil {
+		t.Fatalf("SetSubagentOverride failed: %v", err)
+	}
+
+	if !om.ClearSubagentOverride("conv_abc") {
+		t.Fatal("expected ClearSubagentOverride to return true")
+	}
+
+	if _, ok := om.GetOverride("conv_abc"); ok {
+		t.Fatal("expected subagent-only override snapshot to be removed")
+	}
+	if _, ok := om.GetOverrideForUserWithRole("chat", "user1", "subagent"); ok {
+		t.Fatal("expected subagent routing override to be removed")
+	}
+}
+
+func TestOverrideManager_ClearSubagentKeepsMainOverride(t *testing.T) {
+	om := NewOverrideManager(30 * time.Minute)
+	defer om.Stop()
+
+	mainSeq := []ChannelEntry{{ChannelIndex: 0, ChannelName: "primary"}}
+	subagentSeq := []ChannelEntry{{ChannelIndex: 2, ChannelName: "subagent"}}
+
+	if err := om.SetOverride("conv_abc", "chat", "user1", mainSeq, 0); err != nil {
+		t.Fatalf("SetOverride failed: %v", err)
+	}
+	if err := om.SetSubagentOverride("conv_abc", "chat", "user1", subagentSeq, mainSeq, 0); err != nil {
+		t.Fatalf("SetSubagentOverride failed: %v", err)
+	}
+
+	if !om.ClearSubagentOverride("conv_abc") {
+		t.Fatal("expected ClearSubagentOverride to return true")
+	}
+
+	result, ok := om.GetOverrideForUser("chat", "user1")
+	if !ok {
+		t.Fatal("expected main override to remain")
+	}
+	if len(result) != 1 || result[0].ChannelIndex != 0 {
+		t.Fatalf("unexpected main override sequence: %#v", result)
+	}
+
+	override, ok := om.GetOverride("conv_abc")
+	if !ok {
+		t.Fatal("expected main override snapshot to remain")
+	}
+	if !override.HasMainSequence {
+		t.Fatal("expected main override to keep hasMainSequence=true")
+	}
+	if len(override.SubagentSequence) != 0 {
+		t.Fatalf("expected subagent sequence to be cleared, got %#v", override.SubagentSequence)
+	}
+}
