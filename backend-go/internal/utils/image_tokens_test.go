@@ -781,8 +781,17 @@ func TestExtractImageTokensAndStripBytes_GeminiNonImageIgnored(t *testing.T) {
 //
 // 正因差异巨大，下面的强断言才能真正区分「提取生效」与「提取失效」，
 // 守住本次修复要守的回归（旧版纯色图 + 宽松区间无法区分，是假阳性）。
+//
+// 守护范围（重要，避免后人误解）：本测试只守「图片提取已接入 Gemini 入口
+// + base64 已被剥离出文本 + 未退回按整个 body 字符高估」这三件事。它**不**守
+// sizing 公式本身的正确性——因为参考值 imageTokens 同样来自 estimateImageTokensFromBase64，
+// 与生产入口内部计图走同一条函数链（decodeImageSizeFromBase64 / estimateImageTokensFromSize），
+// 二者锁步：若 sizing 算法回归，本测试断言1 仍满足、照样绿。sizing 正确性由
+// TestEstimateImageTokensFromSize 用硬编码 want 值单独守住。
 func TestEstimateGeminiRequestTokens_WithImage(t *testing.T) {
-	b64 := makeNoisePNG(2048, 2048) // 随机噪声，PNG 压不动，base64 体积巨大
+	// fixture 用 1024x1024：base64 约 4MB，仍不可压缩、charEstimate/5 余量仍 100×+，
+	// 断言完全站得住；相比 2048x2048（base64≈16.7MB、PNG 编码 419 万像素）耗时大降。
+	b64 := makeNoisePNG(1024, 1024) // 随机噪声，PNG 压不动，base64 体积巨大
 	body := `{"contents":[{"role":"user","parts":[{"inlineData":{"mimeType":"image/png","data":"` + b64 + `"}}]}],"generationConfig":{"maxOutputTokens":1024}}`
 	got := EstimateGeminiRequestTokens([]byte(body))
 
@@ -794,6 +803,11 @@ func TestEstimateGeminiRequestTokens_WithImage(t *testing.T) {
 
 	// 断言1：got 必须紧贴「图片真实 token」附近。剥离后 body 只剩极短的 JSON 骨架，
 	// 文本开销只有几十 token，所以 got 应落在 [imageTokens, imageTokens+200] 内。
+	//
+	// 这里的 +200：剥离后 cleaned 仅约 141 字节的 JSON 骨架（contents/role/parts/
+	// inlineData + "<image>" 占位）加上 generationConfig，实测文本开销恒为约 40 token；
+	// 取 200 作为该骨架文本开销的宽松上界，留足余量（约 5×）。
+	// 若后续往 Gemini body 骨架增删字段，需相应复核此上界。
 	if got < imageTokens || got > imageTokens+200 {
 		t.Errorf("EstimateGeminiRequestTokens=%d，期望紧贴图片真实估算 %d(+少量文本开销)；"+
 			"偏离过大说明未按真实尺寸计图", got, imageTokens)
@@ -802,6 +816,8 @@ func TestEstimateGeminiRequestTokens_WithImage(t *testing.T) {
 	// 断言2：got 必须显著小于「把整个 body 按字符估算」的值。
 	// 提取失效退回 EstimateTokens(string(body)) 时，巨大的 base64 会被按字符高估，
 	// 该值至少是 got 的数倍。这里要求 got < charEstimate/5，确保没退回字符高估老路。
+	// 与断言1 略有重叠（断言1 上界已能抓住提取失效），但保留作防御纵深：
+	// 缩 fixture 后该断言耗时已可忽略，换一道独立维度的兜底是划算的。
 	charEstimate := EstimateTokens(string(body))
 	if got >= charEstimate/5 {
 		t.Errorf("EstimateGeminiRequestTokens=%d 未显著低于按字符估算 %d(got>=1/5)，"+
