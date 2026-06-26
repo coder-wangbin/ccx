@@ -582,7 +582,7 @@ onBeforeUnmount(() => {
 
     <div class="border border-border bg-card/75 p-3 shadow-sm dark:bg-card/55">
       <div class="flex flex-wrap items-center gap-3">
-        <div class="relative min-w-[220px] flex-1 max-w-md">
+        <div class="relative w-full min-w-[160px] sm:w-60 lg:w-64">
           <Search class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             v-model="searchQuery"

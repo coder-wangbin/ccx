@@ -10,8 +10,8 @@
 }
 
 .channel-search-field {
-  width: 280px;
-  max-width: 40vw;
+  width: clamp(220px, 28vw, 320px);
+  max-width: 100%;
   flex-shrink: 1;
 }
 
