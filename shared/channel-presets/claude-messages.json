@@ -12,6 +12,7 @@
       "passbackReasoningContent": true,
       "passbackThinkingBlocks": true,
       "stripEmptyTextBlocks": true,
+      "normalizeSystemRoleToTopLevel": true,
       "stripImageGenerationTool": true,
       "noVision": true
     },
@@ -24,6 +25,7 @@
       },
       "reasoningParamStyle": "reasoning",
       "passbackReasoningContent": true,
+      "normalizeSystemRoleToTopLevel": true,
       "noVisionModels": ["mimo-v2.5-pro"],
       "visionFallbackModel": "mimo-v2.5",
       "rateLimitRpm": 80
@@ -46,6 +48,7 @@
       "passbackReasoningContent": true,
       "passbackThinkingBlocks": true,
       "stripEmptyTextBlocks": true,
+      "normalizeSystemRoleToTopLevel": true,
       "noVisionModels": ["glm-5.2", "deepseek-v4-flash"],
       "visionFallbackModel": "MiniMax-M2.7"
     },
@@ -57,7 +60,8 @@
         "haiku": "kimi-k2.6",
         "opus": "kimi-k2.6",
         "sonnet": "kimi-k2.6"
-      }
+      },
+      "normalizeSystemRoleToTopLevel": true
     },
     "glm": {
       "modelMapping": {
@@ -65,7 +69,8 @@
         "haiku": "glm-5.2",
         "opus": "glm-5.2",
         "sonnet": "glm-5.2"
-      }
+      },
+      "normalizeSystemRoleToTopLevel": true
     },
     "minimax": {
       "modelMapping": {
@@ -75,6 +80,7 @@
         "sonnet": "MiniMax-M3"
       },
       "passbackReasoningContent": true,
+      "normalizeSystemRoleToTopLevel": true,
       "noVision": true
     },
     "dashscope": {
@@ -83,7 +89,8 @@
         "haiku": "glm-5.2",
         "opus": "glm-5.2",
         "sonnet": "glm-5.2"
-      }
+      },
+      "normalizeSystemRoleToTopLevel": true
     },
     "opencode-zen": {
       "modelMapping": {
@@ -97,7 +104,8 @@
         "haiku": "high",
         "opus": "max",
         "sonnet": "max"
-      }
+      },
+      "normalizeSystemRoleToTopLevel": true
     },
     "opencode-go": {
       "modelMapping": {
@@ -111,7 +119,8 @@
         "haiku": "high",
         "opus": "max",
         "sonnet": "max"
-      }
+      },
+      "normalizeSystemRoleToTopLevel": true
     },
     "modelscope": {
       "modelMapping": {
@@ -120,6 +129,7 @@
         "opus": "ZhipuAI/GLM-5.2",
         "sonnet": "ZhipuAI/GLM-5.2"
       },
+      "normalizeSystemRoleToTopLevel": true,
       "noVisionModels": ["deepseek-ai/DeepSeek-V4-Flash"],
       "visionFallbackModel": "MiniMax/MiniMax-M2.7"
     },
@@ -140,6 +150,8 @@
       "reasoningParamStyle": "reasoning",
       "passbackReasoningContent": true,
       "passbackThinkingBlocks": true,
+      "stripEmptyTextBlocks": true,
+      "normalizeSystemRoleToTopLevel": true,
       "noVisionModels": ["glm-5.2", "deepseek-v4-flash"],
       "visionFallbackModel": "minimax-m3"
     },
@@ -149,8 +161,14 @@
         "haiku": "qianfan-code-latest",
         "opus": "qianfan-code-latest",
         "sonnet": "qianfan-code-latest"
-      }
+      },
+      "normalizeSystemRoleToTopLevel": true
     },
-    "xfyun": {}
+    "xfyun": {
+      "normalizeSystemRoleToTopLevel": true
+    },
+    "tencent-lkeap": {
+      "normalizeSystemRoleToTopLevel": true
+    }
   }
 }

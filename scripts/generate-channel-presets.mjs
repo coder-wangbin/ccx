@@ -112,7 +112,13 @@ function normalizedCollection(source, collectionKey, defaults) {
   const collection = source[collectionKey] || {}
   return Object.fromEntries(
     Object.entries(collection).map(([name, preset]) => {
-      const normalized = { ...defaults, ...preset }
+      const allowedKeys = new Set([...Object.keys(defaults), 'rateLimitRpm'])
+      const normalized = { ...defaults }
+      for (const [key, value] of Object.entries(preset)) {
+        if (allowedKeys.has(key)) {
+          normalized[key] = value
+        }
+      }
       if (hasOwn(defaults, 'modelMapping') || hasOwn(preset, 'modelMapping')) {
         normalized.modelMapping = preset.modelMapping || {}
       }
@@ -219,6 +225,7 @@ function formatGoConfig(preset) {
   if (preset.reasoningParamStyle) fields.push(`ReasoningParamStyle: ${quote(preset.reasoningParamStyle)}`)
   if (preset.passbackReasoningContent) fields.push('PassbackReasoningContent: true')
   if (preset.passbackThinkingBlocks) fields.push('PassbackThinkingBlocks: true')
+  if (preset.normalizeSystemRoleToTopLevel) fields.push('NormalizeSystemRoleToTopLevel: true')
   if (preset.noVision) fields.push('NoVision: true')
   if (noVisionModels) fields.push(`NoVisionModels: ${noVisionModels}`)
   if (preset.visionFallbackModel) fields.push(`VisionFallbackModel: ${quote(preset.visionFallbackModel)}`)

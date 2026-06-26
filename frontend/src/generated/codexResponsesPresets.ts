@@ -302,5 +302,18 @@ export const codexResponsesPresets: Record<string, CodexResponsesPreset> = {
     "noVision": false,
     "noVisionModels": [],
     "visionFallbackModel": ""
+  },
+  "github-copilot": {
+    "modelMapping": {},
+    "reasoningMapping": {},
+    "reasoningParamStyle": "",
+    "codexNativeToolPassthrough": true,
+    "codexToolCompat": false,
+    "stripCodexClientTools": false,
+    "stripImageGenerationTool": true,
+    "normalizeNonstandardChatRoles": false,
+    "noVision": false,
+    "noVisionModels": [],
+    "visionFallbackModel": ""
   }
 }

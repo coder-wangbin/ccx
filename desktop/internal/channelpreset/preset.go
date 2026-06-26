@@ -105,6 +105,7 @@ type ChannelPayload struct {
 	ReasoningParamStyle           string            `json:"reasoningParamStyle,omitempty"`
 	PassbackReasoningContent      bool              `json:"passbackReasoningContent,omitempty"`
 	PassbackThinkingBlocks        bool              `json:"passbackThinkingBlocks,omitempty"`
+	NormalizeSystemRoleToTopLevel bool              `json:"normalizeSystemRoleToTopLevel,omitempty"`
 	NoVision                      bool              `json:"noVision,omitempty"`
 	NoVisionModels                []string          `json:"noVisionModels,omitempty"`
 	VisionFallbackModel           string            `json:"visionFallbackModel,omitempty"`
@@ -501,6 +502,14 @@ func BuildPayload(req CreateChannelRequest) (ChannelPayload, error) {
 		Status:      "active",
 	}
 	applyTargetDefaults(&payload, preset.ID, target, planID)
+	if targetConfigs, ok := channelTargetConfigs[target]; ok {
+		if targetConfig, ok := targetConfigs[preset.ID]; ok {
+			if preset.ID == ProviderKimi {
+				targetConfig = applyKimiPlanOverrides(targetConfig, target, planID)
+			}
+			applyChannelTargetConfig(&payload, targetConfig)
+		}
+	}
 	return payload, nil
 }
 
@@ -625,6 +634,7 @@ type channelTargetConfig struct {
 	ReasoningParamStyle           string
 	PassbackReasoningContent      bool
 	PassbackThinkingBlocks        bool
+	NormalizeSystemRoleToTopLevel bool
 	NoVision                      bool
 	NoVisionModels                []string
 	VisionFallbackModel           string
@@ -696,6 +706,7 @@ func applyChannelTargetConfig(payload *ChannelPayload, config channelTargetConfi
 	payload.ReasoningParamStyle = config.ReasoningParamStyle
 	payload.PassbackReasoningContent = payload.PassbackReasoningContent || config.PassbackReasoningContent
 	payload.PassbackThinkingBlocks = payload.PassbackThinkingBlocks || config.PassbackThinkingBlocks
+	payload.NormalizeSystemRoleToTopLevel = payload.NormalizeSystemRoleToTopLevel || config.NormalizeSystemRoleToTopLevel
 	payload.NoVision = payload.NoVision || config.NoVision
 	payload.VisionFallbackModel = config.VisionFallbackModel
 	payload.StripEmptyTextBlocks = payload.StripEmptyTextBlocks || config.StripEmptyTextBlocks

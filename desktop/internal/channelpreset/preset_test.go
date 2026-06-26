@@ -7,32 +7,34 @@ import (
 
 func TestBuildPayload(t *testing.T) {
 	tests := []struct {
-		name               string
-		req                CreateChannelRequest
-		wantBaseURL        string
-		wantService        string
-		wantVision         bool
-		wantPassback       bool
-		wantCodex          bool
-		wantStripCodex     bool
-		wantNativeTool     bool
-		wantModels         []string
-		wantModelMap       map[string]string
-		wantNoModelMap     bool
-		wantReasoning      map[string]string
-		wantNoReasoningMap bool
-		wantFallback       string
-		wantNormalize      bool
-		wantNoVisionModels []string
-		wantAuthHeader     string
+		name                string
+		req                 CreateChannelRequest
+		wantBaseURL         string
+		wantService         string
+		wantVision          bool
+		wantPassback        bool
+		wantCodex           bool
+		wantStripCodex      bool
+		wantNativeTool      bool
+		wantModels          []string
+		wantModelMap        map[string]string
+		wantNoModelMap      bool
+		wantReasoning       map[string]string
+		wantNoReasoningMap  bool
+		wantFallback        string
+		wantNormalize       bool
+		wantNormalizeSystem bool
+		wantNoVisionModels  []string
+		wantAuthHeader      string
 	}{
 		{
-			name:         "deepseek messages (anthropic endpoint)",
-			req:          CreateChannelRequest{Provider: ProviderDeepSeek, Target: TargetMessages, APIKey: "sk-test"},
-			wantBaseURL:  "https://api.deepseek.com/anthropic",
-			wantService:  "claude",
-			wantVision:   true,
-			wantPassback: true,
+			name:                "deepseek messages (anthropic endpoint)",
+			req:                 CreateChannelRequest{Provider: ProviderDeepSeek, Target: TargetMessages, APIKey: "sk-test"},
+			wantBaseURL:         "https://api.deepseek.com/anthropic",
+			wantService:         "claude",
+			wantVision:          true,
+			wantPassback:        true,
+			wantNormalizeSystem: true,
 			wantModelMap: map[string]string{
 				"fable":  "deepseek-v4-pro",
 				"haiku":  "deepseek-v4-flash",
@@ -63,11 +65,12 @@ func TestBuildPayload(t *testing.T) {
 			},
 		},
 		{
-			name:         "mimo messages (token plan)",
-			req:          CreateChannelRequest{Provider: ProviderMiMo, Target: TargetMessages, PlanID: "token-sgp-anthropic", APIKey: "tp-test"},
-			wantBaseURL:  "https://token-plan-sgp.xiaomimimo.com/anthropic",
-			wantService:  "claude",
-			wantPassback: true,
+			name:                "mimo messages (token plan)",
+			req:                 CreateChannelRequest{Provider: ProviderMiMo, Target: TargetMessages, PlanID: "token-sgp-anthropic", APIKey: "tp-test"},
+			wantBaseURL:         "https://token-plan-sgp.xiaomimimo.com/anthropic",
+			wantService:         "claude",
+			wantPassback:        true,
+			wantNormalizeSystem: true,
 			wantModelMap: map[string]string{
 				"fable":  "mimo-v2.5-pro",
 				"haiku":  "mimo-v2.5-pro",
@@ -78,11 +81,12 @@ func TestBuildPayload(t *testing.T) {
 			wantFallback:       "mimo-v2.5",
 		},
 		{
-			name:         "mimo messages (auto plan)",
-			req:          CreateChannelRequest{Provider: ProviderMiMo, Target: TargetMessages, APIKey: "tp-test"},
-			wantBaseURL:  "https://api.xiaomimimo.com/anthropic",
-			wantService:  "claude",
-			wantPassback: true,
+			name:                "mimo messages (auto plan)",
+			req:                 CreateChannelRequest{Provider: ProviderMiMo, Target: TargetMessages, APIKey: "tp-test"},
+			wantBaseURL:         "https://api.xiaomimimo.com/anthropic",
+			wantService:         "claude",
+			wantPassback:        true,
+			wantNormalizeSystem: true,
 			wantModelMap: map[string]string{
 				"fable":  "mimo-v2.5-pro",
 				"haiku":  "mimo-v2.5-pro",
@@ -117,12 +121,13 @@ func TestBuildPayload(t *testing.T) {
 			wantFallback:       "mimo-v2.5",
 		},
 		{
-			name:         "compshare messages",
-			req:          CreateChannelRequest{Provider: ProviderCompshare, Target: TargetMessages, APIKey: "cs-test"},
-			wantBaseURL:  "https://cp.compshare.cn",
-			wantService:  "claude",
-			wantVision:   false,
-			wantPassback: true,
+			name:                "compshare messages",
+			req:                 CreateChannelRequest{Provider: ProviderCompshare, Target: TargetMessages, APIKey: "cs-test"},
+			wantBaseURL:         "https://cp.compshare.cn",
+			wantService:         "claude",
+			wantVision:          false,
+			wantPassback:        true,
+			wantNormalizeSystem: true,
 			wantModelMap: map[string]string{
 				"fable":  "glm-5.2",
 				"haiku":  "deepseek-v4-flash",
@@ -209,10 +214,11 @@ func TestBuildPayload(t *testing.T) {
 			wantModelMap:   map[string]string{"codex": "kimi-for-coding", "gpt": "kimi-for-coding"},
 		},
 		{
-			name:        "kimi coding plan messages",
-			req:         CreateChannelRequest{Provider: ProviderKimi, Target: TargetMessages, PlanID: "coding-anthropic", APIKey: "sk-test"},
-			wantBaseURL: "https://api.kimi.com/coding",
-			wantService: "claude",
+			name:                "kimi coding plan messages",
+			req:                 CreateChannelRequest{Provider: ProviderKimi, Target: TargetMessages, PlanID: "coding-anthropic", APIKey: "sk-test"},
+			wantBaseURL:         "https://api.kimi.com/coding",
+			wantService:         "claude",
+			wantNormalizeSystem: true,
 			wantModelMap: map[string]string{
 				"fable":  "kimi-for-coding",
 				"haiku":  "kimi-for-coding",
@@ -293,10 +299,11 @@ func TestBuildPayload(t *testing.T) {
 			},
 		},
 		{
-			name:        "dashscope coding plan messages",
-			req:         CreateChannelRequest{Provider: ProviderDashScope, Target: TargetMessages, PlanID: "coding-anthropic", APIKey: "sk-sp-test"},
-			wantBaseURL: "https://coding.dashscope.aliyuncs.com/apps/anthropic",
-			wantService: "claude",
+			name:                "dashscope coding plan messages",
+			req:                 CreateChannelRequest{Provider: ProviderDashScope, Target: TargetMessages, PlanID: "coding-anthropic", APIKey: "sk-sp-test"},
+			wantBaseURL:         "https://coding.dashscope.aliyuncs.com/apps/anthropic",
+			wantService:         "claude",
+			wantNormalizeSystem: true,
 		},
 		{
 			name:          "dashscope coding plan chat",
@@ -306,10 +313,11 @@ func TestBuildPayload(t *testing.T) {
 			wantNormalize: true,
 		},
 		{
-			name:        "dashscope token plan messages",
-			req:         CreateChannelRequest{Provider: ProviderDashScope, Target: TargetMessages, PlanID: "token-plan-anthropic", APIKey: "sk-tp-test"},
-			wantBaseURL: "https://token-plan.cn-beijing.maas.aliyuncs.com/apps/anthropic",
-			wantService: "claude",
+			name:                "dashscope token plan messages",
+			req:                 CreateChannelRequest{Provider: ProviderDashScope, Target: TargetMessages, PlanID: "token-plan-anthropic", APIKey: "sk-tp-test"},
+			wantBaseURL:         "https://token-plan.cn-beijing.maas.aliyuncs.com/apps/anthropic",
+			wantService:         "claude",
+			wantNormalizeSystem: true,
 		},
 		{
 			name:          "dashscope token plan chat",
@@ -335,10 +343,11 @@ func TestBuildPayload(t *testing.T) {
 			},
 		},
 		{
-			name:        "opencode zen messages",
-			req:         CreateChannelRequest{Provider: ProviderOpenCodeZen, Target: TargetMessages, APIKey: "sk-test"},
-			wantBaseURL: "https://opencode.ai/zen/v1/messages",
-			wantService: "claude",
+			name:                "opencode zen messages",
+			req:                 CreateChannelRequest{Provider: ProviderOpenCodeZen, Target: TargetMessages, APIKey: "sk-test"},
+			wantBaseURL:         "https://opencode.ai/zen/v1/messages",
+			wantService:         "claude",
+			wantNormalizeSystem: true,
 			wantModelMap: map[string]string{
 				"fable":  "glm-5.2",
 				"haiku":  "deepseek-v4-flash",
@@ -353,10 +362,11 @@ func TestBuildPayload(t *testing.T) {
 			},
 		},
 		{
-			name:        "opencode go messages",
-			req:         CreateChannelRequest{Provider: ProviderOpenCodeGo, Target: TargetMessages, APIKey: "sk-test"},
-			wantBaseURL: "https://opencode.ai/zen/go/v1/messages",
-			wantService: "claude",
+			name:                "opencode go messages",
+			req:                 CreateChannelRequest{Provider: ProviderOpenCodeGo, Target: TargetMessages, APIKey: "sk-test"},
+			wantBaseURL:         "https://opencode.ai/zen/go/v1/messages",
+			wantService:         "claude",
+			wantNormalizeSystem: true,
 			wantModelMap: map[string]string{
 				"fable":  "glm-5.2",
 				"haiku":  "deepseek-v4-flash",
@@ -424,11 +434,12 @@ func TestBuildPayload(t *testing.T) {
 			wantModelMap:   map[string]string{"codex": "glm-5.2", "gpt": "glm-5.2"},
 		},
 		{
-			name:         "volc-ark messages (anthropic endpoint)",
-			req:          CreateChannelRequest{Provider: ProviderVolcArk, Target: TargetMessages, APIKey: "ark-test"},
-			wantBaseURL:  "https://ark.cn-beijing.volces.com/api/coding#",
-			wantService:  "claude",
-			wantPassback: true,
+			name:                "volc-ark messages (anthropic endpoint)",
+			req:                 CreateChannelRequest{Provider: ProviderVolcArk, Target: TargetMessages, APIKey: "ark-test"},
+			wantBaseURL:         "https://ark.cn-beijing.volces.com/api/coding#",
+			wantService:         "claude",
+			wantPassback:        true,
+			wantNormalizeSystem: true,
 			wantModelMap: map[string]string{
 				"fable":  "glm-5.2",
 				"haiku":  "deepseek-v4-flash",
@@ -474,10 +485,11 @@ func TestBuildPayload(t *testing.T) {
 			wantFallback:       "minimax-m3",
 		},
 		{
-			name:        "qianfan messages (anthropic endpoint)",
-			req:         CreateChannelRequest{Provider: ProviderQianfan, Target: TargetMessages, APIKey: "qf-test"},
-			wantBaseURL: "https://qianfan.baidubce.com/anthropic/coding",
-			wantService: "claude",
+			name:                "qianfan messages (anthropic endpoint)",
+			req:                 CreateChannelRequest{Provider: ProviderQianfan, Target: TargetMessages, APIKey: "qf-test"},
+			wantBaseURL:         "https://qianfan.baidubce.com/anthropic/coding",
+			wantService:         "claude",
+			wantNormalizeSystem: true,
 			wantModelMap: map[string]string{
 				"fable":  "qianfan-code-latest",
 				"haiku":  "qianfan-code-latest",
@@ -507,11 +519,12 @@ func TestBuildPayload(t *testing.T) {
 			wantStripCodex: true,
 		},
 		{
-			name:           "xfyun messages (anthropic endpoint)",
-			req:            CreateChannelRequest{Provider: ProviderXFyun, Target: TargetMessages, APIKey: "xf-test"},
-			wantBaseURL:    "https://maas-api.cn-huabei-1.xf-yun.com/anthropic",
-			wantService:    "claude",
-			wantNoModelMap: true,
+			name:                "xfyun messages (anthropic endpoint)",
+			req:                 CreateChannelRequest{Provider: ProviderXFyun, Target: TargetMessages, APIKey: "xf-test"},
+			wantBaseURL:         "https://maas-api.cn-huabei-1.xf-yun.com/anthropic",
+			wantService:         "claude",
+			wantNoModelMap:      true,
+			wantNormalizeSystem: true,
 		},
 		{
 			name:           "xfyun chat",
@@ -564,6 +577,9 @@ func TestBuildPayload(t *testing.T) {
 			}
 			if got.NormalizeNonstandardChatRoles != tt.wantNormalize {
 				t.Fatalf("NormalizeNonstandardChatRoles = %v, want %v", got.NormalizeNonstandardChatRoles, tt.wantNormalize)
+			}
+			if got.NormalizeSystemRoleToTopLevel != tt.wantNormalizeSystem {
+				t.Fatalf("NormalizeSystemRoleToTopLevel = %v, want %v", got.NormalizeSystemRoleToTopLevel, tt.wantNormalizeSystem)
 			}
 			if tt.wantModels != nil {
 				if !slices.Equal(got.SupportedModels, tt.wantModels) {
