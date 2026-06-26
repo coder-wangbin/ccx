@@ -10,6 +10,7 @@ import (
 	"image/gif"
 	"image/jpeg"
 	"image/png"
+	"math/rand"
 	"strings"
 	"testing"
 
@@ -99,6 +100,29 @@ func makeGIF(w, h int) string {
 	img := image.NewPaletted(image.Rect(0, 0, w, h), pal)
 	var buf bytes.Buffer
 	_ = gif.Encode(&buf, img, nil)
+	return base64.StdEncoding.EncodeToString(buf.Bytes())
+}
+
+// makeNoisePNG 生成「不可压缩」的随机像素 PNG 的 base64。
+// 与纯色填充的 makePNG 不同：随机噪声让 PNG 几乎压不动，base64 体积巨大
+// （2048x2048 约百万级字符），从而「按真实尺寸计图」与「按整个 body 字符高估」
+// 的 token 差异极大——这是端到端测试能真正区分两者、抓住提取失效回归的前提。
+// 用固定随机种子保证可复现。注意：别改现有 makePNG，其它测试依赖它的纯色行为。
+func makeNoisePNG(w, h int) string {
+	rng := rand.New(rand.NewSource(1))
+	img := image.NewRGBA(image.Rect(0, 0, w, h))
+	for y := 0; y < h; y++ {
+		for x := 0; x < w; x++ {
+			img.Set(x, y, color.RGBA{
+				uint8(rng.Intn(256)),
+				uint8(rng.Intn(256)),
+				uint8(rng.Intn(256)),
+				255,
+			})
+		}
+	}
+	var buf bytes.Buffer
+	_ = png.Encode(&buf, img)
 	return base64.StdEncoding.EncodeToString(buf.Bytes())
 }
 
@@ -699,5 +723,123 @@ func TestEstimateRequestTokens_NoImageDoubleCount(t *testing.T) {
 				t.Errorf("EstimateRequestTokens=%d, want ~324+小开销 (双重计数会接近 648+)", got)
 			}
 		})
+	}
+}
+
+// Gemini 内联图（contents[].parts[].inlineData）必须被识别、按真实尺寸计 token 并剥离 base64。
+// camelCase(inlineData/mimeType) 与 snake_case(inline_data/mime_type) 两种变体都要覆盖。
+func TestExtractImageTokensAndStripBytes_GeminiInlineData(t *testing.T) {
+	b64 := makePNG(512, 512) // 324 token
+	tests := []struct {
+		name string
+		body string
+	}{
+		{
+			name: "camelCase",
+			body: `{"contents":[{"role":"user","parts":[{"text":"hi"},{"inlineData":{"mimeType":"image/png","data":"` + b64 + `"}}]}]}`,
+		},
+		{
+			name: "snake_case",
+			body: `{"contents":[{"role":"user","parts":[{"inline_data":{"mime_type":"image/png","data":"` + b64 + `"}}]}]}`,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cleaned, tokens := extractImageTokensAndStripBytes([]byte(tt.body))
+			if tokens != 324 {
+				t.Errorf("tokens=%d, want 324", tokens)
+			}
+			if !json.Valid(cleaned) {
+				t.Fatalf("cleaned 非合法 JSON: %s", string(cleaned))
+			}
+			if bytes.Contains(cleaned, []byte(b64)) {
+				t.Errorf("base64 未被剥离: %s", string(cleaned))
+			}
+		})
+	}
+}
+
+// Gemini 非图 inlineData（如 audio/pdf）不应被当作图片计 token。
+func TestExtractImageTokensAndStripBytes_GeminiNonImageIgnored(t *testing.T) {
+	b64 := makePNG(512, 512)
+	body := `{"contents":[{"parts":[{"inlineData":{"mimeType":"application/pdf","data":"` + b64 + `"}}]}]}`
+	cleaned, tokens := extractImageTokensAndStripBytes([]byte(body))
+	if tokens != 0 {
+		t.Errorf("非图 inlineData 不应计 token, got %d", tokens)
+	}
+	if !bytes.Equal(cleaned, []byte(body)) {
+		t.Errorf("非图 body 不应被改动")
+	}
+}
+
+// EstimateGeminiRequestTokens 端到端：含大图的 Gemini 请求必须「按真实尺寸计图」，
+// 绝不能退回「把整个 body（含巨大 base64）按字符数估算」的高估老路。
+//
+// 这里用 makeNoisePNG 造不可压缩的随机像素图：base64 体积巨大，于是
+//   - 真实尺寸估算（smart_resize）只有几千 token；
+//   - 而按整个 body 字符估算（提取失效时的行为）会高达 base64长度/3.5 量级，差出一个数量级。
+//
+// 正因差异巨大，下面的强断言才能真正区分「提取生效」与「提取失效」，
+// 守住本次修复要守的回归（旧版纯色图 + 宽松区间无法区分，是假阳性）。
+func TestEstimateGeminiRequestTokens_WithImage(t *testing.T) {
+	b64 := makeNoisePNG(2048, 2048) // 随机噪声，PNG 压不动，base64 体积巨大
+	body := `{"contents":[{"role":"user","parts":[{"inlineData":{"mimeType":"image/png","data":"` + b64 + `"}}]}],"generationConfig":{"maxOutputTokens":1024}}`
+	got := EstimateGeminiRequestTokens([]byte(body))
+
+	// 期望值：图片真实 token（按 base64 解出的尺寸 smart_resize）+ 一点剥离后文本开销。
+	imageTokens := estimateImageTokensFromBase64(b64)
+	if imageTokens <= 0 {
+		t.Fatalf("测试 fixture 异常：估算不出图片 token (imageTokens=%d)", imageTokens)
+	}
+
+	// 断言1：got 必须紧贴「图片真实 token」附近。剥离后 body 只剩极短的 JSON 骨架，
+	// 文本开销只有几十 token，所以 got 应落在 [imageTokens, imageTokens+200] 内。
+	if got < imageTokens || got > imageTokens+200 {
+		t.Errorf("EstimateGeminiRequestTokens=%d，期望紧贴图片真实估算 %d(+少量文本开销)；"+
+			"偏离过大说明未按真实尺寸计图", got, imageTokens)
+	}
+
+	// 断言2：got 必须显著小于「把整个 body 按字符估算」的值。
+	// 提取失效退回 EstimateTokens(string(body)) 时，巨大的 base64 会被按字符高估，
+	// 该值至少是 got 的数倍。这里要求 got < charEstimate/5，确保没退回字符高估老路。
+	charEstimate := EstimateTokens(string(body))
+	if got >= charEstimate/5 {
+		t.Errorf("EstimateGeminiRequestTokens=%d 未显著低于按字符估算 %d(got>=1/5)，"+
+			"疑似退回把整个 body 当文本高估（图片提取失效）", got, charEstimate)
+	}
+}
+
+// JPEG 的 SOF 尺寸标记被前置大段（EXIF/COM）推到 8KB 之后时，
+// 提高 sniff 上限后仍应能读出真实尺寸，而非回退 fallback。
+func TestDecodeImageSizeFromBase64_LargeHeaderBeforeSOF(t *testing.T) {
+	// 生成一张正常 JPEG，再在 SOI(FFD8) 之后插入一个大的 COM 段(FFFE + 长度 + 数据)，
+	// 把 SOF 推到 8KB 之后、64KB 之内，验证现在能读出尺寸。
+	raw, err := base64.StdEncoding.DecodeString(makeJPEG(1024, 768, 90))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(raw) < 2 || raw[0] != 0xFF || raw[1] != 0xD8 {
+		t.Fatal("makeJPEG 未以 SOI 开头")
+	}
+	// COM 段：FF FE <2字节长度(含自身)> <数据>。长度上限 65535。
+	const comPayload = 20000
+	com := make([]byte, 0, comPayload+4)
+	com = append(com, 0xFF, 0xFE)
+	segLen := comPayload + 2
+	com = append(com, byte(segLen>>8), byte(segLen&0xFF))
+	com = append(com, bytes.Repeat([]byte{0x20}, comPayload)...)
+
+	withBigHeader := make([]byte, 0, len(raw)+len(com))
+	withBigHeader = append(withBigHeader, raw[:2]...) // SOI
+	withBigHeader = append(withBigHeader, com...)     // 大 COM 段
+	withBigHeader = append(withBigHeader, raw[2:]...) // 其余
+
+	b64 := base64.StdEncoding.EncodeToString(withBigHeader)
+	h, w, ok := decodeImageSizeFromBase64(b64)
+	if !ok {
+		t.Fatal("SOF 在大头之后仍应能读出尺寸（sniff 上限已提高）")
+	}
+	if h != 768 || w != 1024 {
+		t.Errorf("读出尺寸 %dx%d, want 1024x768", w, h)
 	}
 }

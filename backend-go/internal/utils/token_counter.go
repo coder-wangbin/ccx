@@ -34,7 +34,16 @@ func EstimateTokens(text string) int {
 	return int(cjkTokens + otherTokens + 0.5) // 四舍五入
 }
 
-// EstimateMessagesTokens 估算消息数组的 token 数量
+// EstimateMessagesTokens 估算消息数组的 token 数量。
+//
+// 算法（marshal 后按字符估算 + 每条消息约 4 token + 图片 token）与
+// EstimateRequestTokens 处理 messages 字段的逻辑一致——EstimateRequestTokens 直接复用本函数，
+// 二者不再各持一份实现，避免漂移（DRY）。
+// 对已剥离 base64 的输入复用本函数不会重复计图，但成本因 schema 而异：
+//   - OpenAI data URL：整个 url 值连同 ";base64," 一起被替换成 "<image>"，"base64" 特征消失，
+//     extractImageTokensAndStripBytes 直接短路，近乎零成本。
+//   - Anthropic：仅 source.data 被替换，"type":"base64" 仍残留，不短路、会再做一次 gjson 全量解析；
+//     但 data 已是占位符 "<image>"，imagePayloadFromBlock 跳过，必返回 0 图片 token，不重复计图。
 func EstimateMessagesTokens(messages interface{}) int {
 	if messages == nil {
 		return 0
@@ -58,14 +67,18 @@ func EstimateMessagesTokens(messages interface{}) int {
 	return EstimateTokens(string(cleaned)) + msgCount*4 + imageTokens
 }
 
-// EstimateRequestTokens 从请求体估算输入 token
+// EstimateRequestTokens 从请求体估算输入 token。
+//
+// 注意：这是「路由用的保守上界估算」，非计费精度。结果在上游不回 usage 时会回填给客户端，
+// 而图片按 Qwen3-VL 16384 上界估算，对 OpenAI/Anthropic 实际计费可能偏高（详见 image_tokens.go）。
 func EstimateRequestTokens(bodyBytes []byte) int {
 	if len(bodyBytes) == 0 {
 		return 0
 	}
 
 	// 提取图片 token 并把 base64 字段替换成占位符，后续按 cleaned 估算文本，
-	// 图片 token 在此处一次性计入，下方不再走会二次提取的 EstimateMessagesTokens。
+	// 图片 token 在此处一次性计入；下方 messages 复用 EstimateMessagesTokens，
+	// 其对已剥离的 cleaned 会短路、返回 0 图片 token，不会重复计图。
 	cleaned, imageTokens := extractImageTokensAndStripBytes(bodyBytes)
 
 	var req map[string]interface{}
@@ -90,12 +103,9 @@ func EstimateRequestTokens(bodyBytes []byte) int {
 		}
 	}
 
-	// messages：cleaned 里的 base64 已剥离，按文本估算即可，不再重复提取图片
+	// messages：cleaned 里的 base64 已剥离，复用 EstimateMessagesTokens 统一算法。
 	if messages, ok := req["messages"].([]interface{}); ok {
-		data, err := json.Marshal(messages)
-		if err == nil {
-			total += EstimateTokens(string(data)) + len(messages)*4
-		}
+		total += EstimateMessagesTokens(messages)
 	}
 
 	// tools (每个工具约 100-200 tokens)
@@ -104,6 +114,24 @@ func EstimateRequestTokens(bodyBytes []byte) int {
 	}
 
 	return total
+}
+
+// EstimateGeminiRequestTokens 从 Gemini 请求体估算输入 token。
+//
+// Gemini 内联图在 contents[].parts[].inlineData(.data) 下，需先经
+// extractImageTokensAndStripBytes 把 base64 剥离、按真实尺寸计图，
+// 否则大图会被当文本字符数高估而撞穿 scheduler 阈值导致 503（与其它三种 schema 同一类 bug）。
+// 同样是「路由用的保守上界估算」，非计费精度（详见 image_tokens.go）。
+//
+// 与 chat/messages 路径不同，这里刻意只算「剥离后文本 + 图片 token」，不叠加每条消息约 4 token
+// 的结构开销：Gemini 输入主体是图片与长文本，结构开销占比极小，省略它既不影响路由判断
+// （保守上界 + 上层另计 thinkingBudget），也避免为不同 schema 维护各自的开销系数。
+func EstimateGeminiRequestTokens(bodyBytes []byte) int {
+	if len(bodyBytes) == 0 {
+		return 0
+	}
+	cleaned, imageTokens := extractImageTokensAndStripBytes(bodyBytes)
+	return EstimateTokens(string(cleaned)) + imageTokens
 }
 
 // EstimateResponseTokens 从响应内容估算输出 token
@@ -155,6 +183,9 @@ func isCJK(r rune) bool {
 
 // EstimateResponsesRequestTokens 从 Responses API 请求体估算输入 token
 // 支持 instructions、input (string 或 []item) 格式
+//
+// 注意：这是「路由用的保守上界估算」，非计费精度。结果在上游不回 usage 时会回填给客户端，
+// 而图片按 Qwen3-VL 16384 上界估算，对 OpenAI/Anthropic 实际计费可能偏高（详见 image_tokens.go）。
 func EstimateResponsesRequestTokens(bodyBytes []byte) int {
 	if len(bodyBytes) == 0 {
 		return 0

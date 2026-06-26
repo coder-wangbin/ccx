@@ -32,7 +32,7 @@ func BuildChatContextRequirement(bodyBytes []byte, cfg config.ContextRoutingConf
 
 // BuildGeminiContextRequirement 估算 Gemini 请求上下文需求，并计入 thinkingBudget。
 func BuildGeminiContextRequirement(bodyBytes []byte, cfg config.ContextRoutingConfig) *scheduler.ContextRequirement {
-	inputTokens := utils.EstimateTokens(string(bodyBytes))
+	inputTokens := utils.EstimateGeminiRequestTokens(bodyBytes)
 	outputTokens, explicit := extractGeminiMaxOutputTokens(bodyBytes)
 	thinkingBudget := extractGeminiThinkingBudget(bodyBytes)
 	return buildContextRequirement(inputTokens+thinkingBudget, outputTokens, explicit, cfg)

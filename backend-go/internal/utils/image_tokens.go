@@ -25,14 +25,24 @@ import (
 //
 // 选 Qwen3-VL 是因为它上限 16384 比 OpenAI/Anthropic/Gemini 都高，
 // 作为"保守上界"覆盖各家上游都不会低估。
+//
+// 计费精度提示：本模块产出的是「路由用的保守上界估算」，不是计费精度。
+// 上游缺 usage 时，EstimateRequestTokens/EstimateResponsesRequestTokens 的结果会回填
+// 给客户端；Qwen3-VL 的 16384 上界对 OpenAI/Anthropic 实际计费会偏高。这是刻意取舍：
+// 宁可估高也别估低导致大图撞穿 scheduler 阈值被全量跳过而 503。
 const (
-	imagePatchFactor      = 28 // patch_size * spatial_merge_size = 14 * 2
-	imageMinTokenNum      = 4
-	imageMaxTokenNum      = 16384
-	imageMaxAspectRatio   = 200
-	imageMaxDimension     = 100000 // 单边像素上限：超过即视为非法，避免超大尺寸下乘积整型溢出
-	imageHeaderSniffBytes = 8192   // base64 头 8KB 足以读到常见格式的 width/height
-	imageTokenFallback    = 1500   // WebP/AVIF/损坏图等无法读尺寸时的兜底
+	imagePatchFactor    = 28 // patch_size * spatial_merge_size = 14 * 2
+	imageMinTokenNum    = 4
+	imageMaxTokenNum    = 16384
+	imageMaxAspectRatio = 200
+	imageMaxDimension   = 100000 // 单边像素上限：超过即视为非法，避免超大尺寸下乘积整型溢出
+	// imageHeaderSniffBytes 是从 base64 头部截取、喂给 image.DecodeConfig 的「base64 字符数」上限
+	// （非解码后字节数）。base64 按 4/3 膨胀，故 90112 字符约对应 66KB 解码字节，
+	// 足以覆盖 JPEG 单个 APP1(EXIF)/APP0 段（长度字段上限 64KB）把 SOF 尺寸标记推后的情况。
+	// 旧值 8192 字符仅能解码约 6KB，手机照片几十 KB 的 EXIF/缩略图会把 SOF 推到其后，
+	// 导致读不出尺寸而回退 imageTokenFallback（约 10× 低估）。
+	imageHeaderSniffBytes = 90112 // ≈ 64KB 解码字节
+	imageTokenFallback    = 1500  // WebP/AVIF/损坏图等无法读尺寸时的兜底
 )
 
 // estimateImageTokensFromSize 根据图片真实 H/W 估算 token 数。
@@ -50,7 +60,10 @@ func estimateImageTokensFromSize(height, width int) int {
 	if height > width {
 		mx, mn = height, width
 	}
-	if mx/mn > imageMaxAspectRatio {
+	// 用交叉相乘代替整型除法 mx/mn > ratio，避免整型截断导致阈值附近不严格
+	// （如 mx/mn=200.9 整除得 200 不触发）。mx 上界为 imageMaxDimension，
+	// imageMaxAspectRatio*mn 最大约 2e7，远在 int 范围内，不会溢出。
+	if mx > imageMaxAspectRatio*mn {
 		return imageTokenFallback
 	}
 
@@ -111,7 +124,8 @@ func ceilBy(v float64, factor int) int {
 }
 
 // decodeImageSizeFromBase64 从 base64 字符串读取图片真实 H×W，不解码像素。
-// 只对头部 8KB 做 base64 decode，足以覆盖 JPEG/PNG/GIF 的尺寸字段。
+// 只对头部 imageHeaderSniffBytes 个 base64 字符做 decode（约 64KB 解码字节），
+// 足以覆盖 JPEG/PNG/GIF 的尺寸字段，含手机照片几十 KB EXIF/缩略图把 SOF 推后的情况。
 func decodeImageSizeFromBase64(b64 string) (height, width int, ok bool) {
 	b64 = strings.TrimSpace(b64)
 	if b64 == "" {
