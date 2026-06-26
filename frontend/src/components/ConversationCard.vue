@@ -24,17 +24,6 @@
         </span>
       </div>
 
-      <div v-if="!expanded && hasSubagentActivity" class="subagent-summary" @click.stop="$emit('toggleExpand')">
-        <div class="subagent-summary-main">
-          <v-icon size="16">mdi-source-branch</v-icon>
-          <span>{{ t('cockpit.subagents') }}</span>
-          <strong>{{ displaySubagentCount }}</strong>
-        </div>
-        <div class="subagent-summary-route">
-          <span>{{ subagentRouteLabel }}</span>
-        </div>
-      </div>
-
       <div
         v-if="conversation.parentConversationId || conversation.parentThreadId || (!expanded && childConversationCount > 0)"
         class="relation-row"
@@ -422,11 +411,6 @@ const subagentSequence = computed((): ChannelInfo[] => {
 const hasSubagentOverride = computed(() => !!props.override?.subagentSequence && props.override.subagentSequence.length > 0)
 const showSubagentSection = computed(() => hasSubagentActivity.value || hasSubagentOverride.value)
 const subagentCurrentChannel = computed(() => props.conversation.subagentChannel ?? -1)
-
-const subagentRouteLabel = computed(() => {
-  return hasSubagentOverride.value ? t('cockpit.subagentOverride') : t('cockpit.subagentFollowMain')
-})
-
 
 const currentChannelInfo = computed(() => {
   const existing = channelSequence.value.find(ch => ch.index === props.conversation.currentChannel)
@@ -855,40 +839,6 @@ function shortId(value: string): string {
   margin-top: 12px;
   padding-top: 10px;
   border-top: 1px dashed rgba(var(--v-border-color), var(--v-border-opacity));
-}
-
-.subagent-summary {
-  margin-top: 10px;
-  padding: 8px 10px;
-  border: 1px solid rgba(var(--v-theme-warning), 0.45);
-  background: rgba(var(--v-theme-warning), 0.1);
-}
-
-.subagent-summary-main,
-.subagent-summary-route {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-}
-
-.subagent-summary-main {
-  color: rgb(var(--v-theme-warning));
-  font-size: 12px;
-  font-weight: 800;
-}
-
-.subagent-summary-route {
-  margin-top: 5px;
-  color: rgb(var(--v-theme-on-surface) / 62%);
-  font-size: 11px;
-}
-
-.subagent-summary-route span {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .subagent-list {
