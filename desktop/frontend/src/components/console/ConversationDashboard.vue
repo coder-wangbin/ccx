@@ -341,13 +341,13 @@ onBeforeUnmount(() => {
       <p class="text-sm">{{ notice.message }}</p>
     </Alert>
 
-    <div class="flex flex-wrap items-center gap-2">
-      <div class="flex flex-wrap items-center gap-1.5">
+    <div class="cockpit-toolbar flex flex-wrap items-center gap-2">
+      <div class="cockpit-filter flex flex-wrap items-center gap-1.5">
         <button
           v-for="option in kindFilterOptions"
           :key="option.value"
           type="button"
-          class="border px-2.5 py-1 text-[10px] font-bold tracking-[0.08em] text-muted-foreground transition-colors hover:bg-accent/40"
+          class="cockpit-filter-button border px-2.5 py-1 text-[10px] font-bold tracking-[0.08em] text-muted-foreground transition-colors hover:bg-accent/40"
           :class="[option.class, { 'border-primary bg-primary/10 text-primary': kindFilter === option.value }]"
           :data-active="kindFilter === option.value"
           @click="kindFilter = option.value"
@@ -356,9 +356,9 @@ onBeforeUnmount(() => {
         </button>
       </div>
 
-      <div class="min-w-4 flex-1" />
+      <div class="cockpit-toolbar-spacer min-w-4 flex-1" />
 
-      <div class="relative w-full min-w-[160px] sm:w-60 lg:w-64">
+      <div class="cockpit-search relative w-full min-w-[160px] sm:w-60 lg:w-64">
         <Search class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input
           v-model="searchQuery"
@@ -378,7 +378,7 @@ onBeforeUnmount(() => {
       </div>
 
       <Select v-model="overrideDuration">
-        <SelectTrigger class="h-9 w-[160px] shrink-0">
+        <SelectTrigger class="cockpit-duration-select h-9 w-[160px] shrink-0">
           <SelectValue :placeholder="t('cockpit.overrideDuration')" />
         </SelectTrigger>
         <SelectContent>
@@ -459,6 +459,38 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
+.cockpit-search {
+  flex-shrink: 1;
+}
+
+@media (max-width: 1024px) {
+  .cockpit-toolbar {
+    gap: 6px;
+  }
+
+  .cockpit-filter {
+    gap: 4px;
+  }
+
+  .cockpit-filter-button {
+    padding-inline: 0.5rem;
+    letter-spacing: 0.04em;
+  }
+
+  .cockpit-toolbar-spacer {
+    min-width: 0;
+  }
+
+  .cockpit-search {
+    width: 13rem;
+    min-width: 9rem;
+  }
+
+  .cockpit-duration-select {
+    width: 9.25rem;
+  }
+}
+
 :deep(.conversation-card-target .conversation-card) {
   border-color: var(--color-primary);
   box-shadow: 6px 6px 0 0 var(--color-primary);
