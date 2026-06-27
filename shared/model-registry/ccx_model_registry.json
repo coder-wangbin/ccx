@@ -102,6 +102,19 @@
       "reasoningEfforts": ["low", "medium", "high", "xhigh"]
     },
     {
+      "patterns": [
+        "(?:^|[-/])gpt-5\\.6-sol(?=$|@)",
+        "(?:^|[-/])gpt-5\\.6-terra(?=$|@)",
+        "(?:^|[-/])gpt-5\\.6-luna(?=$|@)"
+      ],
+      "provider": "amazon-bedrock",
+      "displayName": "Amazon Bedrock GPT-5.6",
+      "contextWindowTokens": 272000,
+      "maxOutputTokens": 128000,
+      "reasoningEfforts": ["low", "medium", "high", "xhigh", "max"],
+      "sources": ["https://github.com/openai/codex/compare/rust-v0.142.2...rust-v0.142.3"]
+    },
+    {
       "patterns": ["(?:^|[-/])gpt-5\\.4(?:-openai-compact)?(?=$|@)"],
       "provider": "openai",
       "displayName": "gpt-5.4",

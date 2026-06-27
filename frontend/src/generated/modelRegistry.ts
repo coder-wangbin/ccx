@@ -155,6 +155,54 @@ export const builtinUpstreamModelCapabilities: Record<string, UpstreamModelCapab
       "xhigh"
     ]
   },
+  "(?:^|[-/])gpt-5\\.6-sol(?=$|@)": {
+    "provider": "amazon-bedrock",
+    "displayName": "Amazon Bedrock GPT-5.6",
+    "contextWindowTokens": 272000,
+    "maxOutputTokens": 128000,
+    "reasoningEfforts": [
+      "low",
+      "medium",
+      "high",
+      "xhigh",
+      "max"
+    ],
+    "sources": [
+      "https://github.com/openai/codex/compare/rust-v0.142.2...rust-v0.142.3"
+    ]
+  },
+  "(?:^|[-/])gpt-5\\.6-terra(?=$|@)": {
+    "provider": "amazon-bedrock",
+    "displayName": "Amazon Bedrock GPT-5.6",
+    "contextWindowTokens": 272000,
+    "maxOutputTokens": 128000,
+    "reasoningEfforts": [
+      "low",
+      "medium",
+      "high",
+      "xhigh",
+      "max"
+    ],
+    "sources": [
+      "https://github.com/openai/codex/compare/rust-v0.142.2...rust-v0.142.3"
+    ]
+  },
+  "(?:^|[-/])gpt-5\\.6-luna(?=$|@)": {
+    "provider": "amazon-bedrock",
+    "displayName": "Amazon Bedrock GPT-5.6",
+    "contextWindowTokens": 272000,
+    "maxOutputTokens": 128000,
+    "reasoningEfforts": [
+      "low",
+      "medium",
+      "high",
+      "xhigh",
+      "max"
+    ],
+    "sources": [
+      "https://github.com/openai/codex/compare/rust-v0.142.2...rust-v0.142.3"
+    ]
+  },
   "(?:^|[-/])gpt-5\\.4(?:-openai-compact)?(?=$|@)": {
     "provider": "openai",
     "displayName": "gpt-5.4",

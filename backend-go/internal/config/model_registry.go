@@ -204,6 +204,16 @@ func BuiltinAgentModelProfiles() map[string]AgentModelProfile {
 			ReasoningEfforts:       []string{"low", "medium", "high", "xhigh"},
 			SupportsPriorityTier:   true,
 		},
+		"gpt-5.6-*": {
+			DisplayName:            "Amazon Bedrock GPT-5.6",
+			ContextWindowTokens:    272000,
+			MaxContextWindowTokens: 272000,
+			EffectiveContextRatio:  0.95,
+			AutoCompactRatio:       0.90,
+			TruncationMode:         "tokens",
+			TruncationLimit:        10000,
+			ReasoningEfforts:       []string{"low", "medium", "high", "xhigh", "max"},
+		},
 		"claude-haiku-4-5*": {
 			DisplayName:         "Claude Haiku 4.5",
 			ContextWindowTokens: 200000,

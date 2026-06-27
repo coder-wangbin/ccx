@@ -18,6 +18,22 @@ func TestResolveAgentModelProfile_CodexBuiltins(t *testing.T) {
 	}
 }
 
+func TestResolveAgentModelProfile_GPT56BedrockBuiltins(t *testing.T) {
+	profile := ResolveAgentModelProfile("gpt-5.6-sol", nil)
+	if !profile.Known {
+		t.Fatal("expected built-in gpt-5.6-sol profile")
+	}
+	if profile.Profile.ContextWindowTokens != 272000 {
+		t.Fatalf("ContextWindowTokens = %d, want 272000", profile.Profile.ContextWindowTokens)
+	}
+	if profile.Profile.MaxContextWindowTokens != 272000 {
+		t.Fatalf("MaxContextWindowTokens = %d, want 272000", profile.Profile.MaxContextWindowTokens)
+	}
+	if !containsString(profile.Profile.ReasoningEfforts, "max") {
+		t.Fatalf("ReasoningEfforts = %v, want max", profile.Profile.ReasoningEfforts)
+	}
+}
+
 func TestResolveAgentModelProfile_ClaudeBuiltins(t *testing.T) {
 	profile := ResolveAgentModelProfile("claude-sonnet-4-6", nil)
 	if !profile.Known {
@@ -149,6 +165,31 @@ func TestResolveUpstreamCapability_Qwen37MaxBuiltin(t *testing.T) {
 	assertFloatPointerValue(t, pricing.OutputPrice, 36, "Pricing.OutputPrice")
 }
 
+func TestResolveUpstreamCapability_GPT56BedrockBuiltin(t *testing.T) {
+	upstream := &UpstreamConfig{
+		ModelMapping: map[string]string{
+			"agent": "gpt-5.6-terra",
+		},
+	}
+
+	resolved := ResolveUpstreamCapability("agent", upstream, nil)
+	if !resolved.Known || resolved.Source != "builtin" {
+		t.Fatalf("source = %q known=%v, want builtin known", resolved.Source, resolved.Known)
+	}
+	if resolved.Capability.Provider != "amazon-bedrock" {
+		t.Fatalf("Provider = %q, want amazon-bedrock", resolved.Capability.Provider)
+	}
+	if resolved.Capability.ContextWindowTokens != 272000 {
+		t.Fatalf("ContextWindowTokens = %d, want 272000", resolved.Capability.ContextWindowTokens)
+	}
+	if resolved.Capability.MaxOutputTokens != 128000 {
+		t.Fatalf("MaxOutputTokens = %d, want 128000", resolved.Capability.MaxOutputTokens)
+	}
+	if !containsString(resolved.Capability.ReasoningEfforts, "max") {
+		t.Fatalf("ReasoningEfforts = %v, want max", resolved.Capability.ReasoningEfforts)
+	}
+}
+
 func TestResolveUpstreamCapability_Qwen37PlusTieredPricing(t *testing.T) {
 	upstream := &UpstreamConfig{
 		ModelMapping: map[string]string{
@@ -259,4 +300,13 @@ func assertFloatPointerValue(t *testing.T, got *float64, want float64, name stri
 	if *got != want {
 		t.Fatalf("%s = %v, want %v", name, *got, want)
 	}
+}
+
+func containsString(values []string, want string) bool {
+	for _, value := range values {
+		if value == want {
+			return true
+		}
+	}
+	return false
 }
