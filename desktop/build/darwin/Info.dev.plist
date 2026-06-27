@@ -8,7 +8,7 @@
         <key>CFBundleExecutable</key>
             <string>ccx-desktop</string>
         <key>CFBundleIdentifier</key>
-            <string>com.ccx.gateway.desktop.dev</string>
+            <string>com.benedictking.ccx.dev</string>
         <key>CFBundleVersion</key>
             <string>1.0.0</string>
         <key>CFBundleGetInfoString</key>

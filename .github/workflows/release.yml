@@ -79,16 +79,68 @@ jobs:
         run: bun install --frozen-lockfile
         working-directory: ./desktop/frontend
 
+      - name: Import macOS signing certificate
+        env:
+          MACOS_CERTIFICATE_P12_BASE64: ${{ secrets.MACOS_CERTIFICATE_P12_BASE64 }}
+          MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+          MACOS_KEYCHAIN_PASSWORD: ${{ secrets.MACOS_KEYCHAIN_PASSWORD }}
+        run: |
+          missing=0
+          for name in MACOS_CERTIFICATE_P12_BASE64 MACOS_CERTIFICATE_PASSWORD MACOS_KEYCHAIN_PASSWORD; do
+            if [ -z "${!name}" ]; then
+              echo "Missing required macOS signing secret: $name" >&2
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            exit 1
+          fi
+          CERTIFICATE_PATH="$RUNNER_TEMP/developer-id-application.p12"
+          KEYCHAIN_PATH="$RUNNER_TEMP/ccx-signing.keychain-db"
+          echo "$MACOS_CERTIFICATE_P12_BASE64" | base64 -d > "$CERTIFICATE_PATH"
+          security create-keychain -p "$MACOS_KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$MACOS_KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security import "$CERTIFICATE_PATH" -k "$KEYCHAIN_PATH" -P "$MACOS_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          security list-keychains -d user -s "$KEYCHAIN_PATH" login.keychain-db
+          security default-keychain -s "$KEYCHAIN_PATH"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$MACOS_KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security find-identity -v -p codesigning "$KEYCHAIN_PATH"
+          rm -f "$CERTIFICATE_PATH"
+
+      - name: Verify macOS notarization configuration
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+        run: |
+          missing=0
+          for name in APPLE_ID APPLE_TEAM_ID APPLE_APP_SPECIFIC_PASSWORD; do
+            if [ -z "${!name}" ]; then
+              echo "Missing required macOS notarization secret: $name" >&2
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            exit 1
+          fi
+
       - name: Build Desktop arm64 DMG
         env:
           BUILD_VERSION: ${{ github.ref_name }}
           GIT_COMMIT: ${{ github.sha }}
+          MACOS_CODESIGN_IDENTITY: "Developer ID Application: Wang Zhiwei (PZV79TYXCR)"
+          MACOS_NOTARIZE: "true"
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
         run: |
           mkdir -p bin
+          rm -f bin/ccx-go
           cp ../backend-go/ccx-darwin-arm64 bin/ccx-go
           BUILD_TIME=$(date -u '+%Y-%m-%d_%H:%M:%S')
           VERSION="${BUILD_VERSION#v}"
-          wails3 task darwin:package:dmg ARCH=arm64 BUILD_VERSION="${VERSION}" BUILD_TIME="${BUILD_TIME}" GIT_COMMIT="${GIT_COMMIT}"
+          wails3 task darwin:package:dmg ARCH=arm64 BUILD_VERSION="${VERSION}" BUILD_TIME="${BUILD_TIME}" GIT_COMMIT="${GIT_COMMIT}" MACOS_CODESIGN_IDENTITY="${MACOS_CODESIGN_IDENTITY}" MACOS_NOTARIZE="${MACOS_NOTARIZE}" APPLE_ID="${APPLE_ID}" APPLE_TEAM_ID="${APPLE_TEAM_ID}" APPLE_APP_SPECIFIC_PASSWORD="${APPLE_APP_SPECIFIC_PASSWORD}"
           shasum -a 256 "bin/CCX-Desktop-${VERSION}-darwin-arm64.dmg" | awk '{print $1}' > "bin/CCX-Desktop-${VERSION}-darwin-arm64.dmg.sha256"
         working-directory: ./desktop
 
@@ -96,11 +148,17 @@ jobs:
         env:
           BUILD_VERSION: ${{ github.ref_name }}
           GIT_COMMIT: ${{ github.sha }}
+          MACOS_CODESIGN_IDENTITY: "Developer ID Application: Wang Zhiwei (PZV79TYXCR)"
+          MACOS_NOTARIZE: "true"
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
         run: |
+          rm -f bin/ccx-go
           cp ../backend-go/ccx-darwin-amd64 bin/ccx-go
           BUILD_TIME=$(date -u '+%Y-%m-%d_%H:%M:%S')
           VERSION="${BUILD_VERSION#v}"
-          wails3 task darwin:package:dmg ARCH=amd64 BUILD_VERSION="${VERSION}" BUILD_TIME="${BUILD_TIME}" GIT_COMMIT="${GIT_COMMIT}"
+          wails3 task darwin:package:dmg ARCH=amd64 BUILD_VERSION="${VERSION}" BUILD_TIME="${BUILD_TIME}" GIT_COMMIT="${GIT_COMMIT}" MACOS_CODESIGN_IDENTITY="${MACOS_CODESIGN_IDENTITY}" MACOS_NOTARIZE="${MACOS_NOTARIZE}" APPLE_ID="${APPLE_ID}" APPLE_TEAM_ID="${APPLE_TEAM_ID}" APPLE_APP_SPECIFIC_PASSWORD="${APPLE_APP_SPECIFIC_PASSWORD}"
           shasum -a 256 "bin/CCX-Desktop-${VERSION}-darwin-amd64.dmg" | awk '{print $1}' > "bin/CCX-Desktop-${VERSION}-darwin-amd64.dmg.sha256"
         working-directory: ./desktop
 
