@@ -14,7 +14,7 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  build-macos:
+  build-macos-backend:
     runs-on: macos-latest
     steps:
       - name: Checkout code
@@ -49,8 +49,34 @@ jobs:
           go-version: "1.25.x"
           cache-dependency-path: backend-go/go.sum
 
-      - name: Install cosign
-        uses: sigstore/cosign-installer@v4.0.0
+      - name: Import macOS signing certificate
+        env:
+          MACOS_CERTIFICATE_P12_BASE64: ${{ secrets.MACOS_CERTIFICATE_P12_BASE64 }}
+          MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+          MACOS_KEYCHAIN_PASSWORD: ${{ secrets.MACOS_KEYCHAIN_PASSWORD }}
+        run: |
+          missing=0
+          for name in MACOS_CERTIFICATE_P12_BASE64 MACOS_CERTIFICATE_PASSWORD MACOS_KEYCHAIN_PASSWORD; do
+            if [ -z "${!name}" ]; then
+              echo "Missing required macOS signing secret: $name" >&2
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            exit 1
+          fi
+          CERTIFICATE_PATH="$RUNNER_TEMP/developer-id-application.p12"
+          KEYCHAIN_PATH="$RUNNER_TEMP/ccx-signing.keychain-db"
+          echo "$MACOS_CERTIFICATE_P12_BASE64" | base64 -d > "$CERTIFICATE_PATH"
+          security create-keychain -p "$MACOS_KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$MACOS_KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security import "$CERTIFICATE_PATH" -k "$KEYCHAIN_PATH" -P "$MACOS_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          security list-keychains -d user -s "$KEYCHAIN_PATH" login.keychain-db
+          security default-keychain -s "$KEYCHAIN_PATH"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$MACOS_KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security find-identity -v -p codesigning "$KEYCHAIN_PATH"
+          rm -f "$CERTIFICATE_PATH"
 
       - name: Build Backend arm64
         run: |
@@ -63,11 +89,62 @@ jobs:
           CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -ldflags "-s -w -X main.Version=${{ github.ref_name }} -X main.BuildTime=$(date -u '+%Y-%m-%d_%H:%M:%S') -X main.GitCommit=${{ github.sha }}" -o ccx-darwin-amd64
         working-directory: ./backend-go
 
-      - name: Generate checksums
+      - name: Sign Backend binaries
+        env:
+          MACOS_CODESIGN_IDENTITY: "Developer ID Application: Wang Zhiwei (PZV79TYXCR)"
+        run: |
+          codesign --force --timestamp --options runtime --sign "$MACOS_CODESIGN_IDENTITY" backend-go/ccx-darwin-arm64
+          codesign --force --timestamp --options runtime --sign "$MACOS_CODESIGN_IDENTITY" backend-go/ccx-darwin-amd64
+          codesign --verify --strict --verbose=4 backend-go/ccx-darwin-arm64
+          codesign --verify --strict --verbose=4 backend-go/ccx-darwin-amd64
+
+      - name: Generate backend checksums
         run: |
           cd backend-go
           shasum -a 256 ccx-darwin-arm64 | awk '{print $1}' > ccx-darwin-arm64.sha256
           shasum -a 256 ccx-darwin-amd64 | awk '{print $1}' > ccx-darwin-amd64.sha256
+
+      - name: Upload macOS backend artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-backend
+          path: |
+            backend-go/ccx-darwin-arm64
+            backend-go/ccx-darwin-amd64
+            backend-go/ccx-darwin-arm64.sha256
+            backend-go/ccx-darwin-amd64.sha256
+          retention-days: 1
+
+  build-macos-desktop:
+    runs-on: macos-latest
+    needs: build-macos-backend
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [arm64, amd64]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Cache desktop Bun dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-desktop-bun-${{ hashFiles('desktop/frontend/bun.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-desktop-bun-
+            ${{ runner.os }}-bun-
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.25.x"
+          cache-dependency-path: desktop/go.sum
 
       - name: Install Wails3 CLI
         run: bash ./scripts/install-wails3.sh
@@ -78,6 +155,15 @@ jobs:
       - name: Install Desktop Frontend Deps
         run: bun install --frozen-lockfile
         working-directory: ./desktop/frontend
+
+      - name: Download macOS backend artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: macos-backend
+          path: backend-go
+
+      - name: Restore backend executable permissions
+        run: chmod +x backend-go/ccx-darwin-arm64 backend-go/ccx-darwin-amd64
 
       - name: Import macOS signing certificate
         env:
@@ -108,6 +194,41 @@ jobs:
           security find-identity -v -p codesigning "$KEYCHAIN_PATH"
           rm -f "$CERTIFICATE_PATH"
 
+      - name: Build Desktop ${{ matrix.arch }} DMG
+        env:
+          BUILD_VERSION: ${{ github.ref_name }}
+          GIT_COMMIT: ${{ github.sha }}
+          MACOS_CODESIGN_IDENTITY: "Developer ID Application: Wang Zhiwei (PZV79TYXCR)"
+        run: |
+          mkdir -p bin
+          rm -f bin/ccx-go
+          cp "../backend-go/ccx-darwin-${{ matrix.arch }}" bin/ccx-go
+          BUILD_TIME=$(date -u '+%Y-%m-%d_%H:%M:%S')
+          VERSION="${BUILD_VERSION#v}"
+          wails3 task darwin:package:dmg ARCH=${{ matrix.arch }} BUILD_VERSION="${VERSION}" BUILD_TIME="${BUILD_TIME}" GIT_COMMIT="${GIT_COMMIT}" MACOS_CODESIGN_IDENTITY="${MACOS_CODESIGN_IDENTITY}" MACOS_NOTARIZE=false
+        working-directory: ./desktop
+
+      - name: Upload Desktop ${{ matrix.arch }} DMG
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-desktop-${{ matrix.arch }}-dmg
+          path: desktop/bin/CCX-Desktop-*-darwin-${{ matrix.arch }}.dmg
+          retention-days: 1
+
+  notarize-macos-desktop:
+    runs-on: macos-latest
+    needs: build-macos-desktop
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [arm64, amd64]
+    steps:
+      - name: Download Desktop ${{ matrix.arch }} DMG
+        uses: actions/download-artifact@v4
+        with:
+          name: macos-desktop-${{ matrix.arch }}-dmg
+          path: desktop/bin
+
       - name: Verify macOS notarization configuration
         env:
           APPLE_ID: ${{ secrets.APPLE_ID }}
@@ -125,42 +246,55 @@ jobs:
             exit 1
           fi
 
-      - name: Build Desktop arm64 DMG
+      - name: Notarize Desktop ${{ matrix.arch }} DMG
         env:
-          BUILD_VERSION: ${{ github.ref_name }}
-          GIT_COMMIT: ${{ github.sha }}
-          MACOS_CODESIGN_IDENTITY: "Developer ID Application: Wang Zhiwei (PZV79TYXCR)"
-          MACOS_NOTARIZE: "true"
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
         run: |
-          mkdir -p bin
-          rm -f bin/ccx-go
-          cp ../backend-go/ccx-darwin-arm64 bin/ccx-go
-          BUILD_TIME=$(date -u '+%Y-%m-%d_%H:%M:%S')
-          VERSION="${BUILD_VERSION#v}"
-          wails3 task darwin:package:dmg ARCH=arm64 BUILD_VERSION="${VERSION}" BUILD_TIME="${BUILD_TIME}" GIT_COMMIT="${GIT_COMMIT}" MACOS_CODESIGN_IDENTITY="${MACOS_CODESIGN_IDENTITY}" MACOS_NOTARIZE="${MACOS_NOTARIZE}" APPLE_ID="${APPLE_ID}" APPLE_TEAM_ID="${APPLE_TEAM_ID}" APPLE_APP_SPECIFIC_PASSWORD="${APPLE_APP_SPECIFIC_PASSWORD}"
-          shasum -a 256 "bin/CCX-Desktop-${VERSION}-darwin-arm64.dmg" | awk '{print $1}' > "bin/CCX-Desktop-${VERSION}-darwin-arm64.dmg.sha256"
-        working-directory: ./desktop
+          DMG_FILE=$(find desktop/bin -maxdepth 1 -name "CCX-Desktop-*-darwin-${{ matrix.arch }}.dmg" -print -quit)
+          if [ -z "$DMG_FILE" ]; then
+            echo "Missing DMG for ${{ matrix.arch }}" >&2
+            exit 1
+          fi
+          xcrun notarytool submit "$DMG_FILE" --apple-id "$APPLE_ID" --team-id "$APPLE_TEAM_ID" --password "$APPLE_APP_SPECIFIC_PASSWORD" --wait
+          xcrun stapler staple "$DMG_FILE"
+          xcrun stapler validate "$DMG_FILE"
+          shasum -a 256 "$DMG_FILE" | awk '{print $1}' > "$DMG_FILE.sha256"
 
-      - name: Build Desktop amd64 DMG
-        env:
-          BUILD_VERSION: ${{ github.ref_name }}
-          GIT_COMMIT: ${{ github.sha }}
-          MACOS_CODESIGN_IDENTITY: "Developer ID Application: Wang Zhiwei (PZV79TYXCR)"
-          MACOS_NOTARIZE: "true"
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-        run: |
-          rm -f bin/ccx-go
-          cp ../backend-go/ccx-darwin-amd64 bin/ccx-go
-          BUILD_TIME=$(date -u '+%Y-%m-%d_%H:%M:%S')
-          VERSION="${BUILD_VERSION#v}"
-          wails3 task darwin:package:dmg ARCH=amd64 BUILD_VERSION="${VERSION}" BUILD_TIME="${BUILD_TIME}" GIT_COMMIT="${GIT_COMMIT}" MACOS_CODESIGN_IDENTITY="${MACOS_CODESIGN_IDENTITY}" MACOS_NOTARIZE="${MACOS_NOTARIZE}" APPLE_ID="${APPLE_ID}" APPLE_TEAM_ID="${APPLE_TEAM_ID}" APPLE_APP_SPECIFIC_PASSWORD="${APPLE_APP_SPECIFIC_PASSWORD}"
-          shasum -a 256 "bin/CCX-Desktop-${VERSION}-darwin-amd64.dmg" | awk '{print $1}' > "bin/CCX-Desktop-${VERSION}-darwin-amd64.dmg.sha256"
-        working-directory: ./desktop
+      - name: Upload notarized Desktop ${{ matrix.arch }} artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-desktop-${{ matrix.arch }}-notarized
+          path: |
+            desktop/bin/CCX-Desktop-*-darwin-${{ matrix.arch }}.dmg
+            desktop/bin/CCX-Desktop-*-darwin-${{ matrix.arch }}.dmg.sha256
+          retention-days: 1
+
+  finalize-macos:
+    runs-on: ubuntu-latest
+    needs: [build-macos-backend, notarize-macos-desktop]
+    steps:
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v4.0.0
+
+      - name: Download macOS backend artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: macos-backend
+          path: backend-go
+
+      - name: Download notarized Desktop arm64 artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: macos-desktop-arm64-notarized
+          path: desktop/bin
+
+      - name: Download notarized Desktop amd64 artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: macos-desktop-amd64-notarized
+          path: desktop/bin
 
       - name: Generate macOS checksums
         run: |
@@ -762,7 +896,7 @@ jobs:
 
   finalize:
     runs-on: ubuntu-latest
-    needs: [build-macos, build-windows, build-linux, build-linux-arm64-desktop]
+    needs: [finalize-macos, build-windows, build-linux, build-linux-arm64-desktop]
     steps:
       - name: Notify release ready
         run: echo "All builds complete. Draft release is ready for review."
