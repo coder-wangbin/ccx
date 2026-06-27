@@ -853,6 +853,7 @@
   "cockpit.active": "Active: {count}",
   "cockpit.override": "Override: {count}",
   "cockpit.mainConversation": "Main conversation",
+  "cockpit.recap": "Recap",
   "cockpit.detail.requests": "Requests",
   "cockpit.detail.duration": "Duration",
   "cockpit.mainRouting": "Main routing",

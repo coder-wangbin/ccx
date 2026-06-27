@@ -2,7 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { Check, Copy, CornerUpLeft, GitBranch } from 'lucide-vue-next'
+import { Check, Copy, CornerUpLeft, FileText, GitBranch } from 'lucide-vue-next'
 import { useLanguage } from '@/composables/useLanguage'
 import type {
   ChannelSequenceEntry,
@@ -557,6 +557,15 @@ function shortId(value: string): string {
         >
           <span v-if="mainConversationTurns.length > 1" class="main-conversation-turn-index">{{ index - mainConversationTurns.length + 1 }}</span>
           <span class="main-conversation-turn-text">{{ turn }}</span>
+        </div>
+      </div>
+      <div v-if="conversation.lastRecap" class="main-conversation-recap mt-2 border-t border-dashed border-border pt-2">
+        <div class="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.04em] text-primary">
+          <FileText class="h-3.5 w-3.5" />
+          <span>{{ t('cockpit.recap') }}</span>
+        </div>
+        <div class="mt-1.5 whitespace-pre-wrap break-words text-xs font-semibold leading-relaxed text-foreground/80">
+          {{ conversation.lastRecap }}
         </div>
       </div>
       <div class="mt-2 grid grid-cols-2 gap-2">
