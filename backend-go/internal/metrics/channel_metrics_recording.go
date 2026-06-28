@@ -25,12 +25,10 @@ func (m *MetricsManager) recordSuccessWithUsageLocked(baseURL, apiKey, serviceTy
 	metrics.SuccessCount++
 	metrics.LastSuccessAt = &now
 
-	m.appendToWindowKey(metrics, true)
-	m.handleBreakerSuccessLocked(metrics, now)
-
 	inputTokens, outputTokens, cacheCreationTokens, cacheReadTokens := extractUsageTokens(usage)
 
 	m.appendToHistoryKeyWithUsage(metrics, now, true, FailureClassNone, inputTokens, outputTokens, cacheCreationTokens, cacheReadTokens)
+	m.handleBreakerSuccessLocked(metrics, now)
 
 	if m.store != nil {
 		m.store.AddRecord(PersistentRecord{
@@ -68,9 +66,8 @@ func (m *MetricsManager) recordFailureLocked(baseURL, apiKey, serviceType string
 	metrics.FailureCount++
 	metrics.LastFailureAt = &now
 
-	m.appendToWindowKey(metrics, false)
-	m.handleBreakerFailureLocked(metrics, failureClass, now)
 	m.appendToHistoryKey(metrics, now, false, normalizeFailureClass(false, failureClass))
+	m.handleBreakerFailureLocked(metrics, failureClass, now)
 
 	if m.store != nil {
 		m.store.AddRecord(PersistentRecord{
@@ -179,7 +176,6 @@ func (m *MetricsManager) RecordRequestFinalizeOutcome(baseURL, apiKey, serviceTy
 	if success {
 		metrics.SuccessCount++
 		metrics.LastSuccessAt = &now
-		m.appendToWindowKey(metrics, true)
 		m.handleBreakerSuccessLocked(metrics, now)
 
 		inputTokens, outputTokens, cacheCreationTokens, cacheReadTokens := extractUsageTokens(usage)
@@ -210,7 +206,6 @@ func (m *MetricsManager) RecordRequestFinalizeOutcome(baseURL, apiKey, serviceTy
 	failureClass = normalizeFailureClass(false, failureClass)
 	metrics.FailureCount++
 	metrics.LastFailureAt = &now
-	m.appendToWindowKey(metrics, false)
 	m.handleBreakerFailureLocked(metrics, failureClass, now)
 	record.InputTokens = 0
 	record.OutputTokens = 0
@@ -293,15 +288,6 @@ func (m *MetricsManager) RecordRequestEnd(baseURL, apiKey, serviceType string) {
 		if metrics.ActiveRequests > 0 {
 			metrics.ActiveRequests--
 		}
-	}
-}
-
-// appendToWindowKey 向 Key 滑动窗口添加记录
-func (m *MetricsManager) appendToWindowKey(metrics *KeyMetrics, success bool) {
-	metrics.recentResults = append(metrics.recentResults, success)
-	// 保持窗口大小
-	if len(metrics.recentResults) > m.windowSize {
-		metrics.recentResults = metrics.recentResults[1:]
 	}
 }
 

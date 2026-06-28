@@ -112,6 +112,7 @@ func (m *MetricsManager) ToResponseMultiURL(channelIndex int, baseURLs []string,
 
 	for _, metrics := range seenMetrics {
 		m.advanceCircuitStateIfDueLocked(metrics, now)
+		m.refreshBreakerWindowsLocked(metrics, now)
 		resp.RequestCount += metrics.RequestCount
 		resp.SuccessCount += metrics.SuccessCount
 		resp.FailureCount += metrics.FailureCount
@@ -191,6 +192,7 @@ func (m *MetricsManager) ToResponseMultiURL(channelIndex int, baseURLs []string,
 					continue
 				}
 				seenHistorical[metrics.MetricsKey] = struct{}{}
+				m.refreshBreakerWindowsLocked(metrics, now)
 				resp.RequestCount += metrics.RequestCount
 				resp.SuccessCount += metrics.SuccessCount
 				resp.FailureCount += metrics.FailureCount

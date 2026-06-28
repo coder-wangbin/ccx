@@ -17,7 +17,9 @@ func (m *MetricsManager) IsKeyHealthy(baseURL, apiKey, serviceType string) bool 
 	if metrics == nil {
 		return true // 没有记录，默认健康
 	}
-	m.advanceCircuitStateIfDueLocked(metrics, time.Now())
+	now := time.Now()
+	m.advanceCircuitStateIfDueLocked(metrics, now)
+	m.refreshBreakerWindowsLocked(metrics, now)
 	if metrics.CircuitState == CircuitStateOpen {
 		return false
 	}
@@ -50,6 +52,7 @@ func (m *MetricsManager) IsChannelHealthyWithKeys(baseURL string, activeKeys []s
 		}
 		for _, metrics := range variants {
 			m.advanceCircuitStateIfDueLocked(metrics, now)
+			m.refreshBreakerWindowsLocked(metrics, now)
 			if metrics.CircuitState == CircuitStateOpen {
 				hasOpenOnly = true
 				continue
@@ -100,6 +103,7 @@ func (m *MetricsManager) IsChannelHealthyMultiURL(baseURLs []string, activeKeys 
 	now := time.Now()
 	for _, metrics := range m.getIdentityMetricsByMultiURLAndKeysLocked(baseURLs, activeKeys, serviceType) {
 		m.advanceCircuitStateIfDueLocked(metrics, now)
+		m.refreshBreakerWindowsLocked(metrics, now)
 		if metrics.CircuitState == CircuitStateOpen {
 			hasOpenOnly = true
 			continue
@@ -144,6 +148,7 @@ func (m *MetricsManager) CalculateChannelFailureRateMultiURL(baseURLs []string, 
 	now := time.Now()
 	for _, metrics := range m.getIdentityMetricsByMultiURLAndKeysLocked(baseURLs, activeKeys, serviceType) {
 		m.advanceCircuitStateIfDueLocked(metrics, now)
+		m.refreshBreakerWindowsLocked(metrics, now)
 		if metrics.CircuitState == CircuitStateOpen {
 			hasOpenOnly = true
 			continue
@@ -177,7 +182,9 @@ func (m *MetricsManager) CalculateKeyFailureRate(baseURL, apiKey, serviceType st
 	if metrics == nil {
 		return 0
 	}
-	m.advanceCircuitStateIfDueLocked(metrics, time.Now())
+	now := time.Now()
+	m.advanceCircuitStateIfDueLocked(metrics, now)
+	m.refreshBreakerWindowsLocked(metrics, now)
 	if metrics.CircuitState == CircuitStateOpen && len(metrics.breakerResults) == 0 {
 		return 1
 	}
@@ -206,6 +213,7 @@ func (m *MetricsManager) CalculateChannelFailureRate(baseURL string, activeKeys 
 		}
 		for _, metrics := range variants {
 			m.advanceCircuitStateIfDueLocked(metrics, now)
+			m.refreshBreakerWindowsLocked(metrics, now)
 			if metrics.CircuitState == CircuitStateOpen {
 				hasOpenOnly = true
 				continue
@@ -239,7 +247,9 @@ func (m *MetricsManager) GetKeyMetrics(baseURL, apiKey, serviceType string) *Key
 
 	metrics := m.getFirstMatchingMetricsLocked(baseURL, apiKey, serviceType)
 	if metrics != nil {
-		m.advanceCircuitStateIfDueLocked(metrics, time.Now())
+		now := time.Now()
+		m.advanceCircuitStateIfDueLocked(metrics, now)
+		m.refreshBreakerWindowsLocked(metrics, now)
 		return &KeyMetrics{
 			MetricsKey:          metrics.MetricsKey,
 			BaseURL:             metrics.BaseURL,
@@ -276,10 +286,12 @@ func (m *MetricsManager) GetChannelAggregatedMetrics(channelIndex int, baseURL s
 	var maxConsecutiveFailures int64
 	var maxHalfOpenSuccesses int
 	channelState := CircuitStateClosed
+	now := time.Now()
 
 	for _, apiKey := range activeKeys {
 		for _, metrics := range m.getMetricsVariantsLocked(baseURL, apiKey, serviceType) {
-			m.advanceCircuitStateIfDueLocked(metrics, time.Now())
+			m.advanceCircuitStateIfDueLocked(metrics, now)
+			m.refreshBreakerWindowsLocked(metrics, now)
 			aggregated.RequestCount += metrics.RequestCount
 			aggregated.SuccessCount += metrics.SuccessCount
 			aggregated.FailureCount += metrics.FailureCount
@@ -485,6 +497,7 @@ func (m *MetricsManager) GetAllKeyMetrics() []*KeyMetrics {
 	now := time.Now()
 	for _, metrics := range m.keyMetrics {
 		m.advanceCircuitStateIfDueLocked(metrics, now)
+		m.refreshBreakerWindowsLocked(metrics, now)
 		result = append(result, &KeyMetrics{
 			MetricsKey:          metrics.MetricsKey,
 			BaseURL:             metrics.BaseURL,
@@ -784,7 +797,9 @@ func (m *MetricsManager) GetKeyCircuitState(baseURL, apiKey, serviceType string)
 	if metrics == nil {
 		return CircuitStateClosed
 	}
-	m.advanceCircuitStateIfDueLocked(metrics, time.Now())
+	now := time.Now()
+	m.advanceCircuitStateIfDueLocked(metrics, now)
+	m.refreshBreakerWindowsLocked(metrics, now)
 	return metrics.CircuitState
 }
 
@@ -797,7 +812,9 @@ func (m *MetricsManager) TryAcquireProbe(baseURL, apiKey, serviceType string) bo
 	if metrics == nil {
 		return false
 	}
-	m.advanceCircuitStateIfDueLocked(metrics, time.Now())
+	now := time.Now()
+	m.advanceCircuitStateIfDueLocked(metrics, now)
+	m.refreshBreakerWindowsLocked(metrics, now)
 	if metrics.CircuitState != CircuitStateHalfOpen || metrics.ProbeInFlight {
 		return false
 	}
@@ -833,6 +850,7 @@ func (m *MetricsManager) channelCircuitStateMultiURLLocked(baseURLs []string, ac
 				return CircuitStateClosed
 			}
 			m.advanceCircuitStateIfDueLocked(metrics, now)
+			m.refreshBreakerWindowsLocked(metrics, now)
 			if metrics.CircuitState == CircuitStateClosed {
 				return CircuitStateClosed
 			}
@@ -856,6 +874,7 @@ func (m *MetricsManager) HasProbeCandidateMultiURL(baseURLs []string, activeKeys
 	for _, apiKey := range activeKeys {
 		for _, metrics := range m.getIdentityMetricsByMultiURLLocked(baseURLs, apiKey, serviceType) {
 			m.advanceCircuitStateIfDueLocked(metrics, now)
+			m.refreshBreakerWindowsLocked(metrics, now)
 			if metrics.CircuitState == CircuitStateHalfOpen && !metrics.ProbeInFlight {
 				return true
 			}
@@ -873,6 +892,8 @@ func (m *MetricsManager) ShouldSuspendKey(baseURL, apiKey, serviceType string) b
 	if metrics == nil {
 		return false
 	}
-	m.advanceCircuitStateIfDueLocked(metrics, time.Now())
+	now := time.Now()
+	m.advanceCircuitStateIfDueLocked(metrics, now)
+	m.refreshBreakerWindowsLocked(metrics, now)
 	return metrics.CircuitState == CircuitStateOpen
 }

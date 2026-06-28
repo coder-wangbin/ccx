@@ -28,6 +28,66 @@ func TestMultiURLHealthTreatsMissingKeyAsAvailableCandidate(t *testing.T) {
 	}
 }
 
+func TestBreakerHealthWindowExpiresOldFailures(t *testing.T) {
+	m := NewMetricsManager()
+	defer m.Stop()
+
+	baseURL := "https://example.com"
+	apiKey := "sk-test"
+	serviceType := "openai"
+	old := time.Now().Add(-defaultBreakerHealthWindow - time.Minute)
+
+	m.mu.Lock()
+	metrics := m.getOrCreateKey(baseURL, apiKey, serviceType)
+	metrics.requestHistory = append(metrics.requestHistory,
+		RequestRecord{Timestamp: old, Success: false, FailureClass: FailureClassRetryable},
+		RequestRecord{Timestamp: old.Add(time.Second), Success: true},
+	)
+	metrics.recentResults = []bool{false, true}
+	metrics.breakerResults = []bool{false, true}
+	metrics.ConsecutiveFailures = 1
+	m.mu.Unlock()
+
+	if !m.IsChannelHealthyMultiURL([]string{baseURL}, []string{apiKey}, serviceType) {
+		t.Fatal("expected channel to become healthy after breaker health window expires")
+	}
+	if got := m.CalculateChannelFailureRateMultiURL([]string{baseURL}, []string{apiKey}, serviceType); got != 0 {
+		t.Fatalf("expected expired breaker failure rate 0, got %v", got)
+	}
+	if got := m.GetKeyMetrics(baseURL, apiKey, serviceType).ConsecutiveFailures; got != 0 {
+		t.Fatalf("expected expired consecutive failures reset to 0, got %d", got)
+	}
+}
+
+func TestBreakerHealthWindowKeepsRecentFailures(t *testing.T) {
+	m := NewMetricsManager()
+	defer m.Stop()
+
+	baseURL := "https://example.com"
+	apiKey := "sk-test"
+	serviceType := "openai"
+	now := time.Now()
+
+	m.mu.Lock()
+	metrics := m.getOrCreateKey(baseURL, apiKey, serviceType)
+	metrics.requestHistory = append(metrics.requestHistory,
+		RequestRecord{Timestamp: now.Add(-5 * time.Minute), Success: false, FailureClass: FailureClassRetryable},
+		RequestRecord{Timestamp: now.Add(-4 * time.Minute), Success: false, FailureClass: FailureClassRetryable},
+		RequestRecord{Timestamp: now.Add(-3 * time.Minute), Success: false, FailureClass: FailureClassRetryable},
+		RequestRecord{Timestamp: now.Add(-2 * time.Minute), Success: true},
+		RequestRecord{Timestamp: now.Add(-time.Minute), Success: true},
+	)
+	m.refreshBreakerWindowsLocked(metrics, now)
+	m.mu.Unlock()
+
+	if m.IsChannelHealthyMultiURL([]string{baseURL}, []string{apiKey}, serviceType) {
+		t.Fatal("expected channel to remain unhealthy while recent breaker failures are inside health window")
+	}
+	if got := m.CalculateChannelFailureRateMultiURL([]string{baseURL}, []string{apiKey}, serviceType); got != 0.6 {
+		t.Fatalf("expected recent breaker failure rate 0.6, got %v", got)
+	}
+}
+
 func TestGetHistoricalStatsMultiURL_DeduplicatesEquivalentURLs(t *testing.T) {
 	m := NewMetricsManager()
 	defer m.Stop()

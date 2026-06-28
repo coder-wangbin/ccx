@@ -7,11 +7,46 @@ import (
 	"github.com/BenedictKing/ccx/internal/statelog"
 )
 
-func (m *MetricsManager) appendToBreakerWindowKey(metrics *KeyMetrics, success bool) {
-	metrics.breakerResults = append(metrics.breakerResults, success)
-	if len(metrics.breakerResults) > m.windowSize {
-		metrics.breakerResults = metrics.breakerResults[1:]
+func (m *MetricsManager) refreshBreakerWindowsLocked(metrics *KeyMetrics, now time.Time) {
+	if metrics == nil {
+		return
 	}
+	cutoff := now.Add(-defaultBreakerHealthWindow)
+
+	recentRecords := make([]bool, 0, m.windowSize)
+	breakerRecords := make([]bool, 0, m.windowSize)
+	pendingIndexes := make(map[int]struct{}, len(metrics.pendingHistoryIdx))
+	for _, idx := range metrics.pendingHistoryIdx {
+		pendingIndexes[idx] = struct{}{}
+	}
+	var consecutiveRetryable int64
+	for idx, record := range metrics.requestHistory {
+		if _, pending := pendingIndexes[idx]; pending {
+			continue
+		}
+		if !record.Timestamp.Before(cutoff) {
+			recentRecords = append(recentRecords, record.Success)
+			if isBreakerRelevantFailure(record.Success, record.FailureClass) {
+				breakerRecords = append(breakerRecords, record.Success)
+			}
+			if record.Success {
+				consecutiveRetryable = 0
+			} else if normalizeFailureClass(false, record.FailureClass).IsBreakerRelevant() {
+				consecutiveRetryable++
+			}
+		}
+	}
+
+	if len(recentRecords) > m.windowSize {
+		recentRecords = recentRecords[len(recentRecords)-m.windowSize:]
+	}
+	if len(breakerRecords) > m.windowSize {
+		breakerRecords = breakerRecords[len(breakerRecords)-m.windowSize:]
+	}
+
+	metrics.recentResults = append(metrics.recentResults[:0], recentRecords...)
+	metrics.breakerResults = append(metrics.breakerResults[:0], breakerRecords...)
+	metrics.ConsecutiveFailures = consecutiveRetryable
 }
 
 func (m *MetricsManager) calculateKeyBreakerFailureRateInternal(metrics *KeyMetrics) float64 {
@@ -130,7 +165,7 @@ func (m *MetricsManager) advanceCircuitStateIfDueLocked(metrics *KeyMetrics, now
 
 func (m *MetricsManager) handleBreakerSuccessLocked(metrics *KeyMetrics, now time.Time) {
 	m.advanceCircuitStateIfDueLocked(metrics, now)
-	m.appendToBreakerWindowKey(metrics, true)
+	m.refreshBreakerWindowsLocked(metrics, now)
 	metrics.ConsecutiveFailures = 0
 
 	switch metrics.CircuitState {
@@ -154,13 +189,11 @@ func (m *MetricsManager) handleBreakerSuccessLocked(metrics *KeyMetrics, now tim
 func (m *MetricsManager) handleBreakerFailureLocked(metrics *KeyMetrics, failureClass FailureClass, now time.Time) {
 	failureClass = normalizeFailureClass(false, failureClass)
 	m.advanceCircuitStateIfDueLocked(metrics, now)
+	m.refreshBreakerWindowsLocked(metrics, now)
 	if !failureClass.IsBreakerRelevant() {
 		// 非 breaker 相关失败仅更新观测统计，不需要同步持久化熔断状态
 		return
 	}
-
-	metrics.ConsecutiveFailures++
-	m.appendToBreakerWindowKey(metrics, false)
 
 	switch metrics.CircuitState {
 	case CircuitStateHalfOpen:
@@ -181,6 +214,7 @@ func (m *MetricsManager) isKeyCircuitBroken(metrics *KeyMetrics) bool {
 	if metrics == nil {
 		return false
 	}
+	m.refreshBreakerWindowsLocked(metrics, time.Now())
 	if metrics.ConsecutiveFailures >= m.consecutiveFailuresThreshold {
 		return true
 	}

@@ -65,6 +65,7 @@ const (
 	defaultHalfOpenSuccessThreshold              int           = 1
 	defaultCircuitBackoffBase                    time.Duration = 30 * time.Second
 	defaultCircuitBackoffMax                     time.Duration = 10 * time.Minute
+	defaultBreakerHealthWindow                   time.Duration = 15 * time.Minute
 	// 流式健康检测默认参数
 	defaultStreamFirstContentTimeoutMs = 30000  // HTTP 200 后首个有效内容等待超时（30秒）
 	defaultStreamInactivityTimeoutMs   = 20000  // 首字后连续性确认窗口（20秒）
@@ -324,35 +325,9 @@ func (m *MetricsManager) loadFromStore() error {
 			}
 		}
 
-		windowCutoff := time.Now().Add(-15 * time.Minute)
+		now := time.Now()
 		for _, metrics := range m.keyMetrics {
-			metrics.recentResults = make([]bool, 0, m.windowSize)
-			metrics.breakerResults = make([]bool, 0, m.windowSize)
-			var recentRecords []bool
-			var breakerRecords []bool
-			var consecutiveRetryable int64
-			for _, record := range metrics.requestHistory {
-				if record.Timestamp.After(windowCutoff) {
-					recentRecords = append(recentRecords, record.Success)
-					if isBreakerRelevantFailure(record.Success, record.FailureClass) {
-						breakerRecords = append(breakerRecords, record.Success)
-					}
-				}
-				if record.Success {
-					consecutiveRetryable = 0
-				} else if record.FailureClass.IsBreakerRelevant() {
-					consecutiveRetryable++
-				}
-			}
-			metrics.ConsecutiveFailures = consecutiveRetryable
-			if len(recentRecords) > m.windowSize {
-				recentRecords = recentRecords[len(recentRecords)-m.windowSize:]
-			}
-			if len(breakerRecords) > m.windowSize {
-				breakerRecords = breakerRecords[len(breakerRecords)-m.windowSize:]
-			}
-			metrics.recentResults = append(metrics.recentResults, recentRecords...)
-			metrics.breakerResults = append(metrics.breakerResults, breakerRecords...)
+			m.refreshBreakerWindowsLocked(metrics, now)
 		}
 	}
 
@@ -375,6 +350,7 @@ func (m *MetricsManager) loadFromStore() error {
 		metrics.HalfOpenSuccesses = state.HalfOpenSuccesses
 		metrics.ConsecutiveFailures = state.ConsecutiveFailures
 		metrics.ProbeInFlight = false
+		m.refreshBreakerWindowsLocked(metrics, time.Now())
 	}
 
 	log.Printf("[Metrics-Load] [%s] 已从持久化存储加载 %d 条历史记录、%d 条熔断状态，重建 %d 个 Key 指标",
