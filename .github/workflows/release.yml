@@ -217,7 +217,7 @@ jobs:
 
   notarize-macos-desktop:
     runs-on: macos-latest
-    timeout-minutes: 30
+    timeout-minutes: 50
     needs: build-macos-desktop
     strategy:
       fail-fast: false
