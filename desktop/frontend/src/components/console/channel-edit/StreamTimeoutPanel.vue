@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { Button } from '@/components/ui/button'
 import { useLanguage } from '@/composables/useLanguage'
+import { streamTimeoutPresets } from '@/utils/stream-timeout-presets'
 
 interface FormData {
   streamFirstContentTimeoutEnabled: boolean
@@ -21,12 +22,6 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useLanguage()
-
-const streamTimeoutPresets = {
-  gentle: { firstContentMs: 90000, inactivityMs: 90000, toolCallIdleMs: 300000 },
-  balanced: { firstContentMs: 60000, inactivityMs: 60000, toolCallIdleMs: 180000 },
-  aggressive: { firstContentMs: 30000, inactivityMs: 30000, toolCallIdleMs: 60000 },
-} as const
 
 function updateField<K extends keyof FormData>(key: K, value: FormData[K]) {
   emit('update:form', { [key]: value } as Partial<FormData>)

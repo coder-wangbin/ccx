@@ -6,6 +6,7 @@ import { Alert } from '@/components/ui/alert'
 import { Save, RefreshCw, Zap } from 'lucide-vue-next'
 import { useStatus } from '@/composables/useStatus'
 import { useLanguage } from '@/composables/useLanguage'
+import { streamTimeoutPresets } from '@/utils/stream-timeout-presets'
 import { GetAdminAccessKey } from '@bindings/github.com/BenedictKing/ccx/desktop/desktopservice'
 
 const { status } = useStatus()
@@ -24,9 +25,9 @@ const form = reactive({
   consecutiveFailuresThreshold: 3,
   requestTimeoutMs: 120000,
   responseHeaderTimeoutMs: 60000,
-  streamFirstContentTimeoutMs: 30000,
-  streamInactivityTimeoutMs: 20000,
-  streamToolCallIdleTimeoutMs: 120000,
+  streamFirstContentTimeoutMs: streamTimeoutPresets.balanced.firstContentMs,
+  streamInactivityTimeoutMs: streamTimeoutPresets.balanced.inactivityMs,
+  streamToolCallIdleTimeoutMs: streamTimeoutPresets.balanced.toolCallIdleMs,
 })
 
 const sliderStyle = (value: number, min: number, max: number) => {
@@ -36,10 +37,10 @@ const sliderStyle = (value: number, min: number, max: number) => {
 
 // 工具调用 idle 预设按低速 5 TPS 粗估：60/120/300s 分别预留约 300/600/1500 token 的参数生成窗口。
 const presets = [
-  { key: 'gentle', labelKey: 'env.runtimeCbPresetGentle' as const, windowSize: 20, failureThreshold: 0.70, consecutiveFailuresThreshold: 5, requestTimeoutMs: 300000, responseHeaderTimeoutMs: 120000, streamFirstContentTimeoutMs: 90000, streamInactivityTimeoutMs: 90000, streamToolCallIdleTimeoutMs: 300000 },
-  { key: 'balanced', labelKey: 'env.runtimeCbPresetBalanced' as const, windowSize: 10, failureThreshold: 0.50, consecutiveFailuresThreshold: 3, requestTimeoutMs: 120000, responseHeaderTimeoutMs: 60000, streamFirstContentTimeoutMs: 60000, streamInactivityTimeoutMs: 60000, streamToolCallIdleTimeoutMs: 180000 },
-  { key: 'aggressive', labelKey: 'env.runtimeCbPresetAggressive' as const, windowSize: 5, failureThreshold: 0.30, consecutiveFailuresThreshold: 2, requestTimeoutMs: 60000, responseHeaderTimeoutMs: 30000, streamFirstContentTimeoutMs: 30000, streamInactivityTimeoutMs: 30000, streamToolCallIdleTimeoutMs: 60000 },
-  { key: 'custom', labelKey: 'env.runtimeCbPresetCustom' as const, windowSize: 10, failureThreshold: 0.50, consecutiveFailuresThreshold: 3, requestTimeoutMs: 120000, responseHeaderTimeoutMs: 60000, streamFirstContentTimeoutMs: 60000, streamInactivityTimeoutMs: 60000, streamToolCallIdleTimeoutMs: 180000 },
+  { key: 'gentle', labelKey: 'env.runtimeCbPresetGentle' as const, windowSize: 20, failureThreshold: 0.70, consecutiveFailuresThreshold: 5, requestTimeoutMs: 300000, responseHeaderTimeoutMs: 120000, streamFirstContentTimeoutMs: streamTimeoutPresets.gentle.firstContentMs, streamInactivityTimeoutMs: streamTimeoutPresets.gentle.inactivityMs, streamToolCallIdleTimeoutMs: streamTimeoutPresets.gentle.toolCallIdleMs },
+  { key: 'balanced', labelKey: 'env.runtimeCbPresetBalanced' as const, windowSize: 10, failureThreshold: 0.50, consecutiveFailuresThreshold: 3, requestTimeoutMs: 120000, responseHeaderTimeoutMs: 60000, streamFirstContentTimeoutMs: streamTimeoutPresets.balanced.firstContentMs, streamInactivityTimeoutMs: streamTimeoutPresets.balanced.inactivityMs, streamToolCallIdleTimeoutMs: streamTimeoutPresets.balanced.toolCallIdleMs },
+  { key: 'aggressive', labelKey: 'env.runtimeCbPresetAggressive' as const, windowSize: 5, failureThreshold: 0.30, consecutiveFailuresThreshold: 2, requestTimeoutMs: 60000, responseHeaderTimeoutMs: 30000, streamFirstContentTimeoutMs: streamTimeoutPresets.aggressive.firstContentMs, streamInactivityTimeoutMs: streamTimeoutPresets.aggressive.inactivityMs, streamToolCallIdleTimeoutMs: streamTimeoutPresets.aggressive.toolCallIdleMs },
+  { key: 'custom', labelKey: 'env.runtimeCbPresetCustom' as const, windowSize: 10, failureThreshold: 0.50, consecutiveFailuresThreshold: 3, requestTimeoutMs: 120000, responseHeaderTimeoutMs: 60000, streamFirstContentTimeoutMs: streamTimeoutPresets.balanced.firstContentMs, streamInactivityTimeoutMs: streamTimeoutPresets.balanced.inactivityMs, streamToolCallIdleTimeoutMs: streamTimeoutPresets.balanced.toolCallIdleMs },
 ]
 
 // 历史图片轮次限制

@@ -28,6 +28,7 @@ import { getChannelTypeApi, type ManagedChannelType } from '@/utils/channel-type
 import { buildExpectedRequestUrls } from '@/utils/expected-request-urls'
 import { sortModelNamesDesc } from '@/utils/model-priority'
 import { parseQuickInput } from '@/utils/quick-input-parser'
+import { defaultStreamTimeouts } from '@/utils/stream-timeout-presets'
 import { claudeMessagesPresets } from '@/generated/claude-messages-presets'
 import { codexResponsesPresets } from '@/generated/codex-responses-presets'
 import { openaiMessagesPresets } from '@/generated/openai-messages-presets'
@@ -396,11 +397,11 @@ const form = reactive({
   requestTimeoutMs: '' as string | number,
   responseHeaderTimeoutMs: '' as string | number,
   streamFirstContentTimeoutEnabled: false,
-  streamFirstContentTimeoutMs: 30000,
+  streamFirstContentTimeoutMs: defaultStreamTimeouts.firstContentMs,
   streamInactivityTimeoutEnabled: false,
-  streamInactivityTimeoutMs: 20000,
+  streamInactivityTimeoutMs: defaultStreamTimeouts.inactivityMs,
   streamToolCallIdleTimeoutEnabled: false,
-  streamToolCallIdleTimeoutMs: 30000,
+  streamToolCallIdleTimeoutMs: defaultStreamTimeouts.toolCallIdleMs,
   rateLimitRpm: '' as string | number,
   rateLimitWindowMinutes: '' as string | number,
   rateLimitMaxConcurrent: '' as string | number,
@@ -488,11 +489,11 @@ function resetForm() {
   form.requestTimeoutMs = ''
   form.responseHeaderTimeoutMs = ''
   form.streamFirstContentTimeoutEnabled = false
-  form.streamFirstContentTimeoutMs = 30000
+  form.streamFirstContentTimeoutMs = defaultStreamTimeouts.firstContentMs
   form.streamInactivityTimeoutEnabled = false
-  form.streamInactivityTimeoutMs = 20000
+  form.streamInactivityTimeoutMs = defaultStreamTimeouts.inactivityMs
   form.streamToolCallIdleTimeoutEnabled = false
-  form.streamToolCallIdleTimeoutMs = 30000
+  form.streamToolCallIdleTimeoutMs = defaultStreamTimeouts.toolCallIdleMs
   form.rateLimitRpm = ''
   form.rateLimitWindowMinutes = ''
   form.rateLimitMaxConcurrent = ''
@@ -566,11 +567,11 @@ function populateFromChannel(ch: Channel) {
   form.requestTimeoutMs = ch.requestTimeoutMs || ''
   form.responseHeaderTimeoutMs = ch.responseHeaderTimeoutMs || ''
   form.streamFirstContentTimeoutEnabled = !!(ch.streamFirstContentTimeoutMs && ch.streamFirstContentTimeoutMs > 0)
-  form.streamFirstContentTimeoutMs = ch.streamFirstContentTimeoutMs && ch.streamFirstContentTimeoutMs > 0 ? ch.streamFirstContentTimeoutMs : 30000
+  form.streamFirstContentTimeoutMs = ch.streamFirstContentTimeoutMs && ch.streamFirstContentTimeoutMs > 0 ? ch.streamFirstContentTimeoutMs : defaultStreamTimeouts.firstContentMs
   form.streamInactivityTimeoutEnabled = !!(ch.streamInactivityTimeoutMs && ch.streamInactivityTimeoutMs > 0)
-  form.streamInactivityTimeoutMs = ch.streamInactivityTimeoutMs && ch.streamInactivityTimeoutMs > 0 ? ch.streamInactivityTimeoutMs : 20000
+  form.streamInactivityTimeoutMs = ch.streamInactivityTimeoutMs && ch.streamInactivityTimeoutMs > 0 ? ch.streamInactivityTimeoutMs : defaultStreamTimeouts.inactivityMs
   form.streamToolCallIdleTimeoutEnabled = !!(ch.streamToolCallIdleTimeoutMs && ch.streamToolCallIdleTimeoutMs > 0)
-  form.streamToolCallIdleTimeoutMs = ch.streamToolCallIdleTimeoutMs && ch.streamToolCallIdleTimeoutMs > 0 ? ch.streamToolCallIdleTimeoutMs : 30000
+  form.streamToolCallIdleTimeoutMs = ch.streamToolCallIdleTimeoutMs && ch.streamToolCallIdleTimeoutMs > 0 ? ch.streamToolCallIdleTimeoutMs : defaultStreamTimeouts.toolCallIdleMs
   form.rateLimitRpm = (ch.rateLimitRpm && ch.rateLimitRpm > 0) ? ch.rateLimitRpm : ''
   form.rateLimitWindowMinutes = (ch.rateLimitWindowMinutes && ch.rateLimitWindowMinutes > 0) ? ch.rateLimitWindowMinutes : ''
   form.rateLimitMaxConcurrent = (ch.rateLimitMaxConcurrent && ch.rateLimitMaxConcurrent > 0) ? ch.rateLimitMaxConcurrent : ''
