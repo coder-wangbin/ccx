@@ -119,11 +119,35 @@
         <div ref="mainConversationTurnsRef" class="main-conversation-turns">
           <div
             v-for="(turn, index) in mainConversationTurns"
-            :key="`${index}-${turn}`"
-            :class="['main-conversation-turn', { 'main-conversation-turn--numbered': mainConversationTurns.length > 1 }]"
+            :key="`${index}-${turn.fullText}`"
+            :class="[
+              'main-conversation-turn',
+              {
+                'main-conversation-turn--numbered': mainConversationTurns.length > 1,
+                'main-conversation-turn--collapsible': turn.truncated,
+              },
+            ]"
+            :role="turn.truncated ? 'button' : undefined"
+            :tabindex="turn.truncated ? 0 : undefined"
+            :aria-expanded="turn.truncated ? turn.expanded : undefined"
+            @click.stop="turn.truncated && toggleMainConversationTurn(index)"
+            @keydown.enter.prevent.stop="turn.truncated && toggleMainConversationTurn(index)"
+            @keydown.space.prevent.stop="turn.truncated && toggleMainConversationTurn(index)"
           >
             <span v-if="mainConversationTurns.length > 1" class="main-conversation-turn-index">{{ index - mainConversationTurns.length + 1 }}</span>
-            <span class="main-conversation-turn-text">{{ turn }}</span>
+            <span class="main-conversation-turn-text">
+              <template v-if="turn.truncated && !turn.expanded">
+                <span>{{ turn.head }}</span>
+                <span
+                  class="main-conversation-turn-ellipsis"
+                  aria-hidden="true"
+                >
+                  …
+                </span>
+                <span>{{ turn.tail }}</span>
+              </template>
+              <template v-else>{{ turn.fullText }}</template>
+            </span>
           </div>
         </div>
         <div v-if="conversation.lastRecap" class="main-conversation-recap">
@@ -275,7 +299,7 @@ import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import type { ConversationInfo, SequenceOverrideInfo, ChannelSequenceEntry } from '@/services/api'
 import type { SubagentSummary } from '@/utils/conversationDashboard'
 import { useI18n } from '@/i18n'
-import { buildConversationTurnPreview, getConversationTurnFont } from '@/utils/conversationPreview'
+import { buildConversationTurnMiddlePreview, getConversationTurnFont } from '@/utils/conversationPreview'
 import ConversationChannelSequence from './ConversationChannelSequence.vue'
 
 const { t } = useI18n()
@@ -285,6 +309,14 @@ interface ChannelInfo {
   name: string
   status: string
   circuitOpen?: boolean
+}
+
+interface MainConversationTurn {
+  fullText: string
+  head: string
+  tail: string
+  truncated: boolean
+  expanded: boolean
 }
 
 const props = defineProps<{
@@ -374,24 +406,33 @@ const displayLabel = computed(() => props.conversation.title || props.conversati
 const mainConversationText = computed(() => props.conversation.lastUserMessage || displayLabel.value)
 const mainConversationTurnsRef = ref<HTMLElement | null>(null)
 const mainConversationTurnsWidth = ref(0)
+const expandedMainConversationTurnIndexes = ref<Set<number>>(new Set())
 let mainConversationTurnsObserver: ResizeObserver | null = null
 const isSingleMainConversation = computed(() => props.conversation.requestCount <= 1)
-const mainConversationTurns = computed(() => {
-  if (!isSingleMainConversation.value) {
-    return splitConversationTurns(mainConversationText.value)
-  }
-
+const sourceMainConversationTurns = computed(() => {
+  if (!isSingleMainConversation.value) return splitConversationTurns(mainConversationText.value)
+  return [mainConversationText.value]
+})
+const mainConversationTurns = computed<MainConversationTurn[]>(() => {
   const element = mainConversationTurnsRef.value
   const width = mainConversationTurnsWidth.value
-  if (!props.expanded || !element || width <= 0) return [mainConversationText.value]
+  const font = element && width > 0 ? getConversationTurnFont(element) : ''
 
-  return [
-    buildConversationTurnPreview(mainConversationText.value, {
+  return sourceMainConversationTurns.value.map((turn, index) => {
+    const preview = buildConversationTurnMiddlePreview(turn, {
       width,
-      font: getConversationTurnFont(element),
-      maxLines: 5,
-    }),
-  ]
+      font,
+      edgeLines: 2,
+    })
+
+    return {
+      fullText: turn,
+      head: preview.head,
+      tail: preview.tail,
+      truncated: preview.truncated,
+      expanded: expandedMainConversationTurnIndexes.value.has(index),
+    }
+  })
 })
 const childConversationCount = computed(() => props.conversation.childConversationIds?.length ?? 0)
 const firstChildConversationId = computed(() => props.conversation.childConversationIds?.[0])
@@ -432,6 +473,16 @@ const mainDetailRows = computed(() => [
   { label: t('cockpit.detail.duration'), value: duration.value },
 ])
 
+function toggleMainConversationTurn(index: number) {
+  const next = new Set(expandedMainConversationTurnIndexes.value)
+  if (next.has(index)) {
+    next.delete(index)
+  } else {
+    next.add(index)
+  }
+  expandedMainConversationTurnIndexes.value = next
+}
+
 watch(
   () => props.expanded,
   (expanded) => {
@@ -439,11 +490,19 @@ watch(
     mainConversationTurnsObserver = null
     if (!expanded) {
       mainConversationTurnsWidth.value = 0
+      expandedMainConversationTurnIndexes.value = new Set()
       return
     }
     void syncMainConversationTurnsWidth()
   },
   { immediate: true },
+)
+
+watch(
+  () => mainConversationText.value,
+  () => {
+    expandedMainConversationTurnIndexes.value = new Set()
+  },
 )
 
 onBeforeUnmount(() => {
@@ -867,6 +926,15 @@ function shortId(value: string): string {
   word-break: break-word;
 }
 
+.main-conversation-turn--collapsible {
+  cursor: pointer;
+}
+
+.main-conversation-turn--collapsible:focus-visible {
+  outline: 2px solid rgb(var(--v-theme-primary) / 60%);
+  outline-offset: 2px;
+}
+
 .main-conversation-turn--numbered {
   display: grid;
   grid-template-columns: 18px minmax(0, 1fr);
@@ -884,6 +952,25 @@ function shortId(value: string): string {
 
 .main-conversation-turn-text {
   min-width: 0;
+}
+
+.main-conversation-turn-ellipsis {
+  display: block;
+  width: 100%;
+  margin: 2px 0;
+  padding: 0 6px;
+  border: 0;
+  background: transparent;
+  color: rgb(var(--v-theme-primary));
+  cursor: pointer;
+  font: inherit;
+  font-weight: 900;
+  line-height: 1.4;
+  text-align: center;
+}
+
+.main-conversation-turn-ellipsis:hover {
+  background: rgb(var(--v-theme-primary) / 8%);
 }
 
 .main-conversation-recap {

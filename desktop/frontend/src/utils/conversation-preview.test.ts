@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildConversationTurnMiddlePreview, buildConversationTurnPreview } from './conversationPreview'
+import { buildConversationTurnMiddlePreview, buildConversationTurnPreview } from './conversation-preview'
 
 describe('buildConversationTurnPreview', () => {
   it('limits a single turn to five rendered lines', () => {

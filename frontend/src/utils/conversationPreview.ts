@@ -5,6 +5,12 @@ export interface ConversationTurnPreviewOptions {
   measureText?: (text: string, font: string) => number
 }
 
+export interface ConversationTurnMiddlePreview {
+  head: string
+  tail: string
+  truncated: boolean
+}
+
 let conversationTurnCanvas: HTMLCanvasElement | null = null
 
 export function getConversationTurnFont(element: HTMLElement): string {
@@ -32,32 +38,46 @@ export function buildConversationTurnPreview(text: string, options: Conversation
   if (width <= 0) return normalized
 
   const measureText = options.measureText ?? defaultMeasureText
-  const lines: string[] = []
-  let truncated = false
-
-  for (const paragraph of normalized.split('\n')) {
-    if (lines.length >= maxLines) {
-      truncated = true
-      break
-    }
-
-    const wrapped = wrapConversationParagraph(paragraph, width, options.font, measureText)
-    for (const line of wrapped) {
-      if (lines.length >= maxLines) {
-        truncated = true
-        break
-      }
-      lines.push(line)
-    }
-
-    if (truncated) break
-  }
+  const { lines, truncated } = wrapConversationText(normalized, width, options.font, measureText, maxLines)
 
   if (lines.length === 0) return ''
   if (truncated) {
-    lines[maxLines - 1] = appendEllipsis(lines[maxLines - 1], width, options.font, measureText)
+    const lastIndex = lines.length - 1
+    lines[lastIndex] = appendEllipsis(lines[lastIndex], width, options.font, measureText)
   }
   return lines.join('\n')
+}
+
+export function buildConversationTurnMiddlePreview(
+  text: string,
+  options: ConversationTurnPreviewOptions & { edgeLines?: number },
+): ConversationTurnMiddlePreview {
+  const normalized = text.replace(/\r/g, '').trim()
+  if (normalized === '') return { head: '', tail: '', truncated: false }
+
+  const edgeLines = Math.max(1, Math.floor(options.edgeLines ?? 2))
+  const visibleLines = edgeLines * 2
+  const width = Number.isFinite(options.width) ? options.width : 0
+
+  if (width <= 0) {
+    const sourceLines = normalized.split('\n')
+    if (sourceLines.length <= visibleLines) return { head: normalized, tail: '', truncated: false }
+    return {
+      head: sourceLines.slice(0, edgeLines).join('\n'),
+      tail: sourceLines.slice(-edgeLines).join('\n'),
+      truncated: true,
+    }
+  }
+
+  const measureText = options.measureText ?? defaultMeasureText
+  const { lines } = wrapConversationText(normalized, width, options.font, measureText)
+  if (lines.length <= visibleLines) return { head: normalized, tail: '', truncated: false }
+
+  return {
+    head: lines.slice(0, edgeLines).join('\n'),
+    tail: lines.slice(-edgeLines).join('\n'),
+    truncated: true,
+  }
 }
 
 function defaultMeasureText(text: string, font: string): number {
@@ -129,6 +149,38 @@ function wrapConversationParagraph(
 
   flushCurrent()
   return lines.length > 0 ? lines : ['']
+}
+
+function wrapConversationText(
+  text: string,
+  width: number,
+  font: string,
+  measureText: (text: string, font: string) => number,
+  maxLines?: number,
+): { lines: string[], truncated: boolean } {
+  const lines: string[] = []
+  const lineLimit = maxLines === undefined ? Number.POSITIVE_INFINITY : Math.max(1, Math.floor(maxLines))
+  let truncated = false
+
+  for (const paragraph of text.split('\n')) {
+    if (lines.length >= lineLimit) {
+      truncated = true
+      break
+    }
+
+    const wrapped = wrapConversationParagraph(paragraph, width, font, measureText)
+    for (const line of wrapped) {
+      if (lines.length >= lineLimit) {
+        truncated = true
+        break
+      }
+      lines.push(line)
+    }
+
+    if (truncated) break
+  }
+
+  return { lines, truncated }
 }
 
 function appendEllipsis(
