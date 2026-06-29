@@ -268,7 +268,7 @@ onBeforeUnmount(() => {
       >
         <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" @click="emit('close')" />
 
-        <div class="relative z-10 flex max-h-[85vh] w-[90vw] max-w-4xl flex-col rounded-2xl border border-border bg-card shadow-2xl">
+        <div class="relative z-10 flex h-[85vh] max-h-[85vh] w-[90vw] max-w-4xl flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-2xl">
           <div class="flex shrink-0 items-center justify-between border-b border-border p-4">
             <div class="flex min-w-0 items-center gap-2">
               <h3 class="truncate text-sm font-semibold">
@@ -304,7 +304,7 @@ onBeforeUnmount(() => {
               {{ t('channelLogs.empty') }}
             </div>
 
-            <ScrollArea v-else class="h-full">
+            <ScrollArea v-else type="auto" class="h-full min-h-0 w-full">
               <div class="divide-y divide-border">
                 <div
                   v-for="(log, index) in logs"

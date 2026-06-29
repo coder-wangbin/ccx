@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import {
   AlertTriangle,
   ArrowDown,
@@ -120,13 +121,19 @@ const visibleDisabledKeys = computed(() => {
           >
             {{ formatModelsCount(getKeyStatus(key)?.statusCode ?? 'OK', getKeyStatus(key)?.modelCount ?? 0) }}
           </span>
-          <span
-            v-else-if="getKeyStatus(key)?.error"
-            class="rounded bg-destructive/10 px-1.5 py-0.5 text-[9px] font-medium text-destructive"
-            :title="getKeyStatus(key)?.error"
-          >
-            models {{ getKeyStatus(key)?.statusCode || 'ERR' }}
-          </span>
+          <Tooltip v-else-if="getKeyStatus(key)?.error">
+            <TooltipTrigger as-child>
+              <span
+                class="cursor-help rounded bg-destructive/10 px-1.5 py-0.5 text-[9px] font-medium text-destructive"
+                :title="getKeyStatus(key)?.error"
+              >
+                models {{ getKeyStatus(key)?.statusCode || 'ERR' }}
+              </span>
+            </TooltipTrigger>
+            <TooltipContent side="top" class="max-w-[300px] whitespace-pre-wrap break-words text-xs">
+              {{ getKeyStatus(key)?.error }}
+            </TooltipContent>
+          </Tooltip>
           <span
             v-if="duplicateKeyIndex === index"
             class="text-[10px] text-destructive shrink-0"
