@@ -78,21 +78,6 @@
         />
       </v-col>
 
-      <slot name="custom-headers" ></slot>
-
-      <!-- Transport 代理路由网络 -->
-      <v-col cols="12">
-        <TransportConfigGroup :form="form" :rules="rules" @update:field="updateField">
-          <template #stream-timeout>
-            <slot name="stream-timeout" ></slot>
-          </template>
-        </TransportConfigGroup>
-      </v-col>
-
-      <!-- 主动限速 -->
-      <v-col cols="12">
-        <RateLimitGroup :form="form" @update:field="updateField" />
-      </v-col>
     </v-row>
   </div>
 </template>
@@ -100,9 +85,7 @@
 <script setup lang="ts">
 import { useI18n } from '../../i18n'
 import CompatibilitySwitchGroup from './CompatibilitySwitchGroup.vue'
-import RateLimitGroup from './RateLimitGroup.vue'
 import RuntimeSwitchGroup from './RuntimeSwitchGroup.vue'
-import TransportConfigGroup from './TransportConfigGroup.vue'
 
 interface FormData {
   insecureSkipVerify: boolean
@@ -125,15 +108,8 @@ interface FormData {
   stripEmptyTextBlocks?: boolean
   normalizeSystemRoleToTopLevel?: boolean
   historicalImageTurnLimit?: number
-  proxyUrl: string
   authHeader?: 'auto' | 'bearer' | 'x-api-key' | ''
-  requestTimeoutMs: string | number | null
-  responseHeaderTimeoutMs: string | number | null
-  rateLimitRpm: string | number | null
-  rateLimitWindowMinutes: string | number | null
-  rateLimitMaxConcurrent: string | number | null
   rateLimitAutoFromHeaders: boolean
-  routePrefix?: string
   serviceType: string
 }
 
@@ -145,10 +121,6 @@ interface Props {
   reasoningParamStyleOptions: Array<{ title: string; value: string }>
   textVerbosityOptions: Array<{ title: string; value: string }>
   diagnosing?: boolean
-  rules: {
-    requestTimeoutMs: (_value: string | number | null) => boolean | string
-    responseHeaderTimeoutMs: (_value: string | number | null) => boolean | string
-  }
 }
 
 defineProps<Props>()

@@ -49,6 +49,7 @@ import ModelMappingPanel from './channel-edit/ModelMappingPanel.vue'
 import ModelCapabilityPanel from './channel-edit/ModelCapabilityPanel.vue'
 import AdvancedPanel from './channel-edit/AdvancedPanel.vue'
 import CustomHeadersPanel from './channel-edit/CustomHeadersPanel.vue'
+import CustomParamsPanel from './channel-edit/CustomParamsPanel.vue'
 import StreamTimeoutPanel from './channel-edit/StreamTimeoutPanel.vue'
 
 interface Props {
@@ -1969,6 +1970,12 @@ void toggleSupportedModelFilter
                       />
                       <div class="mt-6">
                         <StreamTimeoutPanel
+                          :form="form"
+                          @update:form="(updates) => Object.assign(form, updates)"
+                        />
+                      </div>
+                      <div class="mt-6">
+                        <CustomParamsPanel
                           :form="form"
                           @update:form="(updates) => Object.assign(form, updates)"
                         />

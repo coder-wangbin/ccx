@@ -164,7 +164,6 @@
                 :reasoning-param-style-options="reasoningParamStyleOptions"
                 :text-verbosity-options="textVerbosityOptions"
                 :diagnosing="diagnosingCompat"
-                :rules="rules"
                 @update:form="updateForm"
                 @menu-update="onMenuUpdate"
                 @diagnose="handleDiagnoseCompat"
@@ -179,19 +178,27 @@
               />
 
               <div class="mt-6">
-                <StreamTimeoutSection
-                  :selected-strategy="selectedStreamTimeoutStrategy"
-                  :first-content-enabled="form.streamFirstContentTimeoutEnabled"
-                  :first-content-ms="form.streamFirstContentTimeoutMs"
-                  :inactivity-enabled="form.streamInactivityTimeoutEnabled"
-                  :inactivity-ms="form.streamInactivityTimeoutMs"
-                  :tool-call-idle-enabled="form.streamToolCallIdleTimeoutEnabled"
-                  :tool-call-idle-ms="form.streamToolCallIdleTimeoutMs"
-                  @apply-strategy="applyStreamTimeoutStrategy"
-                  @update:first-content-ms="form.streamFirstContentTimeoutMs = $event"
-                  @update:inactivity-ms="form.streamInactivityTimeoutMs = $event"
-                  @update:tool-call-idle-ms="form.streamToolCallIdleTimeoutMs = $event"
-                />
+                <TransportConfigGroup :form="form" :rules="rules" @update:field="(field, value) => updateForm({ [field]: value })">
+                  <template #stream-timeout>
+                    <StreamTimeoutSection
+                      :selected-strategy="selectedStreamTimeoutStrategy"
+                      :first-content-enabled="form.streamFirstContentTimeoutEnabled"
+                      :first-content-ms="form.streamFirstContentTimeoutMs"
+                      :inactivity-enabled="form.streamInactivityTimeoutEnabled"
+                      :inactivity-ms="form.streamInactivityTimeoutMs"
+                      :tool-call-idle-enabled="form.streamToolCallIdleTimeoutEnabled"
+                      :tool-call-idle-ms="form.streamToolCallIdleTimeoutMs"
+                      @apply-strategy="applyStreamTimeoutStrategy"
+                      @update:first-content-ms="form.streamFirstContentTimeoutMs = $event"
+                      @update:inactivity-ms="form.streamInactivityTimeoutMs = $event"
+                      @update:tool-call-idle-ms="form.streamToolCallIdleTimeoutMs = $event"
+                    />
+                  </template>
+                </TransportConfigGroup>
+              </div>
+
+              <div class="mt-6">
+                <RateLimitGroup :form="form" @update:field="(field, value) => updateForm({ [field]: value })" />
               </div>
             </section>
           </v-form>
@@ -258,6 +265,8 @@ import SupportedModelsFilter from './edit-channel/SupportedModelsFilter.vue'
 import CustomHeadersSection from './edit-channel/CustomHeadersSection.vue'
 import StreamTimeoutSection from './edit-channel/StreamTimeoutSection.vue'
 import AdvancedOptionsSection from './edit-channel/AdvancedOptionsSection.vue'
+import TransportConfigGroup from './edit-channel/TransportConfigGroup.vue'
+import RateLimitGroup from './edit-channel/RateLimitGroup.vue'
 
 interface Props {
   show: boolean
