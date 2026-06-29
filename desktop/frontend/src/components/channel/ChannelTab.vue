@@ -8,7 +8,12 @@ import { useChannelPresets } from '@/composables/useChannelPresets'
 import { useAdminApi } from '@/composables/useAdminApi'
 import { useDesktopActivity } from '@/composables/useDesktopActivity'
 import { useLanguage } from '@/composables/useLanguage'
-import type { CopilotDeviceCodeResponse, CopilotTokenResponse } from '@/services/admin-api'
+import {
+  COPILOT_OAUTH_DEVICE_CODE_PATH,
+  COPILOT_OAUTH_TOKEN_PATH,
+  type CopilotDeviceCodeResponse,
+  type CopilotTokenResponse,
+} from '@/services/admin-api'
 import { openExternalLink, openProviderPromotion, openProviderConsole, providerConsoleLinks, providerPromotionLinks } from '@/lib/external-link'
 import compshareIcon from '@/assets/compshare.png'
 import runapiIcon from '@/assets/runapi.svg'
@@ -233,17 +238,32 @@ const copilotUserCode = ref('')
 const copilotVerificationUri = ref('')
 const copilotDeviceCode = ref('')
 const copilotToken = ref('')
+const copilotUserCodeCopied = ref(false)
 let copilotPollTimer: ReturnType<typeof setTimeout> | null = null
+let copilotCopyTimer: ReturnType<typeof setTimeout> | null = null
 
 function clearCopilotPollTimer() {
   if (copilotPollTimer !== null) { clearTimeout(copilotPollTimer); copilotPollTimer = null }
 }
 
+function clearCopilotCopyTimer() {
+  if (copilotCopyTimer !== null) { clearTimeout(copilotCopyTimer); copilotCopyTimer = null }
+}
+
+function clearCopilotAuthorizationCode() {
+  copilotDeviceCode.value = ''
+  copilotUserCode.value = ''
+  copilotVerificationUri.value = ''
+  copilotUserCodeCopied.value = false
+  clearCopilotCopyTimer()
+}
+
+
 async function pollCopilotToken(intervalSeconds: number) {
   if (!copilotDeviceCode.value) return
   copilotPolling.value = true
   try {
-    const res = await adminApi.post<CopilotTokenResponse>('/copilot/oauth/token', { deviceCode: copilotDeviceCode.value })
+    const res = await adminApi.post<CopilotTokenResponse>(COPILOT_OAUTH_TOKEN_PATH, { deviceCode: copilotDeviceCode.value })
     if (res.accessToken) {
       copilotToken.value = res.accessToken
       copilotOAuthSuccess.value = true
@@ -251,6 +271,7 @@ async function pollCopilotToken(intervalSeconds: number) {
       copilotPolling.value = false
       copilotOAuthLoading.value = false
       clearCopilotPollTimer()
+      clearCopilotAuthorizationCode()
       // 保存到 keysByProvider 用于复用提示
       await loadChannelPresets()
       return
@@ -272,12 +293,13 @@ async function pollCopilotToken(intervalSeconds: number) {
 
 async function startCopilotOAuth() {
   clearCopilotPollTimer()
+  clearCopilotAuthorizationCode()
   copilotOAuthLoading.value = true
   copilotOAuthError.value = ''
   copilotOAuthSuccess.value = false
   copilotToken.value = ''
   try {
-    const device = await adminApi.post<CopilotDeviceCodeResponse>('/copilot/oauth/device/code')
+    const device = await adminApi.post<CopilotDeviceCodeResponse>(COPILOT_OAUTH_DEVICE_CODE_PATH)
     copilotDeviceCode.value = device.deviceCode
     copilotUserCode.value = device.userCode
     copilotVerificationUri.value = device.verificationUri
@@ -311,7 +333,10 @@ async function submitCopilot() {
   emit('created', 'responses')
 }
 
-onBeforeUnmount(clearCopilotPollTimer)
+onBeforeUnmount(() => {
+  clearCopilotPollTimer()
+  clearCopilotCopyTimer()
+})
 
 const submit = async () => {
   localError.value = ''

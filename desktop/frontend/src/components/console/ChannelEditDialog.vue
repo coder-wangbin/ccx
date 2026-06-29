@@ -8,7 +8,12 @@ import {
 import { useConsoleChannels } from '@/composables/useConsoleChannels'
 import { useLanguage } from '@/composables/useLanguage'
 import { AdminApiError, useAdminApi } from '@/composables/useAdminApi'
-import type { CopilotDeviceCodeResponse, CopilotTokenResponse } from '@/services/admin-api'
+import {
+  COPILOT_OAUTH_DEVICE_CODE_PATH,
+  COPILOT_OAUTH_TOKEN_PATH,
+  type CopilotDeviceCodeResponse,
+  type CopilotTokenResponse,
+} from '@/services/admin-api'
 import {
   buildChannelPayload,
   createModelCapabilityRow,
@@ -84,17 +89,32 @@ const copilotOAuthSuccess = ref(false)
 const copilotUserCode = ref('')
 const copilotVerificationUri = ref('')
 const copilotDeviceCode = ref('')
+const copilotUserCodeCopied = ref(false)
 let copilotPollTimer: ReturnType<typeof setTimeout> | null = null
+let copilotCopyTimer: ReturnType<typeof setTimeout> | null = null
 
 function clearCopilotPollTimer() {
   if (copilotPollTimer !== null) { clearTimeout(copilotPollTimer); copilotPollTimer = null }
 }
 
+function clearCopilotCopyTimer() {
+  if (copilotCopyTimer !== null) { clearTimeout(copilotCopyTimer); copilotCopyTimer = null }
+}
+
+function clearCopilotAuthorizationCode() {
+  copilotDeviceCode.value = ''
+  copilotUserCode.value = ''
+  copilotVerificationUri.value = ''
+  copilotUserCodeCopied.value = false
+  clearCopilotCopyTimer()
+}
+
+
 async function pollCopilotToken(intervalSeconds: number) {
   if (!copilotDeviceCode.value) return
   copilotPolling.value = true
   try {
-    const token = await adminApi.post<CopilotTokenResponse>('/copilot/oauth/token', { deviceCode: copilotDeviceCode.value })
+    const token = await adminApi.post<CopilotTokenResponse>(COPILOT_OAUTH_TOKEN_PATH, { deviceCode: copilotDeviceCode.value })
     if (token.accessToken) {
       if (!existingApiKeys.value.includes(token.accessToken)) existingApiKeys.value.push(token.accessToken)
       copilotOAuthSuccess.value = true
@@ -102,6 +122,7 @@ async function pollCopilotToken(intervalSeconds: number) {
       copilotPolling.value = false
       copilotOAuthLoading.value = false
       clearCopilotPollTimer()
+      clearCopilotAuthorizationCode()
       return
     }
     if (token.error === 'expired_token') {
@@ -121,11 +142,12 @@ async function pollCopilotToken(intervalSeconds: number) {
 
 async function startCopilotOAuth() {
   clearCopilotPollTimer()
+  clearCopilotAuthorizationCode()
   copilotOAuthLoading.value = true
   copilotOAuthError.value = ''
   copilotOAuthSuccess.value = false
   try {
-    const device = await adminApi.post<CopilotDeviceCodeResponse>('/copilot/oauth/device/code')
+    const device = await adminApi.post<CopilotDeviceCodeResponse>(COPILOT_OAUTH_DEVICE_CODE_PATH)
     copilotDeviceCode.value = device.deviceCode
     copilotUserCode.value = device.userCode
     copilotVerificationUri.value = device.verificationUri
@@ -913,6 +935,8 @@ onBeforeUnmount(() => {
     scrollRoot.removeEventListener('scroll', scrollHandler)
   }
   clearDuplicateKeyHighlight()
+  clearCopilotPollTimer()
+  clearCopilotCopyTimer()
   scrollRoot = null
   scrollHandler = null
 })
