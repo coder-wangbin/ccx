@@ -108,6 +108,7 @@ func TestBuildTargetURL_SkipVersionWithHash(t *testing.T) {
 		// 已有版本号：不添加 /v1
 		{"with_version", "https://api.example.com/v1", "responses", "https://api.example.com/v1/responses"},
 		{"with_v2", "https://api.example.com/v2", "openai", "https://api.example.com/v2/chat/completions"},
+		{"full_responses_endpoint", "https://api.example.com/v1/responses", "responses", "https://api.example.com/v1/responses"},
 
 		// # 结尾：跳过 /v1
 		{"hash_skip", "https://api.example.com#", "responses", "https://api.example.com/responses"},
