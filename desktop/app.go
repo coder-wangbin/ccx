@@ -351,7 +351,7 @@ func (s *DesktopService) GetProviderPresets(target string) []channelpreset.Provi
 		return presets
 	}
 	for i := range presets {
-		presets[i].Plans = channelpreset.FilterPlansForTarget(presets[i].Plans, target)
+		presets[i].Plans = channelpreset.FilterPlansForTarget(presets[i], target)
 	}
 	return presets
 }

@@ -134,6 +134,7 @@ func TestBuildPayload(t *testing.T) {
 				"mimo-v2.5": "max",
 				"mini":      "high",
 			},
+			wantReasoningStyle: "reasoning",
 			wantNoVisionModels: []string{"mimo-v2.5-pro"},
 			wantFallback:       "mimo-v2.5",
 		},
@@ -715,6 +716,45 @@ func TestBestPlanForTarget(t *testing.T) {
 				t.Fatalf("bestPlanForTarget(%s, %s) = %q, want %q", tt.provider, tt.target, got, tt.want)
 			}
 		})
+	}
+}
+
+func TestFilterPlansForTarget_MiMoTokenPlans(t *testing.T) {
+	preset, ok := FindPreset(ProviderMiMo)
+	if !ok {
+		t.Fatal("FindPreset(mimo) failed")
+	}
+
+	hasPlan := func(plans []ProviderPlan, id string) bool {
+		return slices.ContainsFunc(plans, func(plan ProviderPlan) bool {
+			return plan.ID == id
+		})
+	}
+
+	messagesPlans := FilterPlansForTarget(preset, TargetMessages)
+	if !hasPlan(messagesPlans, "token-cn-anthropic") {
+		t.Fatalf("messages plans should include token-cn-anthropic: %#v", messagesPlans)
+	}
+	if hasPlan(messagesPlans, "token-cn") {
+		t.Fatalf("messages plans should not include OpenAI token plan: %#v", messagesPlans)
+	}
+
+	chatPlans := FilterPlansForTarget(preset, TargetChat)
+	if !hasPlan(chatPlans, "token-cn") {
+		t.Fatalf("chat plans should include OpenAI token plan: %#v", chatPlans)
+	}
+	if hasPlan(chatPlans, "token-cn-anthropic") {
+		t.Fatalf("chat plans should not include Anthropic token plan: %#v", chatPlans)
+	}
+
+	responsesPlans := FilterPlansForTarget(preset, TargetResponses)
+	if !hasPlan(responsesPlans, "openai-chat") {
+		t.Fatalf("responses plans should include pay-as-you-go OpenAI plan: %#v", responsesPlans)
+	}
+	for _, id := range []string{"token-cn", "token-sgp", "token-ams"} {
+		if hasPlan(responsesPlans, id) {
+			t.Fatalf("responses plans should not include MiMo OpenAI token plan %q: %#v", id, responsesPlans)
+		}
 	}
 }
 
