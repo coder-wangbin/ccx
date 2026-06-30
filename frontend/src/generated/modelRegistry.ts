@@ -82,6 +82,20 @@ export const builtinUpstreamModelCapabilities: Record<string, UpstreamModelCapab
       "max"
     ]
   },
+  "(?:^|[-/])claude-sonnet-5(?:-\\d{4}-\\d{2}-\\d{2}|-\\d{6,8})?(?=$|@)": {
+    "provider": "anthropic",
+    "displayName": "Claude Sonnet 5",
+    "contextWindowTokens": 1000000,
+    "maxOutputTokens": 128000,
+    "thinkingMode": "adaptive_only",
+    "reasoningEfforts": [
+      "low",
+      "medium",
+      "high",
+      "xhigh",
+      "max"
+    ]
+  },
   "(?:^|[-/])claude-fable-5(?:-\\d{4}-\\d{2}-\\d{2}|-\\d{6,8})?(?=$|@)": {
     "provider": "anthropic",
     "displayName": "Claude Fable 5",
