@@ -85,6 +85,36 @@ func TestStripCodexClientOnlyTools(t *testing.T) {
 		}
 	})
 
+	t.Run("剥离 tool_search 并保留普通 function", func(t *testing.T) {
+		req := map[string]interface{}{
+			"tools": []interface{}{
+				map[string]interface{}{
+					"type":        "tool_search",
+					"execution":   "client",
+					"description": "Search deferred tools",
+					"parameters":  map[string]interface{}{"type": "object"},
+				},
+				map[string]interface{}{"type": "function", "function": map[string]interface{}{"name": "lookup_user"}},
+			},
+			"tool_choice": map[string]interface{}{"type": "tool_search", "name": "tool_search"},
+		}
+		stripCodexClientOnlyTools(req)
+
+		tools, ok := req["tools"].([]interface{})
+		if !ok {
+			t.Fatalf("tools 被误删")
+		}
+		if len(tools) != 1 {
+			t.Fatalf("tools 长度=%d，期望 1", len(tools))
+		}
+		if got := tools[0].(map[string]interface{})["type"]; got != "function" {
+			t.Fatalf("保留工具类型=%v，期望 function", got)
+		}
+		if req["tool_choice"] != "auto" {
+			t.Fatalf("tool_choice=%v，期望 auto", req["tool_choice"])
+		}
+	})
+
 	t.Run("未知对象类型保守保留", func(t *testing.T) {
 		req := map[string]interface{}{
 			"tools": []interface{}{
@@ -701,6 +731,40 @@ func TestResponsesProviderCodexToolCompatDiffersFromNativePassthroughForOpenAI(t
 			t.Fatalf("保留工具=%v，期望 do_thing", got)
 		}
 	})
+}
+
+func TestResponsesProviderPassthroughCodexCompatStripsToolSearch(t *testing.T) {
+	compat := true
+	upstream := &config.UpstreamConfig{
+		ServiceType:                "responses",
+		CodexToolCompat:            &compat,
+		CodexNativeToolPassthrough: false,
+	}
+	body := []byte(`{
+		"model": "gpt-5.5",
+		"input": "search",
+		"tools": [
+			{"type": "tool_search", "execution": "client", "description": "Search tools", "parameters": {"type": "object", "properties": {}}},
+			{"type": "function", "name": "do_thing", "parameters": {"type": "object", "properties": {}}}
+		],
+		"tool_choice": {"type": "tool_search", "name": "tool_search"}
+	}`)
+
+	providerReq, _, err := (&ResponsesProvider{}).buildProviderRequestBody(nil, "/v1/responses", body, upstream)
+	if err != nil {
+		t.Fatalf("buildProviderRequestBody 失败: %v", err)
+	}
+	reqMap := providerReq.(map[string]interface{})
+	tools := decodeToolMaps(t, reqMap["tools"])
+	if len(tools) != 1 {
+		t.Fatalf("工具数量=%d，期望 1", len(tools))
+	}
+	if got := tools[0]["name"]; got != "do_thing" {
+		t.Fatalf("保留工具=%v，期望 do_thing", got)
+	}
+	if reqMap["tool_choice"] != "auto" {
+		t.Fatalf("tool_choice=%v，期望 auto", reqMap["tool_choice"])
+	}
 }
 
 func decodeToolMaps(t *testing.T, raw interface{}) []map[string]interface{} {
