@@ -66,6 +66,8 @@ const { t } = useI18n()
     if (props.channelType === 'responses') return 'responses'
     return 'claude'
   }
+
+  const defaultNormalizeMetadataUserId = () => props.channelType !== 'responses'
   
   // 详细表单预期请求 URL 预览（防止输入时抖动）
   const formBaseUrlPreview = ref('')
@@ -137,7 +139,7 @@ const { t } = useI18n()
     routePrefix: '',
     supportedModels: [] as string[],
     autoBlacklistBalance: true,
-    normalizeMetadataUserId: true,
+    normalizeMetadataUserId: defaultNormalizeMetadataUserId(),
     stripBillingHeader: false,
     codexNativeToolPassthrough: false,
     codexToolCompat: false,
@@ -463,7 +465,7 @@ const { t } = useI18n()
     form.supportedModels = []
     supportedModelsError.value = ''
     form.autoBlacklistBalance = true
-    form.normalizeMetadataUserId = true
+    form.normalizeMetadataUserId = defaultNormalizeMetadataUserId()
     form.stripBillingHeader = false
     form.codexNativeToolPassthrough = false
     form.codexToolCompat = false
