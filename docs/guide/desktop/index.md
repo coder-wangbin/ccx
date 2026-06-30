@@ -187,6 +187,8 @@ curl http://localhost:3688/v1/models \
 
 ![Environment Params 环境参数](/images/desktop/env-params.png)
 
+安装包运行时，`.env` 位于 CCX Desktop 数据目录，不是源码目录的 `backend-go/.env`。可在 **Gateway Monitor** 的 **Data dir** 查看并打开该目录；如需给 Claude Desktop 启用本地 HTTPS，请参考 [环境配置 - 本地 HTTPS](../environment#本地-https)，并在 `TLS_CERT_FILE` / `TLS_KEY_FILE` 中使用实际绝对路径。
+
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
 | `PORT` | 3688 | 网关端口 |

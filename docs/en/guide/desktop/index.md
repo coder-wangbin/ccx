@@ -187,6 +187,8 @@ Open **Environment Params** to edit the `.env` file. Common settings:
 
 ![Environment Params](/images/desktop/env-params.png)
 
+When installed as CCX Desktop, `.env` is stored in the CCX Desktop data directory, not in the source-tree `backend-go/.env`. You can find and open that directory from **Data dir** in **Gateway Monitor**. To enable local HTTPS for Claude Desktop, see [Environment - Local HTTPS](../environment#local-https) and use expanded absolute paths for `TLS_CERT_FILE` / `TLS_KEY_FILE`.
+
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `PORT` | 3688 | Gateway port |

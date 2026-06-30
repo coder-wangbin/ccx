@@ -39,6 +39,10 @@ ccx/
 ```bash
 # 服务器配置
 PORT=3688                              # 服务器端口（程序内部默认 3000，建议 .env 中显式设置为 3688）
+ENABLE_HTTPS=false                     # Enable local HTTPS listener (default false)
+TLS_AUTO_CERT=true                     # Generate a temporary localhost self-signed certificate when no cert files are configured
+TLS_CERT_FILE=/path/to/localhost.pem   # Optional TLS certificate file; must be set with TLS_KEY_FILE
+TLS_KEY_FILE=/path/to/localhost-key.pem # Optional TLS private key file; must be set with TLS_CERT_FILE
 
 # 运行环境
 ENV=production                         # 运行环境: development | production
@@ -72,6 +76,104 @@ CORS_ORIGIN=*                          # Allowed CORS origin
 # METRICS_WINDOW_SIZE=10               # Sliding window size (min 3, default 10)
 # METRICS_FAILURE_THRESHOLD=0.5        # Failure-rate threshold (0-1, default 0.5)
 ```
+
+#### Local HTTPS
+
+`ENABLE_HTTPS=true` enables HTTPS on the current `PORT` for clients such as Claude Desktop that only accept an HTTPS Gateway Base URL. The recommended local URL is `https://localhost:3688`; CCX still accepts `http://localhost:3688` on the same port for compatibility with existing clients.
+
+- By default, `TLS_AUTO_CERT=true`: when no certificate files are configured, CCX generates an in-process temporary self-signed certificate for `localhost`, `127.0.0.1`, and `::1`. This is useful for local forwarding and desktop self-checks.
+- If the client requires a certificate trusted by the operating system, use `mkcert`, an enterprise certificate, or a manually issued certificate, and set both `TLS_CERT_FILE` and `TLS_KEY_FILE`.
+- `TLS_CERT_FILE` and `TLS_KEY_FILE` must be set together. Setting only one of them fails startup.
+
+When Claude Desktop connects to local HTTPS and the CCX logs show `remote error: tls: unknown certificate`, the client usually does not trust the temporary self-signed certificate. The recommended fix is to generate a locally trusted certificate with `mkcert`.
+
+Install `mkcert`:
+
+```bash
+# macOS
+brew install mkcert
+
+# Linux (Debian/Ubuntu)
+sudo apt install libnss3-tools
+# Then install mkcert from your package manager, Homebrew/Linuxbrew, or the project Release.
+
+# Windows (choose one in an elevated PowerShell)
+choco install mkcert
+scoop bucket add extras
+scoop install mkcert
+```
+
+Install the local CA:
+
+```bash
+mkcert -install
+```
+
+Choose the certificate directory based on how CCX is deployed. For CCX Desktop installers, prefer the actual **Data dir** shown in **Gateway Monitor**; the table lists common defaults:
+
+| Scenario | Suggested certificate directory |
+| --- | --- |
+| Source development | `backend-go/.config/certs` |
+| CCX Desktop macOS installer | `~/Library/Application Support/ccx-desktop/certs` |
+| CCX Desktop Linux installer | `~/.local/state/ccx/certs` |
+| CCX Desktop Windows GitHub installer | `%APPDATA%\ccx-desktop\certs` |
+| CCX Desktop Windows Store/MSIX | `%LOCALAPPDATA%\Packages\<package-family>\LocalCache\Roaming\ccx-desktop\certs` |
+| Linux systemd service | `/etc/ccx/certs` |
+| macOS launchd manual service | `~/ccx/certs` |
+| Windows NSSM service | `C:\ccx\certs` |
+
+For source development or macOS/Linux installers, replace `CERT_DIR` with the actual directory from the table:
+
+```bash
+CERT_DIR="backend-go/.config/certs"
+mkdir -p "$CERT_DIR"
+
+mkcert \
+  -cert-file "$CERT_DIR/localhost.pem" \
+  -key-file "$CERT_DIR/localhost-key.pem" \
+  "localhost" "127.0.0.1" "::1"
+```
+
+Windows PowerShell example. For the Store/MSIX build, check **Data dir** in **Gateway Monitor** first, then set `$certDir` to the `certs` subdirectory under that path:
+
+```powershell
+$certDir = "$env:APPDATA\ccx-desktop\certs"
+New-Item -ItemType Directory -Force $certDir
+
+mkcert `
+  -cert-file "$certDir\localhost.pem" `
+  -key-file "$certDir\localhost-key.pem" `
+  localhost 127.0.0.1 ::1
+```
+
+Then enable HTTPS in the `.env` that is actually used by the running process:
+
+```env
+ENABLE_HTTPS=true
+TLS_AUTO_CERT=false
+TLS_CERT_FILE=/absolute/path/to/localhost.pem
+TLS_KEY_FILE=/absolute/path/to/localhost-key.pem
+```
+
+The `.env` location depends on how CCX is started:
+
+- Source development: usually `backend-go/.env`.
+- CCX Desktop installer: edit it in **Environment Params**; the backend process working directory is the desktop data directory.
+- Linux systemd: usually `/opt/ccx/.env` from `EnvironmentFile`, unless the service file points elsewhere.
+- macOS launchd / Windows NSSM: if you pass settings through service environment variables, configure `ENABLE_HTTPS`, `TLS_AUTO_CERT`, `TLS_CERT_FILE`, and `TLS_KEY_FILE` in that service configuration.
+
+For installers and system services, prefer expanded absolute paths in `.env`; do not rely on relative paths or automatic expansion of variables such as `%APPDATA%`. Restart CCX, then use `https://localhost:3688` as the Gateway Base URL in Claude Desktop.
+
+If Claude Desktop connects through a LAN IP or custom hostname, for example `https://192.168.1.20:3688`, include that IP or hostname when generating the certificate:
+
+```bash
+mkcert \
+  -cert-file "$CERT_DIR/ccx-local.pem" \
+  -key-file "$CERT_DIR/ccx-local-key.pem" \
+  "localhost" "127.0.0.1" "::1" "192.168.1.20"
+```
+
+Do not commit certificate private keys. The example `backend-go/.config/` directory is ignored by default.
 
 `EXTRA_PROXY_ACCESS_KEYS` lets you assign additional proxy-only access keys to multiple clients. It does not add user management, usage tracking, model permissions, or per-key rate limits. Once this variable is configured, admin APIs no longer fall back to `PROXY_ACCESS_KEY`: you must explicitly set an independent `ADMIN_ACCESS_KEY`, and it must not match `PROXY_ACCESS_KEY` or any extra proxy key. Restart the service after changing these access-control environment variables.
 

@@ -78,7 +78,7 @@ QUIET_POLLING_LOGS=true
 
 `EXTRA_PROXY_ACCESS_KEYS` 仅用于代理 API；启用后必须设置独立 `ADMIN_ACCESS_KEY`，管理接口不再回退到 `PROXY_ACCESS_KEY`。
 
-`ENABLE_HTTPS=true` 会让 CCX 直接以 HTTPS 监听本地端口；未配置 `TLS_CERT_FILE`/`TLS_KEY_FILE` 时默认自动生成 localhost 临时自签名证书。完整说明见 `../docs/guide/environment.md`。
+`ENABLE_HTTPS=true` 会让 CCX 在本地端口启用 HTTPS，同时保留同端口 HTTP 兼容；未配置 `TLS_CERT_FILE`/`TLS_KEY_FILE` 时默认自动生成 localhost 临时自签名证书。完整说明见 `../docs/guide/environment.md`。
 
 ### 运行时配置
 

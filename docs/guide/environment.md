@@ -84,11 +84,101 @@ CORS_ORIGIN=*                          # CORS 允许的源
 
 #### 本地 HTTPS
 
-`ENABLE_HTTPS=true` 会让 CCX 直接以 HTTPS 协议监听当前 `PORT`，用于 Claude Desktop 等只接受 HTTPS Gateway Base URL 的客户端。开启后本地访问地址从 `http://localhost:3688` 变为 `https://localhost:3688`。
+`ENABLE_HTTPS=true` 会让 CCX 在当前 `PORT` 启用 HTTPS，用于 Claude Desktop 等只接受 HTTPS Gateway Base URL 的客户端。开启后推荐本地访问地址为 `https://localhost:3688`，同时同端口仍接受 `http://localhost:3688`，以兼容已有客户端配置。
 
 - 默认 `TLS_AUTO_CERT=true`：未配置证书文件时，CCX 会在进程内生成仅包含 `localhost`、`127.0.0.1`、`::1` 的临时自签名证书，适合本地转发和桌面端自检。
 - 如客户端严格要求系统信任证书，请使用 `mkcert`、企业证书或手动签发证书，并同时设置 `TLS_CERT_FILE` 与 `TLS_KEY_FILE`。
 - `TLS_CERT_FILE` 和 `TLS_KEY_FILE` 必须成对设置；只设置其中一个会导致启动失败。
+
+Claude Desktop 访问本地 HTTPS 时，如果 CCX 日志出现 `remote error: tls: unknown certificate`，通常表示客户端不信任临时自签名证书。推荐用 `mkcert` 生成系统信任的本地证书。
+
+安装 `mkcert`：
+
+```bash
+# macOS
+brew install mkcert
+
+# Linux（Debian/Ubuntu）
+sudo apt install libnss3-tools
+# 然后通过系统包管理器、Homebrew/Linuxbrew 或项目 Release 安装 mkcert
+
+# Windows（任选其一，在管理员 PowerShell 中执行）
+choco install mkcert
+scoop bucket add extras
+scoop install mkcert
+```
+
+初始化本机 CA：
+
+```bash
+mkcert -install
+```
+
+生成证书时，先按部署方式选择证书目录。CCX Desktop 安装包请优先以 **Gateway Monitor** 显示的 **Data dir** 为准，下面是常见默认位置：
+
+| 场景 | 建议证书目录 |
+| --- | --- |
+| 源码开发 | `backend-go/.config/certs` |
+| CCX Desktop macOS 安装包 | `~/Library/Application Support/ccx-desktop/certs` |
+| CCX Desktop Linux 安装包 | `~/.local/state/ccx/certs` |
+| CCX Desktop Windows GitHub 安装包 | `%APPDATA%\ccx-desktop\certs` |
+| CCX Desktop Windows Store/MSIX | `%LOCALAPPDATA%\Packages\<package-family>\LocalCache\Roaming\ccx-desktop\certs` |
+| Linux systemd 服务 | `/etc/ccx/certs` |
+| macOS launchd 手动服务 | `~/ccx/certs` |
+| Windows NSSM 服务 | `C:\ccx\certs` |
+
+源码开发或 macOS/Linux 安装包可用以下命令，把 `CERT_DIR` 替换为上表中的实际目录：
+
+```bash
+CERT_DIR="backend-go/.config/certs"
+mkdir -p "$CERT_DIR"
+
+mkcert \
+  -cert-file "$CERT_DIR/localhost.pem" \
+  -key-file "$CERT_DIR/localhost-key.pem" \
+  "localhost" "127.0.0.1" "::1"
+```
+
+Windows PowerShell 示例。若使用 Store/MSIX 版本，请先在 **Gateway Monitor** 查看 **Data dir**，再把 `$certDir` 改成该目录下的 `certs` 子目录：
+
+```powershell
+$certDir = "$env:APPDATA\ccx-desktop\certs"
+New-Item -ItemType Directory -Force $certDir
+
+mkcert `
+  -cert-file "$certDir\localhost.pem" `
+  -key-file "$certDir\localhost-key.pem" `
+  localhost 127.0.0.1 ::1
+```
+
+然后在实际生效的 `.env` 中启用 HTTPS 并写入证书路径：
+
+```env
+ENABLE_HTTPS=true
+TLS_AUTO_CERT=false
+TLS_CERT_FILE=/absolute/path/to/localhost.pem
+TLS_KEY_FILE=/absolute/path/to/localhost-key.pem
+```
+
+`.env` 的位置取决于启动方式：
+
+- 源码开发：通常是 `backend-go/.env`。
+- CCX Desktop 安装包：在 **Environment Params** 中编辑；后端进程工作目录是桌面端数据目录。
+- Linux systemd：通常是 `EnvironmentFile` 指向的 `/opt/ccx/.env`，也可能由服务文件改成其他路径。
+- macOS launchd / Windows NSSM：若通过服务环境变量传入配置，应在对应服务配置中设置 `ENABLE_HTTPS`、`TLS_AUTO_CERT`、`TLS_CERT_FILE`、`TLS_KEY_FILE`。
+
+安装包和系统服务场景建议在 `.env` 中使用展开后的绝对路径；不要依赖相对路径或 `%APPDATA%` 这类变量自动展开。重启 CCX 后，在 Claude Desktop 中使用 `https://localhost:3688` 作为 Gateway Base URL。
+
+如果 Claude Desktop 通过局域网 IP 或自定义主机名访问 CCX，例如 `https://192.168.1.20:3688`，生成证书时必须把该 IP 或主机名一并加入：
+
+```bash
+mkcert \
+  -cert-file "$CERT_DIR/ccx-local.pem" \
+  -key-file "$CERT_DIR/ccx-local-key.pem" \
+  "localhost" "127.0.0.1" "::1" "192.168.1.20"
+```
+
+证书私钥不要提交到仓库；示例中的 `backend-go/.config/` 默认已被忽略。
 
 `EXTRA_PROXY_ACCESS_KEYS` 用于给多个客户端分配额外代理访问密钥，不提供用户管理、用量统计、模型权限或限速能力。只要配置了该变量，管理接口就不再回退到 `PROXY_ACCESS_KEY`：必须显式设置独立的 `ADMIN_ACCESS_KEY`，并且它不能等于 `PROXY_ACCESS_KEY` 或任何额外代理密钥。修改这些访问控制环境变量后需要重启服务。
 
