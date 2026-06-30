@@ -89,6 +89,7 @@ CORS_ORIGIN=*                          # CORS 允许的源
 - 默认 `TLS_AUTO_CERT=true`：未配置证书文件时，CCX 会在进程内生成仅包含 `localhost`、`127.0.0.1`、`::1` 的临时自签名证书，适合本地转发和桌面端自检。
 - 如客户端严格要求系统信任证书，请使用 `mkcert`、企业证书或手动签发证书，并同时设置 `TLS_CERT_FILE` 与 `TLS_KEY_FILE`。
 - `TLS_CERT_FILE` 和 `TLS_KEY_FILE` 必须成对设置；只设置其中一个会导致启动失败。
+- `TLS_CERT_FILE` 和 `TLS_KEY_FILE` 请使用展开后的绝对路径。相对路径会按 CCX 进程工作目录解析；安装包、systemd、launchd、NSSM 或从不同目录启动时，`./backend-go/...` 这类路径很容易找不到文件。
 
 Claude Desktop 访问本地 HTTPS 时，如果 CCX 日志出现 `remote error: tls: unknown certificate`，通常表示客户端不信任临时自签名证书。推荐用 `mkcert` 生成系统信任的本地证书。
 
@@ -127,10 +128,10 @@ mkcert -install
 | macOS launchd 手动服务 | `~/ccx/certs` |
 | Windows NSSM 服务 | `C:\ccx\certs` |
 
-源码开发或 macOS/Linux 安装包可用以下命令，把 `CERT_DIR` 替换为上表中的实际目录：
+源码开发或 macOS/Linux 安装包可用以下命令，把 `CERT_DIR` 替换为上表中的实际目录。示例会先展开为绝对路径，复制到 `.env` 时也应使用输出后的绝对路径：
 
 ```bash
-CERT_DIR="backend-go/.config/certs"
+CERT_DIR="$(pwd)/backend-go/.config/certs"
 mkdir -p "$CERT_DIR"
 
 mkcert \

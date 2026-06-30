@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -87,6 +88,23 @@ func TestConfigureServerTLSLoadsCertFiles(t *testing.T) {
 	}
 	if srv.TLSConfig == nil || len(srv.TLSConfig.Certificates) != 1 {
 		t.Fatalf("TLSConfig certificates = %#v, want one certificate", srv.TLSConfig)
+	}
+}
+
+func TestConfigureServerTLSRelativePathErrorIncludesAbsolutePathHint(t *testing.T) {
+	srv := &http.Server{}
+	envCfg := &config.EnvConfig{
+		EnableHTTPS: true,
+		TLSCertFile: "backend-go/.config/certs/localhost.pem",
+		TLSKeyFile:  "backend-go/.config/certs/localhost-key.pem",
+	}
+
+	err := configureServerTLS(srv, envCfg)
+	if err == nil {
+		t.Fatal("configureServerTLS() error = nil, want error")
+	}
+	if !strings.Contains(err.Error(), "绝对路径") {
+		t.Fatalf("error = %q, want absolute path hint", err)
 	}
 }
 

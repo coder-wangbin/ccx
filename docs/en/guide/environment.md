@@ -84,6 +84,7 @@ CORS_ORIGIN=*                          # Allowed CORS origin
 - By default, `TLS_AUTO_CERT=true`: when no certificate files are configured, CCX generates an in-process temporary self-signed certificate for `localhost`, `127.0.0.1`, and `::1`. This is useful for local forwarding and desktop self-checks.
 - If the client requires a certificate trusted by the operating system, use `mkcert`, an enterprise certificate, or a manually issued certificate, and set both `TLS_CERT_FILE` and `TLS_KEY_FILE`.
 - `TLS_CERT_FILE` and `TLS_KEY_FILE` must be set together. Setting only one of them fails startup.
+- Use expanded absolute paths for `TLS_CERT_FILE` and `TLS_KEY_FILE`. Relative paths are resolved from the CCX process working directory; paths such as `./backend-go/...` commonly fail when CCX is started from an installer, systemd, launchd, NSSM, or another directory.
 
 When Claude Desktop connects to local HTTPS and the CCX logs show `remote error: tls: unknown certificate`, the client usually does not trust the temporary self-signed certificate. The recommended fix is to generate a locally trusted certificate with `mkcert`.
 
@@ -122,10 +123,10 @@ Choose the certificate directory based on how CCX is deployed. For CCX Desktop i
 | macOS launchd manual service | `~/ccx/certs` |
 | Windows NSSM service | `C:\ccx\certs` |
 
-For source development or macOS/Linux installers, replace `CERT_DIR` with the actual directory from the table:
+For source development or macOS/Linux installers, replace `CERT_DIR` with the actual directory from the table. The example expands it to an absolute path; copy the expanded absolute path into `.env`:
 
 ```bash
-CERT_DIR="backend-go/.config/certs"
+CERT_DIR="$(pwd)/backend-go/.config/certs"
 mkdir -p "$CERT_DIR"
 
 mkcert \

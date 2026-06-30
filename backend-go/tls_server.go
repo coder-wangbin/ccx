@@ -11,6 +11,7 @@ import (
 	"math/big"
 	"net"
 	"net/http"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -51,7 +52,7 @@ func configureServerTLS(srv *http.Server, envCfg *config.EnvConfig) error {
 		}
 		cert, err := tls.LoadX509KeyPair(envCfg.TLSCertFile, envCfg.TLSKeyFile)
 		if err != nil {
-			return fmt.Errorf("加载 HTTPS 证书失败: %w", err)
+			return fmt.Errorf("加载 HTTPS 证书失败: %w%s", err, tlsPathHint(envCfg.TLSCertFile, envCfg.TLSKeyFile))
 		}
 		srv.TLSConfig.Certificates = []tls.Certificate{cert}
 		return nil
@@ -106,6 +107,13 @@ func serveHTTPAndHTTPS(srv *http.Server, ln net.Listener) error {
 		timeout = defaultProtocolDetectionTimeout
 	}
 	return srv.Serve(newProtocolDetectingListener(ln, srv.TLSConfig, timeout))
+}
+
+func tlsPathHint(certFile, keyFile string) string {
+	if filepath.IsAbs(certFile) && filepath.IsAbs(keyFile) {
+		return ""
+	}
+	return "；TLS_CERT_FILE/TLS_KEY_FILE 建议使用展开后的绝对路径，相对路径会按 CCX 进程工作目录解析"
 }
 
 type protocolDetectingListener struct {
