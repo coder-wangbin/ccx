@@ -11,12 +11,14 @@ import (
 	"math/big"
 	"net"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/BenedictKing/ccx/internal/config"
 )
 
 const localTLSCertValidity = 365 * 24 * time.Hour
+const defaultProtocolDetectionTimeout = 10 * time.Second
 
 type serverEndpoint struct {
 	Scheme string
@@ -47,6 +49,11 @@ func configureServerTLS(srv *http.Server, envCfg *config.EnvConfig) error {
 		if envCfg.TLSCertFile == "" || envCfg.TLSKeyFile == "" {
 			return fmt.Errorf("TLS_CERT_FILE 和 TLS_KEY_FILE 必须同时设置")
 		}
+		cert, err := tls.LoadX509KeyPair(envCfg.TLSCertFile, envCfg.TLSKeyFile)
+		if err != nil {
+			return fmt.Errorf("加载 HTTPS 证书失败: %w", err)
+		}
+		srv.TLSConfig.Certificates = []tls.Certificate{cert}
 		return nil
 	}
 	if !envCfg.TLSAutoCert {
@@ -60,17 +67,153 @@ func configureServerTLS(srv *http.Server, envCfg *config.EnvConfig) error {
 	return nil
 }
 
+func ensureDefaultNextProtos(tlsConfig *tls.Config) {
+	if !containsString(tlsConfig.NextProtos, "http/1.1") {
+		tlsConfig.NextProtos = append(tlsConfig.NextProtos, "http/1.1")
+	}
+}
+
+func containsString(values []string, want string) bool {
+	for _, value := range values {
+		if value == want {
+			return true
+		}
+	}
+	return false
+}
+
 func startHTTPServer(srv *http.Server, envCfg *config.EnvConfig) error {
 	if !envCfg.EnableHTTPS {
 		return srv.ListenAndServe()
 	}
-	if envCfg.TLSCertFile != "" || envCfg.TLSKeyFile != "" {
-		if envCfg.TLSCertFile == "" || envCfg.TLSKeyFile == "" {
-			return fmt.Errorf("TLS_CERT_FILE 和 TLS_KEY_FILE 必须同时设置")
-		}
-		return srv.ListenAndServeTLS(envCfg.TLSCertFile, envCfg.TLSKeyFile)
+	ln, err := net.Listen("tcp", srv.Addr)
+	if err != nil {
+		return err
 	}
-	return srv.ListenAndServeTLS("", "")
+	return serveHTTPAndHTTPS(srv, ln)
+}
+
+func serveHTTPAndHTTPS(srv *http.Server, ln net.Listener) error {
+	if srv.TLSConfig == nil {
+		return fmt.Errorf("HTTPS 已启用但 TLSConfig 未初始化")
+	}
+	ensureDefaultNextProtos(srv.TLSConfig)
+	timeout := srv.ReadHeaderTimeout
+	if timeout <= 0 {
+		timeout = srv.ReadTimeout
+	}
+	if timeout <= 0 {
+		timeout = defaultProtocolDetectionTimeout
+	}
+	return srv.Serve(newProtocolDetectingListener(ln, srv.TLSConfig, timeout))
+}
+
+type protocolDetectingListener struct {
+	net.Listener
+	tlsConfig *tls.Config
+	timeout   time.Duration
+	conns     chan acceptResult
+	done      chan struct{}
+	closeOnce sync.Once
+}
+
+type acceptResult struct {
+	conn net.Conn
+	err  error
+}
+
+func newProtocolDetectingListener(ln net.Listener, tlsConfig *tls.Config, timeout time.Duration) *protocolDetectingListener {
+	listener := &protocolDetectingListener{
+		Listener:  ln,
+		tlsConfig: tlsConfig,
+		timeout:   timeout,
+		conns:     make(chan acceptResult, 64),
+		done:      make(chan struct{}),
+	}
+	go listener.acceptLoop()
+	return listener
+}
+
+func (l *protocolDetectingListener) Accept() (net.Conn, error) {
+	select {
+	case result := <-l.conns:
+		return result.conn, result.err
+	case <-l.done:
+		return nil, net.ErrClosed
+	}
+}
+
+func (l *protocolDetectingListener) Close() error {
+	l.closeOnce.Do(func() {
+		close(l.done)
+	})
+	return l.Listener.Close()
+}
+
+func (l *protocolDetectingListener) acceptLoop() {
+	for {
+		conn, err := l.Listener.Accept()
+		if err != nil {
+			l.sendResult(acceptResult{err: err})
+			if ne, ok := err.(net.Error); ok && ne.Temporary() {
+				continue
+			}
+			return
+		}
+		go l.detect(conn)
+	}
+}
+
+func (l *protocolDetectingListener) detect(conn net.Conn) {
+	detected, err := detectProtocol(conn, l.tlsConfig, l.timeout)
+	if err != nil {
+		_ = conn.Close()
+		return
+	}
+	l.sendResult(acceptResult{conn: detected})
+}
+
+func (l *protocolDetectingListener) sendResult(result acceptResult) {
+	select {
+	case l.conns <- result:
+	case <-l.done:
+		if result.conn != nil {
+			_ = result.conn.Close()
+		}
+	}
+}
+
+func detectProtocol(conn net.Conn, tlsConfig *tls.Config, timeout time.Duration) (net.Conn, error) {
+	if timeout > 0 {
+		if err := conn.SetReadDeadline(time.Now().Add(timeout)); err != nil {
+			return nil, err
+		}
+		defer conn.SetReadDeadline(time.Time{})
+	}
+	firstByte := make([]byte, 1)
+	n, err := conn.Read(firstByte)
+	if err != nil {
+		return nil, err
+	}
+	buffered := &prefixedConn{Conn: conn, prefix: firstByte[:n]}
+	if n == 1 && firstByte[0] == 0x16 {
+		return tls.Server(buffered, tlsConfig.Clone()), nil
+	}
+	return buffered, nil
+}
+
+type prefixedConn struct {
+	net.Conn
+	prefix []byte
+}
+
+func (c *prefixedConn) Read(p []byte) (int, error) {
+	if len(c.prefix) > 0 {
+		n := copy(p, c.prefix)
+		c.prefix = c.prefix[n:]
+		return n, nil
+	}
+	return c.Conn.Read(p)
 }
 
 func generateLocalhostCertificate(now time.Time) (tls.Certificate, error) {
