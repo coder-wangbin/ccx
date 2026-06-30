@@ -53,7 +53,7 @@ export const claudeMessagesPresets: Record<string, ClaudeMessagesPreset> = {
       "opus": "max",
       "sonnet": "max"
     },
-    "reasoningParamStyle": "reasoning",
+    "reasoningParamStyle": "thinking",
     "passbackReasoningContent": true,
     "passbackThinkingBlocks": false,
     "stripEmptyTextBlocks": false,

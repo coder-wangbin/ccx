@@ -21,6 +21,7 @@ func TestBuildPayload(t *testing.T) {
 		wantNoModelMap      bool
 		wantReasoning       map[string]string
 		wantNoReasoningMap  bool
+		wantReasoningStyle  string
 		wantFallback        string
 		wantNormalize       bool
 		wantNormalizeSystem bool
@@ -84,6 +85,7 @@ func TestBuildPayload(t *testing.T) {
 				"opus":      "max",
 				"sonnet":    "max",
 			},
+			wantReasoningStyle: "thinking",
 			wantNoVisionModels: []string{"mimo-v2.5-pro"},
 			wantFallback:       "mimo-v2.5",
 		},
@@ -100,6 +102,7 @@ func TestBuildPayload(t *testing.T) {
 				"opus":   "mimo-v2.5-pro",
 				"sonnet": "mimo-v2.5-pro",
 			},
+			wantReasoningStyle: "thinking",
 			wantNoVisionModels: []string{"mimo-v2.5-pro"},
 			wantFallback:       "mimo-v2.5",
 		},
@@ -109,6 +112,7 @@ func TestBuildPayload(t *testing.T) {
 			wantBaseURL:        "https://api.xiaomimimo.com/v1",
 			wantService:        "openai",
 			wantNormalize:      true,
+			wantReasoningStyle: "thinking",
 			wantNoVisionModels: []string{"mimo-v2.5-pro"},
 			wantFallback:       "mimo-v2.5",
 		},
@@ -614,6 +618,9 @@ func TestBuildPayload(t *testing.T) {
 			}
 			if tt.wantNoReasoningMap && len(got.ReasoningMapping) != 0 {
 				t.Fatalf("ReasoningMapping = %#v, want empty", got.ReasoningMapping)
+			}
+			if tt.wantReasoningStyle != "" && got.ReasoningParamStyle != tt.wantReasoningStyle {
+				t.Fatalf("ReasoningParamStyle = %q, want %q", got.ReasoningParamStyle, tt.wantReasoningStyle)
 			}
 			if tt.wantNoVisionModels != nil {
 				if !slices.Equal(got.NoVisionModels, tt.wantNoVisionModels) {

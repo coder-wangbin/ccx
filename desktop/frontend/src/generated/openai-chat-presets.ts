@@ -37,7 +37,7 @@ export const openaiChatPresets: Record<string, OpenAIChatPreset> = {
   "mimo": {
     "modelMapping": {},
     "reasoningMapping": {},
-    "reasoningParamStyle": "reasoning",
+    "reasoningParamStyle": "thinking",
     "passbackReasoningContent": false,
     "passbackThinkingBlocks": false,
     "stripEmptyTextBlocks": false,
