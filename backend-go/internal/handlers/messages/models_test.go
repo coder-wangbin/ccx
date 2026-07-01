@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/BenedictKing/ccx/internal/config"
 	"github.com/BenedictKing/ccx/internal/metrics"
@@ -467,7 +468,7 @@ func TestModelsHandler_IncludesImagesModels(t *testing.T) {
 	}
 }
 
-func TestModelsHandler_CollectsFiveSuccessfulChannelsPerProtocol(t *testing.T) {
+func TestModelsHandler_CollectsTwoSuccessfulChannelsPerProtocol(t *testing.T) {
 	var calls atomic.Int32
 	upstreams := make([]config.UpstreamConfig, 0, 6)
 	servers := make([]*httptest.Server, 0, 6)
@@ -510,13 +511,64 @@ func TestModelsHandler_CollectsFiveSuccessfulChannelsPerProtocol(t *testing.T) {
 	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("解析响应失败: %v", err)
 	}
-	for i := 1; i <= 5; i++ {
-		if findModelEntry(resp.Data, fmt.Sprintf("model-%d", i)) == nil {
-			t.Fatalf("缺少成功渠道模型 model-%d: %#v", i, resp.Data)
-		}
+	if findModelEntry(resp.Data, "model-1") == nil {
+		t.Fatalf("缺少首个成功渠道模型 model-1: %#v", resp.Data)
+	}
+	if findModelEntry(resp.Data, "model-2") == nil {
+		t.Fatalf("缺少第二个成功渠道模型 model-2: %#v", resp.Data)
 	}
 	if findModelEntry(resp.Data, "model-0") != nil {
 		t.Fatalf("失败渠道模型不应出现: %#v", resp.Data)
+	}
+	if findModelEntry(resp.Data, "model-3") != nil {
+		t.Fatalf("不应继续采集后续成功渠道模型: %#v", resp.Data)
+	}
+	if got := calls.Load(); got != 3 {
+		t.Fatalf("渠道探测次数 = %d, want 3", got)
+	}
+}
+
+func TestModelsHandler_DisabledKeyFallbackStopsAtCollectTimeout(t *testing.T) {
+	var calls atomic.Int32
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls.Add(1)
+		<-r.Context().Done()
+	}))
+	defer upstream.Close()
+
+	cfgManager := setupModelsConfigManager(t, config.Config{
+		Upstream: []config.UpstreamConfig{{
+			Name:    "messages-disabled-fallback-timeout",
+			BaseURL: upstream.URL,
+			DisabledAPIKeys: []config.DisabledKeyInfo{{
+				Key:        "sk-disabled",
+				Reason:     "authentication_error",
+				Message:    "invalid key",
+				DisabledAt: "2026-04-15T00:00:00Z",
+			}},
+			ServiceType: "claude",
+			Status:      "active",
+		}},
+	})
+	sch := newModelsTestScheduler(cfgManager)
+	router := newModelsRouterForAggregate(&config.EnvConfig{ProxyAccessKey: "test-key"}, cfgManager, sch)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/models", nil)
+	req.Header.Set("Authorization", "Bearer test-key")
+	w := httptest.NewRecorder()
+
+	start := time.Now()
+	router.ServeHTTP(w, req)
+	elapsed := time.Since(start)
+
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, body=%s", w.Code, w.Body.String())
+	}
+	if got := calls.Load(); got != 1 {
+		t.Fatalf("fallback 探测次数 = %d, want 1", got)
+	}
+	if elapsed > 3*modelsCollectTimeout {
+		t.Fatalf("fallback 耗时 = %s, want <= %s", elapsed, 3*modelsCollectTimeout)
 	}
 }
 
@@ -560,6 +612,217 @@ func TestModelsHandler_XChannelOnlyQueriesPinnedChannel(t *testing.T) {
 	}
 	if otherCalls.Load() != 0 {
 		t.Fatalf("other channel should not be queried, calls=%d", otherCalls.Load())
+	}
+}
+
+func TestModelsHandler_ProbesActiveKeysInChannelConcurrently(t *testing.T) {
+	var slowCalls atomic.Int32
+	var fastCalls atomic.Int32
+	var fastWaitTimedOut atomic.Bool
+	slowStarted := make(chan struct{})
+
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Header.Get("Authorization") {
+		case "Bearer sk-slow":
+			slowCalls.Add(1)
+			close(slowStarted)
+			<-r.Context().Done()
+		case "Bearer sk-fast":
+			fastCalls.Add(1)
+			select {
+			case <-slowStarted:
+			case <-time.After(800 * time.Millisecond):
+				fastWaitTimedOut.Store(true)
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"object":"list","data":[{"id":"model-fast","object":"model"}]}`))
+		default:
+			t.Fatalf("unexpected Authorization = %q", r.Header.Get("Authorization"))
+		}
+	}))
+	defer upstream.Close()
+
+	cfgManager := setupModelsConfigManager(t, config.Config{
+		Upstream: []config.UpstreamConfig{{
+			Name:        "messages-multi-key",
+			BaseURL:     upstream.URL,
+			APIKeys:     []string{"sk-slow", "sk-fast"},
+			ServiceType: "claude",
+		}},
+	})
+	sch := newModelsTestScheduler(cfgManager)
+	router := newModelsRouterForAggregate(&config.EnvConfig{ProxyAccessKey: "test-key"}, cfgManager, sch)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/models", nil)
+	req.Header.Set("Authorization", "Bearer test-key")
+	w := httptest.NewRecorder()
+
+	start := time.Now()
+	router.ServeHTTP(w, req)
+	elapsed := time.Since(start)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, body=%s", w.Code, w.Body.String())
+	}
+	if fastWaitTimedOut.Load() {
+		t.Fatal("fast key did not observe slow key request, expected concurrent probing")
+	}
+	if slowCalls.Load() != 1 || fastCalls.Load() != 1 {
+		t.Fatalf("slow/fast calls = %d/%d, want 1/1", slowCalls.Load(), fastCalls.Load())
+	}
+	if elapsed > modelsCollectTimeout {
+		t.Fatalf("并发 key 探测耗时 = %s, want <= %s", elapsed, modelsCollectTimeout)
+	}
+
+	var resp ModelsResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("解析响应失败: %v", err)
+	}
+	if findModelEntry(resp.Data, "model-fast") == nil {
+		t.Fatalf("缺少 fast key 返回模型: %#v", resp.Data)
+	}
+}
+
+func TestModelsHandler_PrefersActiveKeysOverDisabledKeysInSameChannel(t *testing.T) {
+	var activeCalls atomic.Int32
+	var disabledCalls atomic.Int32
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Header.Get("Authorization") {
+		case "Bearer sk-active":
+			activeCalls.Add(1)
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"object":"list","data":[{"id":"model-active","object":"model"}]}`))
+		case "Bearer sk-disabled":
+			disabledCalls.Add(1)
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"object":"list","data":[{"id":"model-disabled","object":"model"}]}`))
+		default:
+			t.Fatalf("unexpected Authorization = %q", r.Header.Get("Authorization"))
+		}
+	}))
+	defer upstream.Close()
+
+	cfgManager := setupModelsConfigManager(t, config.Config{
+		Upstream: []config.UpstreamConfig{{
+			Name:        "messages-active-and-disabled",
+			BaseURL:     upstream.URL,
+			APIKeys:     []string{"sk-active"},
+			ServiceType: "claude",
+			DisabledAPIKeys: []config.DisabledKeyInfo{{
+				Key:        "sk-disabled",
+				Reason:     "authentication_error",
+				Message:    "invalid key",
+				DisabledAt: "2026-04-15T00:00:00Z",
+			}},
+		}},
+	})
+	sch := newModelsTestScheduler(cfgManager)
+	router := newModelsRouterForAggregate(&config.EnvConfig{ProxyAccessKey: "test-key"}, cfgManager, sch)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/models", nil)
+	req.Header.Set("Authorization", "Bearer test-key")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, body=%s", w.Code, w.Body.String())
+	}
+	if activeCalls.Load() != 1 {
+		t.Fatalf("active calls = %d, want 1", activeCalls.Load())
+	}
+	if disabledCalls.Load() != 0 {
+		t.Fatalf("disabled key should not be used when active key exists, calls=%d", disabledCalls.Load())
+	}
+}
+
+func TestModelsHandler_ReturnsRecentCacheWhenDiscoveryFails(t *testing.T) {
+	var fail atomic.Bool
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if fail.Load() {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"object":"list","data":[{"id":"model-cached","object":"model"}]}`))
+	}))
+	defer upstream.Close()
+
+	cfgManager := setupModelsConfigManager(t, config.Config{
+		ChatUpstream: []config.UpstreamConfig{{
+			Name:        "chat-cache",
+			BaseURL:     upstream.URL,
+			APIKeys:     []string{"sk-cache"},
+			ServiceType: "openai",
+		}},
+	})
+	sch := newModelsTestScheduler(cfgManager)
+	router := newModelsRouterForAggregate(&config.EnvConfig{ProxyAccessKey: "test-key"}, cfgManager, sch)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/models", nil)
+	req.Header.Set("Authorization", "Bearer test-key")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("initial status = %d, body=%s", w.Code, w.Body.String())
+	}
+
+	fail.Store(true)
+	req = httptest.NewRequest(http.MethodGet, "/v1/models", nil)
+	req.Header.Set("Authorization", "Bearer test-key")
+	w = httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("cached status = %d, body=%s", w.Code, w.Body.String())
+	}
+	var resp ModelsResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("解析缓存响应失败: %v", err)
+	}
+	if findModelEntry(resp.Data, "model-cached") == nil {
+		t.Fatalf("缺少缓存模型: %#v", resp.Data)
+	}
+}
+
+func TestModelsHandler_CacheSeparatesPinnedChannel(t *testing.T) {
+	defaultUpstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"object":"list","data":[{"id":"model-default","object":"model"}]}`))
+	}))
+	defer defaultUpstream.Close()
+
+	pinnedUpstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer pinnedUpstream.Close()
+
+	cfgManager := setupModelsConfigManager(t, config.Config{
+		ChatUpstream: []config.UpstreamConfig{
+			{Name: "chat-default", BaseURL: defaultUpstream.URL, APIKeys: []string{"sk-default"}, ServiceType: "openai", Priority: 0},
+			{Name: "chat-pinned", BaseURL: pinnedUpstream.URL, APIKeys: []string{"sk-pinned"}, ServiceType: "openai", Priority: 1},
+		},
+	})
+	sch := newModelsTestScheduler(cfgManager)
+	router := newModelsRouterForAggregate(&config.EnvConfig{ProxyAccessKey: "test-key"}, cfgManager, sch)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/models", nil)
+	req.Header.Set("Authorization", "Bearer test-key")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("default status = %d, body=%s", w.Code, w.Body.String())
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/v1/models", nil)
+	req.Header.Set("Authorization", "Bearer test-key")
+	req.Header.Set("X-Channel", "chat-pinned")
+	w = httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("pinned status = %d, body=%s", w.Code, w.Body.String())
 	}
 }
 

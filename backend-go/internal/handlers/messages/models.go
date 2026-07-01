@@ -17,6 +17,7 @@ import (
 
 	"github.com/BenedictKing/ccx/internal/config"
 	"github.com/BenedictKing/ccx/internal/httpclient"
+	"github.com/BenedictKing/ccx/internal/keypool"
 	"github.com/BenedictKing/ccx/internal/middleware"
 	"github.com/BenedictKing/ccx/internal/scheduler"
 	"github.com/BenedictKing/ccx/internal/utils"
@@ -24,11 +25,14 @@ import (
 )
 
 const (
-	modelsRequestTimeout = 30 * time.Second
-	modelsCollectTimeout = 1 * time.Second
-	modelsBatchSize      = 3
-	modelsMaxChannels    = 5
-	modelsMaxAttempts    = 10
+	modelsRequestTimeout      = 5 * time.Second
+	modelsCollectTimeout      = 1 * time.Second
+	modelsBatchSize           = 2
+	modelsMaxChannels         = 2
+	modelsMaxAttempts         = 3
+	modelsFallbackMaxAttempts = 1
+	modelsMaxKeysPerChannel   = 5
+	modelsDiscoveryCacheTTL   = 10 * time.Second
 )
 
 var errNoChannelWithDisabledKeys = errors.New("no channel with disabled keys")
@@ -61,6 +65,8 @@ type ModelEntry struct {
 
 // ModelsHandler 处理 /v1/models 请求，从 Messages、Responses、Chat、Gemini 和 Images 渠道获取并合并模型列表
 func ModelsHandler(envCfg *config.EnvConfig, cfgManager *config.ConfigManager, channelScheduler *scheduler.ChannelScheduler) gin.HandlerFunc {
+	cache := newModelsDiscoveryCache()
+
 	return func(c *gin.Context) {
 		middleware.ProxyAuthMiddleware(envCfg)(c)
 		if c.IsAborted() {
@@ -74,6 +80,10 @@ func ModelsHandler(envCfg *config.EnvConfig, cfgManager *config.ConfigManager, c
 			routePrefix:      c.Param("routePrefix"),
 			channelName:      c.GetHeader("X-Channel"),
 		}
+		cacheKey := modelsDiscoveryCacheKey{
+			routePrefix: req.routePrefix,
+			channelName: req.channelName,
+		}
 
 		results := collectModelsFromAllKinds(req)
 		messagesModels := results[scheduler.ChannelKindMessages]
@@ -85,6 +95,12 @@ func ModelsHandler(envCfg *config.EnvConfig, cfgManager *config.ConfigManager, c
 		mergedModels := mergeModels(messagesModels, responsesModels, chatModels, geminiModels, imagesModels)
 
 		if len(mergedModels) == 0 {
+			if cached, ok := cache.Get(cacheKey); ok {
+				log.Printf("[Models] 实时发现失败，返回缓存: routePrefix=%q, channel=%q, merged=%d",
+					req.routePrefix, req.channelName, len(cached.Data))
+				c.JSON(http.StatusOK, cached)
+				return
+			}
 			c.JSON(http.StatusNotFound, gin.H{
 				"error": gin.H{
 					"message": "models endpoint not available from any upstream",
@@ -95,12 +111,81 @@ func ModelsHandler(envCfg *config.EnvConfig, cfgManager *config.ConfigManager, c
 		}
 
 		response := buildModelsResponse(mergedModels)
+		cache.Set(cacheKey, response)
 
 		log.Printf("[Models] 合并完成: messages=%d, responses=%d, chat=%d, gemini=%d, images=%d, merged=%d",
 			len(messagesModels), len(responsesModels), len(chatModels), len(geminiModels), len(imagesModels), len(mergedModels))
 
 		c.JSON(http.StatusOK, response)
 	}
+}
+
+type modelsDiscoveryCacheKey struct {
+	routePrefix string
+	channelName string
+}
+
+type modelsDiscoveryCacheEntry struct {
+	response  ModelsResponse
+	expiresAt time.Time
+}
+
+type modelsDiscoveryCache struct {
+	mu      sync.RWMutex
+	entries map[modelsDiscoveryCacheKey]modelsDiscoveryCacheEntry
+}
+
+func newModelsDiscoveryCache() *modelsDiscoveryCache {
+	return &modelsDiscoveryCache{
+		entries: make(map[modelsDiscoveryCacheKey]modelsDiscoveryCacheEntry),
+	}
+}
+
+func (cache *modelsDiscoveryCache) Get(key modelsDiscoveryCacheKey) (ModelsResponse, bool) {
+	now := time.Now()
+
+	cache.mu.RLock()
+	entry, ok := cache.entries[key]
+	if !ok || now.After(entry.expiresAt) {
+		cache.mu.RUnlock()
+		return ModelsResponse{}, false
+	}
+	response := cloneModelsResponse(entry.response)
+	cache.mu.RUnlock()
+
+	return response, true
+}
+
+func (cache *modelsDiscoveryCache) Set(key modelsDiscoveryCacheKey, response ModelsResponse) {
+	now := time.Now()
+
+	cache.mu.Lock()
+	for cachedKey, entry := range cache.entries {
+		if now.After(entry.expiresAt) {
+			delete(cache.entries, cachedKey)
+		}
+	}
+	cache.entries[key] = modelsDiscoveryCacheEntry{
+		response:  cloneModelsResponse(response),
+		expiresAt: now.Add(modelsDiscoveryCacheTTL),
+	}
+	cache.mu.Unlock()
+}
+
+func cloneModelsResponse(response ModelsResponse) ModelsResponse {
+	clone := response
+	if response.Data == nil {
+		return clone
+	}
+
+	clone.Data = make([]ModelEntry, len(response.Data))
+	for i, model := range response.Data {
+		if model.InputModalities != nil {
+			model.InputModalities = append([]string(nil), model.InputModalities...)
+		}
+		clone.Data[i] = model
+	}
+	return clone
 }
 
 // ModelsDetailHandler 处理 /v1/models/:model 请求，转发到上游
@@ -156,6 +241,11 @@ type modelsChannelCandidate struct {
 	selection *scheduler.SelectionResult
 }
 
+type modelsAPIKeyCandidate struct {
+	apiKey           string
+	disabledFallback bool
+}
+
 func collectModelsFromAllKinds(req modelsCollectionRequest) map[scheduler.ChannelKind][]ModelEntry {
 	kinds := []scheduler.ChannelKind{
 		scheduler.ChannelKindMessages,
@@ -190,16 +280,16 @@ func collectModelsFromChannels(req modelsCollectionRequest, kind scheduler.Chann
 		return nil
 	}
 
+	ctx, cancel := context.WithTimeout(req.ctx, modelsCollectTimeout)
+	defer cancel()
+
 	candidates, failedChannels := selectModelsChannelCandidates(req, kind)
 	if len(candidates) == 0 {
 		if req.channelName == "" {
-			return fetchModelsFromDisabledKeyFallback(req, kind, failedChannels)
+			return fetchModelsFromDisabledKeyFallback(ctx, req, kind, failedChannels, modelsFallbackMaxAttempts)
 		}
 		return nil
 	}
-
-	ctx, cancel := context.WithTimeout(req.ctx, modelsCollectTimeout)
-	defer cancel()
 
 	resultsByIndex := make(map[int][]ModelEntry, len(candidates))
 	successCount := 0
@@ -245,8 +335,8 @@ func collectModelsFromChannels(req modelsCollectionRequest, kind scheduler.Chann
 	}
 
 	if len(resultsByIndex) == 0 {
-		if req.channelName == "" {
-			if fallback := fetchModelsFromDisabledKeyFallback(req, kind, failedChannels); len(fallback) > 0 {
+		if req.channelName == "" && ctx.Err() == nil {
+			if fallback := fetchModelsFromDisabledKeyFallback(ctx, req, kind, failedChannels, modelsFallbackMaxAttempts); len(fallback) > 0 {
 				return mergeModels(fallback)
 			}
 		}
@@ -295,16 +385,25 @@ func fetchModelsFromCandidate(ctx context.Context, cfgManager *config.ConfigMana
 	return parseModelsResponseForKind(body, upstream, cfgManager.GetConfig().UpstreamModelCapabilities, kind)
 }
 
-func fetchModelsFromDisabledKeyFallback(req modelsCollectionRequest, kind scheduler.ChannelKind, failedChannels map[int]bool) []ModelEntry {
-	for attempt := 0; attempt < modelsMaxAttempts; attempt++ {
+func fetchModelsFromDisabledKeyFallback(ctx context.Context, req modelsCollectionRequest, kind scheduler.ChannelKind, failedChannels map[int]bool, maxAttempts int) []ModelEntry {
+	if maxAttempts <= 0 || ctx.Err() != nil {
+		return nil
+	}
+	for attempt := 0; attempt < maxAttempts; attempt++ {
+		if ctx.Err() != nil {
+			return nil
+		}
 		selection, err := selectChannelWithDisabledKeys(req.cfgManager, failedChannels, kind, req.routePrefix)
 		if err != nil {
 			break
 		}
 		log.Printf("[%s-Models] 活跃渠道不可用，回退到挂起渠道查询模型: channel=%s, reason=%s", channelKindLabel(kind), selection.Upstream.Name, selection.Reason)
-		body, upstream, ok := requestModelsFromSelection(req.ctx, req.cfgManager, selection, "GET", "", kind)
+		body, upstream, ok := requestModelsFromSelection(ctx, req.cfgManager, selection, "GET", "", kind)
 		if ok {
 			return parseModelsResponseForKind(body, upstream, req.cfgManager.GetConfig().UpstreamModelCapabilities, kind)
+		}
+		if ctx.Err() != nil {
+			return nil
 		}
 		failedChannels[selection.ChannelIndex] = true
 	}
@@ -781,12 +880,92 @@ func requestModelsFromSelection(ctx context.Context, cfgManager *config.ConfigMa
 
 	client := httpclient.GetManager().GetStandardClient(modelsRequestTimeout, upstream.InsecureSkipVerify, upstream.ProxyURL)
 
-	apiKey, usedDisabledFallback, err := cfgManager.GetAdminAPIKey(upstream, nil, channelType)
-	if err != nil {
-		log.Printf("[%s-Models] 获取 API Key 失败: channel=%s, error=%v", channelType, upstream.Name, err)
+	keyCandidates := selectModelsAPIKeyCandidates(cfgManager, upstream, channelType)
+	if len(keyCandidates) == 0 {
+		log.Printf("[%s-Models] 获取 API Key 失败: channel=%s, error=没有可用于模型探测的密钥", channelType, upstream.Name)
 		return nil, upstream, false
 	}
-	if usedDisabledFallback {
+
+	type requestResult struct {
+		body []byte
+		ok   bool
+	}
+
+	keyCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	resultCh := make(chan requestResult, len(keyCandidates))
+	for _, candidate := range keyCandidates {
+		candidate := candidate
+		go func() {
+			body, ok := requestModelsWithKey(keyCtx, client, candidateURLs, upstream, method, kind, selection.Reason, candidate)
+			resultCh <- requestResult{body: body, ok: ok}
+		}()
+	}
+
+	for range keyCandidates {
+		select {
+		case result := <-resultCh:
+			if result.ok {
+				cancel()
+				return result.body, upstream, true
+			}
+		case <-ctx.Done():
+			return nil, upstream, false
+		}
+	}
+
+	return nil, upstream, false
+}
+
+func selectModelsAPIKeyCandidates(cfgManager *config.ConfigManager, upstream *config.UpstreamConfig, apiType string) []modelsAPIKeyCandidate {
+	if upstream == nil {
+		return nil
+	}
+
+	seen := make(map[string]bool, modelsMaxKeysPerChannel)
+	active := make([]modelsAPIKeyCandidate, 0, min(modelsMaxKeysPerChannel, len(upstream.APIKeys)))
+	for _, candidate := range keypool.CandidatesForModel(upstream, nil, "") {
+		key := strings.TrimSpace(candidate.APIKey)
+		if key == "" || seen[key] || cfgManager.IsKeyFailed(key, apiType) {
+			continue
+		}
+		seen[key] = true
+		active = append(active, modelsAPIKeyCandidate{apiKey: key})
+		if len(active) >= modelsMaxKeysPerChannel {
+			return active
+		}
+	}
+	if len(active) > 0 {
+		return active
+	}
+
+	// 只要渠道仍配置了正常 APIKeys，就不借用已拉黑 key。
+	for _, key := range upstream.APIKeys {
+		if strings.TrimSpace(key) != "" {
+			return nil
+		}
+	}
+
+	disabled := make([]modelsAPIKeyCandidate, 0, min(modelsMaxKeysPerChannel, len(upstream.DisabledAPIKeys)))
+	for _, disabledKey := range upstream.DisabledAPIKeys {
+		key := strings.TrimSpace(disabledKey.Key)
+		if key == "" || seen[key] {
+			continue
+		}
+		seen[key] = true
+		disabled = append(disabled, modelsAPIKeyCandidate{apiKey: key, disabledFallback: true})
+		if len(disabled) >= modelsMaxKeysPerChannel {
+			break
+		}
+	}
+	return disabled
+}
+
+func requestModelsWithKey(ctx context.Context, client *http.Client, candidateURLs []string, upstream *config.UpstreamConfig, method string, kind scheduler.ChannelKind, reason string, candidate modelsAPIKeyCandidate) ([]byte, bool) {
+	channelType := channelKindLabel(kind)
+	apiKey := candidate.apiKey
+	if candidate.disabledFallback {
 		log.Printf("[%s-Models] 使用已拉黑密钥查询模型列表: channel=%s, key=%s", channelType, upstream.Name, utils.MaskAPIKey(apiKey))
 	}
 
@@ -819,8 +998,8 @@ func requestModelsFromSelection(ctx context.Context, cfgManager *config.ConfigMa
 				continue
 			}
 			log.Printf("[%s-Models] 请求成功: method=%s, channel=%s, key=%s, url=%s, reason=%s",
-				channelType, method, upstream.Name, utils.MaskAPIKey(apiKey), candidateURL, selection.Reason)
-			return body, upstream, true
+				channelType, method, upstream.Name, utils.MaskAPIKey(apiKey), candidateURL, reason)
+			return body, true
 		}
 
 		if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
@@ -835,7 +1014,7 @@ func requestModelsFromSelection(ctx context.Context, cfgManager *config.ConfigMa
 		resp.Body.Close()
 	}
 
-	return nil, upstream, false
+	return nil, false
 }
 
 func channelKindLabel(kind scheduler.ChannelKind) string {
