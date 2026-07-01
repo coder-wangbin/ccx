@@ -905,3 +905,24 @@ func TestBuildPayloadSetsRunAPIWebsite(t *testing.T) {
 		t.Fatalf("Website = %q, want %q", got.Website, want)
 	}
 }
+
+func TestBuildPayloadGitHubCopilotSetsProxyURL(t *testing.T) {
+	got, err := BuildPayload(CreateChannelRequest{
+		Provider: ProviderGitHubCopilot,
+		Target:   TargetResponses,
+		APIKey:   "gho_test",
+		ProxyURL: " socks5://127.0.0.1:1080 ",
+	})
+	if err != nil {
+		t.Fatalf("BuildPayload() error = %v", err)
+	}
+	if got.ServiceType != "copilot" {
+		t.Fatalf("ServiceType = %q, want copilot", got.ServiceType)
+	}
+	if got.BaseURL != "https://api.githubcopilot.com" {
+		t.Fatalf("BaseURL = %q, want https://api.githubcopilot.com", got.BaseURL)
+	}
+	if got.ProxyURL != "socks5://127.0.0.1:1080" {
+		t.Fatalf("ProxyURL = %q, want socks5://127.0.0.1:1080", got.ProxyURL)
+	}
+}

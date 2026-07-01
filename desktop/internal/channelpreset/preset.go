@@ -8,26 +8,27 @@ import (
 )
 
 const (
-	ProviderDeepSeek     = "deepseek"
-	ProviderMiMo         = "mimo"
-	ProviderCompshare    = "compshare"
-	ProviderRunAPI       = "runapi"
-	ProviderUnity2       = "unity2"
-	ProviderKimi         = "kimi"
-	ProviderGLM          = "glm"
-	ProviderSenseNova    = "sensenova"
-	ProviderMiniMax      = "minimax"
-	ProviderDashScope    = "dashscope"
-	ProviderTencentLkeap = "tencent-lkeap"
-	ProviderKimiCode     = "kimi-code"
-	ProviderVolcArk      = "volc-ark"
-	ProviderQianfan      = "qianfan"
-	ProviderXFyun        = "xfyun"
-	ProviderOriginRouter = "originrouter"
-	ProviderOpenRouter   = "openrouter"
-	ProviderModelScope   = "modelscope"
-	ProviderOpenCodeZen  = "opencode-zen"
-	ProviderOpenCodeGo   = "opencode-go"
+	ProviderDeepSeek      = "deepseek"
+	ProviderMiMo          = "mimo"
+	ProviderCompshare     = "compshare"
+	ProviderRunAPI        = "runapi"
+	ProviderUnity2        = "unity2"
+	ProviderKimi          = "kimi"
+	ProviderGLM           = "glm"
+	ProviderSenseNova     = "sensenova"
+	ProviderMiniMax       = "minimax"
+	ProviderDashScope     = "dashscope"
+	ProviderTencentLkeap  = "tencent-lkeap"
+	ProviderKimiCode      = "kimi-code"
+	ProviderVolcArk       = "volc-ark"
+	ProviderQianfan       = "qianfan"
+	ProviderXFyun         = "xfyun"
+	ProviderOriginRouter  = "originrouter"
+	ProviderOpenRouter    = "openrouter"
+	ProviderModelScope    = "modelscope"
+	ProviderOpenCodeZen   = "opencode-zen"
+	ProviderOpenCodeGo    = "opencode-go"
+	ProviderGitHubCopilot = "github-copilot"
 
 	TargetMessages  = "messages"
 	TargetChat      = "chat"
@@ -86,6 +87,7 @@ type CreateChannelRequest struct {
 	APIKey      string `json:"apiKey"`
 	Name        string `json:"name"`
 	Description string `json:"description"`
+	ProxyURL    string `json:"proxyUrl"`
 }
 
 type CreateChannelResult struct {
@@ -104,6 +106,7 @@ type ChannelPayload struct {
 	AuthHeader                    string            `json:"authHeader,omitempty"`
 	BaseURL                       string            `json:"baseUrl"`
 	APIKeys                       []string          `json:"apiKeys"`
+	ProxyURL                      string            `json:"proxyUrl,omitempty"`
 	ModelMapping                  map[string]string `json:"modelMapping,omitempty"`
 	ReasoningMapping              map[string]string `json:"reasoningMapping,omitempty"`
 	ReasoningParamStyle           string            `json:"reasoningParamStyle,omitempty"`
@@ -487,6 +490,10 @@ func Presets() []ProviderPreset {
 }
 
 func BuildPayload(req CreateChannelRequest) (ChannelPayload, error) {
+	if strings.EqualFold(strings.TrimSpace(req.Provider), ProviderGitHubCopilot) {
+		return buildGitHubCopilotPayload(req)
+	}
+
 	preset, ok := FindPreset(req.Provider)
 	if !ok {
 		return ChannelPayload{}, fmt.Errorf("不支持的 provider: %s", req.Provider)
@@ -533,6 +540,42 @@ func BuildPayload(req CreateChannelRequest) (ChannelPayload, error) {
 		}
 	}
 	return payload, nil
+}
+
+func buildGitHubCopilotPayload(req CreateChannelRequest) (ChannelPayload, error) {
+	target := strings.TrimSpace(req.Target)
+	if target == "" {
+		target = TargetResponses
+	}
+	if target != TargetResponses {
+		return ChannelPayload{}, fmt.Errorf("GitHub Copilot 仅支持添加到 %s 渠道", TargetResponses)
+	}
+
+	apiKey := strings.TrimSpace(req.APIKey)
+	if apiKey == "" {
+		return ChannelPayload{}, fmt.Errorf("API Key 不能为空")
+	}
+
+	baseURL := strings.TrimSpace(req.BaseURL)
+	if baseURL == "" {
+		baseURL = "https://api.githubcopilot.com"
+	}
+	name := strings.TrimSpace(req.Name)
+	if name == "" {
+		name = defaultChannelName(ProviderGitHubCopilot, target)
+	}
+
+	return ChannelPayload{
+		Name:        name,
+		Description: strings.TrimSpace(req.Description),
+		Website:     "https://github.com/settings/copilot",
+		ServiceType: "copilot",
+		BaseURL:     baseURL,
+		APIKeys:     []string{apiKey},
+		ProxyURL:    strings.TrimSpace(req.ProxyURL),
+		Priority:    1,
+		Status:      "active",
+	}, nil
 }
 
 // targetMatchesURL 判断 URL 是否与 target 协议兼容。
