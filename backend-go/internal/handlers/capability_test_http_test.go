@@ -965,6 +965,9 @@ func TestBuildTestRequestWithModel_ChatReasoningEffortUsesProviderCompatibleValu
 	if body["reasoning_effort"] != "low" {
 		t.Fatalf("reasoning_effort=%v, want low", body["reasoning_effort"])
 	}
+	if body["max_tokens"] != float64(capabilityProbeMaxTokens) {
+		t.Fatalf("max_tokens=%v, want %d", body["max_tokens"], capabilityProbeMaxTokens)
+	}
 }
 
 func TestBuildTestRequestWithModel_KimiK27CodeChatUsesRequiredReasoningEffort(t *testing.T) {
