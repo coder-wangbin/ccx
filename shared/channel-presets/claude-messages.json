@@ -127,11 +127,12 @@
     },
     "opencode-go": {
       "modelMapping": {
-        "fable": "glm-5.2",
-        "haiku": "deepseek-v4-flash",
-        "opus": "glm-5.2",
-        "sonnet": "glm-5.2"
+        "fable": "minimax-m3",
+        "haiku": "minimax-m2.7",
+        "opus": "minimax-m3",
+        "sonnet": "minimax-m3"
       },
+      "authHeader": "x-api-key",
       "reasoningMapping": {
         "fable": "max",
         "haiku": "high",

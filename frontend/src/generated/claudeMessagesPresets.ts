@@ -7,6 +7,7 @@ export interface ClaudeMessagesPreset {
   modelMapping: Record<string, string>
   reasoningMapping: Partial<Record<string, ClaudeMessagesReasoningEffort>>
   reasoningParamStyle: ClaudeMessagesReasoningParamStyle
+  authHeader: '' | 'auto' | 'bearer' | 'x-api-key'
   passbackReasoningContent: boolean
   passbackThinkingBlocks: boolean
   stripEmptyTextBlocks: boolean
@@ -29,6 +30,7 @@ export const claudeMessagesPresets: Record<string, ClaudeMessagesPreset> = {
     },
     "reasoningMapping": {},
     "reasoningParamStyle": "reasoning",
+    "authHeader": "",
     "passbackReasoningContent": true,
     "passbackThinkingBlocks": true,
     "stripEmptyTextBlocks": true,
@@ -54,6 +56,7 @@ export const claudeMessagesPresets: Record<string, ClaudeMessagesPreset> = {
       "sonnet": "max"
     },
     "reasoningParamStyle": "thinking",
+    "authHeader": "",
     "passbackReasoningContent": true,
     "passbackThinkingBlocks": false,
     "stripEmptyTextBlocks": false,
@@ -82,6 +85,7 @@ export const claudeMessagesPresets: Record<string, ClaudeMessagesPreset> = {
       "sonnet": "max"
     },
     "reasoningParamStyle": "reasoning",
+    "authHeader": "",
     "passbackReasoningContent": true,
     "passbackThinkingBlocks": true,
     "stripEmptyTextBlocks": true,
@@ -99,6 +103,7 @@ export const claudeMessagesPresets: Record<string, ClaudeMessagesPreset> = {
     "modelMapping": {},
     "reasoningMapping": {},
     "reasoningParamStyle": "",
+    "authHeader": "",
     "passbackReasoningContent": false,
     "passbackThinkingBlocks": false,
     "stripEmptyTextBlocks": false,
@@ -113,6 +118,7 @@ export const claudeMessagesPresets: Record<string, ClaudeMessagesPreset> = {
     "modelMapping": {},
     "reasoningMapping": {},
     "reasoningParamStyle": "",
+    "authHeader": "",
     "passbackReasoningContent": false,
     "passbackThinkingBlocks": false,
     "stripEmptyTextBlocks": false,
@@ -132,6 +138,7 @@ export const claudeMessagesPresets: Record<string, ClaudeMessagesPreset> = {
     },
     "reasoningMapping": {},
     "reasoningParamStyle": "",
+    "authHeader": "",
     "passbackReasoningContent": false,
     "passbackThinkingBlocks": false,
     "stripEmptyTextBlocks": false,
@@ -151,6 +158,7 @@ export const claudeMessagesPresets: Record<string, ClaudeMessagesPreset> = {
     },
     "reasoningMapping": {},
     "reasoningParamStyle": "",
+    "authHeader": "",
     "passbackReasoningContent": false,
     "passbackThinkingBlocks": false,
     "stripEmptyTextBlocks": false,
@@ -170,6 +178,7 @@ export const claudeMessagesPresets: Record<string, ClaudeMessagesPreset> = {
     },
     "reasoningMapping": {},
     "reasoningParamStyle": "",
+    "authHeader": "",
     "passbackReasoningContent": false,
     "passbackThinkingBlocks": false,
     "stripEmptyTextBlocks": false,
@@ -192,6 +201,7 @@ export const claudeMessagesPresets: Record<string, ClaudeMessagesPreset> = {
     },
     "reasoningMapping": {},
     "reasoningParamStyle": "",
+    "authHeader": "",
     "passbackReasoningContent": true,
     "passbackThinkingBlocks": false,
     "stripEmptyTextBlocks": false,
@@ -211,6 +221,7 @@ export const claudeMessagesPresets: Record<string, ClaudeMessagesPreset> = {
     },
     "reasoningMapping": {},
     "reasoningParamStyle": "",
+    "authHeader": "",
     "passbackReasoningContent": false,
     "passbackThinkingBlocks": false,
     "stripEmptyTextBlocks": false,
@@ -235,6 +246,7 @@ export const claudeMessagesPresets: Record<string, ClaudeMessagesPreset> = {
       "sonnet": "max"
     },
     "reasoningParamStyle": "",
+    "authHeader": "",
     "passbackReasoningContent": false,
     "passbackThinkingBlocks": false,
     "stripEmptyTextBlocks": false,
@@ -247,10 +259,10 @@ export const claudeMessagesPresets: Record<string, ClaudeMessagesPreset> = {
   },
   "opencode-go": {
     "modelMapping": {
-      "fable": "glm-5.2",
-      "haiku": "deepseek-v4-flash",
-      "opus": "glm-5.2",
-      "sonnet": "glm-5.2"
+      "fable": "minimax-m3",
+      "haiku": "minimax-m2.7",
+      "opus": "minimax-m3",
+      "sonnet": "minimax-m3"
     },
     "reasoningMapping": {
       "fable": "max",
@@ -259,6 +271,7 @@ export const claudeMessagesPresets: Record<string, ClaudeMessagesPreset> = {
       "sonnet": "max"
     },
     "reasoningParamStyle": "",
+    "authHeader": "x-api-key",
     "passbackReasoningContent": false,
     "passbackThinkingBlocks": false,
     "stripEmptyTextBlocks": false,
@@ -278,6 +291,7 @@ export const claudeMessagesPresets: Record<string, ClaudeMessagesPreset> = {
     },
     "reasoningMapping": {},
     "reasoningParamStyle": "",
+    "authHeader": "",
     "passbackReasoningContent": false,
     "passbackThinkingBlocks": false,
     "stripEmptyTextBlocks": false,
@@ -305,6 +319,7 @@ export const claudeMessagesPresets: Record<string, ClaudeMessagesPreset> = {
       "minimax-m3": "xhigh"
     },
     "reasoningParamStyle": "reasoning",
+    "authHeader": "",
     "passbackReasoningContent": true,
     "passbackThinkingBlocks": true,
     "stripEmptyTextBlocks": true,
@@ -327,6 +342,7 @@ export const claudeMessagesPresets: Record<string, ClaudeMessagesPreset> = {
     },
     "reasoningMapping": {},
     "reasoningParamStyle": "",
+    "authHeader": "",
     "passbackReasoningContent": false,
     "passbackThinkingBlocks": false,
     "stripEmptyTextBlocks": false,
@@ -346,6 +362,7 @@ export const claudeMessagesPresets: Record<string, ClaudeMessagesPreset> = {
     },
     "reasoningMapping": {},
     "reasoningParamStyle": "",
+    "authHeader": "",
     "passbackReasoningContent": false,
     "passbackThinkingBlocks": false,
     "stripEmptyTextBlocks": false,
@@ -360,6 +377,7 @@ export const claudeMessagesPresets: Record<string, ClaudeMessagesPreset> = {
     "modelMapping": {},
     "reasoningMapping": {},
     "reasoningParamStyle": "",
+    "authHeader": "",
     "passbackReasoningContent": false,
     "passbackThinkingBlocks": false,
     "stripEmptyTextBlocks": false,

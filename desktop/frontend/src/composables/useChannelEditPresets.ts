@@ -22,6 +22,7 @@ type FormLike = {
   textVerbosity: 'low' | 'medium' | 'high' | ''
   visionFallbackModel: string
   visionFallbackReasoningEffort: ModelMappingRow['reasoning']
+  authHeader: 'auto' | 'bearer' | 'x-api-key' | ''
 }
 
 type ChannelEditPresetOptions = {
@@ -85,6 +86,7 @@ export function useChannelEditPresets(options: ChannelEditPresetOptions) {
     options.form.noVision = preset.noVision
     options.form.visionFallbackModel = preset.visionFallbackModel
     options.form.visionFallbackReasoningEffort = ''
+    options.form.authHeader = preset.authHeader || 'auto'
   }
 
   function applyCodexResponsesPreset(name: string) {

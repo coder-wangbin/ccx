@@ -723,6 +723,7 @@ func defaultChannelName(provider string, target string) string {
 
 type channelTargetConfig struct {
 	ServiceType                   string
+	AuthHeader                    string
 	ModelMapping                  map[string]string
 	ReasoningMapping              map[string]string
 	ReasoningParamStyle           string
@@ -796,6 +797,9 @@ func applyKimiPlanOverrides(config channelTargetConfig, target string, planID st
 func applyChannelTargetConfig(payload *ChannelPayload, config channelTargetConfig) {
 	if config.ServiceType != "" {
 		payload.ServiceType = config.ServiceType
+	}
+	if config.AuthHeader != "" {
+		payload.AuthHeader = config.AuthHeader
 	}
 	payload.ModelMapping = maps.Clone(config.ModelMapping)
 	payload.ReasoningMapping = maps.Clone(config.ReasoningMapping)

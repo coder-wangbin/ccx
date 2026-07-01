@@ -386,10 +386,10 @@ func TestBuildPayload(t *testing.T) {
 			wantService:         "claude",
 			wantNormalizeSystem: true,
 			wantModelMap: map[string]string{
-				"fable":  "glm-5.2",
-				"haiku":  "deepseek-v4-flash",
-				"opus":   "glm-5.2",
-				"sonnet": "glm-5.2",
+				"fable":  "minimax-m3",
+				"haiku":  "minimax-m2.7",
+				"opus":   "minimax-m3",
+				"sonnet": "minimax-m3",
 			},
 			wantReasoning: map[string]string{
 				"fable":  "max",
