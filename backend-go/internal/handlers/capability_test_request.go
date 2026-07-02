@@ -448,7 +448,9 @@ func sendAndCheckStream(ctx context.Context, channel *config.UpstreamConfig, req
 	doneCh := make(chan streamResult, 1)
 
 	go func() {
-		preflight := common.PreflightStreamEvents(eventChan, errChan, common.StreamPreflightTimeouts{})
+		preflight := common.PreflightStreamEventsWithOptions(eventChan, errChan, common.StreamPreflightTimeouts{}, common.StreamPreflightOptions{
+			TreatThinkingAsContent: true,
+		})
 		if preflight.HasError {
 			doneCh <- streamResult{err: preflight.Error}
 			return
