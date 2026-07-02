@@ -172,13 +172,13 @@ func (s *ChannelScheduler) SelectChannelWithOptions(ctx context.Context, opts Se
 				}
 				upstream := s.getUpstreamByIndex(ch.Index, kind)
 				if upstream != nil && s.channelIsRuntimeAvailable(upstream, kind, ch.Index) {
-					log.Printf("[%s-Override] 按手动排序选择渠道: [%d] %s (user: %s)", prefix, ch.Index, ch.Name, maskUserID(userID))
+					log.Printf("[%s-Override] 按手动排序选择渠道: [%d] %s (user: %s, role=%s, sequenceHead=%s)", prefix, ch.Index, ch.Name, maskUserID(userID), schedulerAgentRoleForLog(opts.AgentRole), formatOverrideSequenceHead(sequence, 3))
 					// Idle 续期：对话活跃时延长 override TTL
 					s.overrideManager.RefreshOverrideForUser(string(kind), userID)
 					return s.selectionResult(kind, upstream, ch.Index, "manual_override"), nil
 				}
 			}
-			log.Printf("[%s-Override] 手动排序序列中无当前可用渠道，保留排序并回退默认调度 (user: %s)", prefix, maskUserID(userID))
+			log.Printf("[%s-Override] 手动排序序列中无当前可用渠道，保留排序并回退默认调度 (user: %s, role=%s, sequenceHead=%s)", prefix, maskUserID(userID), schedulerAgentRoleForLog(opts.AgentRole), formatOverrideSequenceHead(sequence, 3))
 		}
 	}
 
@@ -662,6 +662,34 @@ func applyManualOverrideOrder(activeChannels []ChannelInfo, sequence []conversat
 		}
 	}
 	return ordered
+}
+
+func schedulerAgentRoleForLog(role string) string {
+	if strings.TrimSpace(role) == "" {
+		return "unknown"
+	}
+	return role
+}
+
+func formatOverrideSequenceHead(sequence []conversation.ChannelEntry, limit int) string {
+	if len(sequence) == 0 {
+		return "[]"
+	}
+	if limit <= 0 || limit > len(sequence) {
+		limit = len(sequence)
+	}
+	parts := make([]string, 0, limit+1)
+	for _, entry := range sequence[:limit] {
+		name := entry.ChannelName
+		if name == "" {
+			name = "unknown"
+		}
+		parts = append(parts, fmt.Sprintf("%d:%s", entry.ChannelIndex, name))
+	}
+	if len(sequence) > limit {
+		parts = append(parts, fmt.Sprintf("+%d", len(sequence)-limit))
+	}
+	return "[" + strings.Join(parts, ",") + "]"
 }
 
 func traceAffinityKey(kind ChannelKind, userID string, requirement *ContextRequirement) string {
