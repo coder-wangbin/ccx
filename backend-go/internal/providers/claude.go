@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/BenedictKing/ccx/internal/config"
+	"github.com/BenedictKing/ccx/internal/thinkingcache"
 	"github.com/BenedictKing/ccx/internal/types"
 	"github.com/BenedictKing/ccx/internal/utils"
 	"github.com/gin-gonic/gin"
@@ -695,6 +696,9 @@ func (p *ClaudeProvider) ConvertToProviderRequest(c *gin.Context, upstream *conf
 		if !upstream.PassbackReasoningContent && !upstream.PassbackThinkingBlocks {
 			bodyBytes = stripThinkingBlocksFromBody(bodyBytes)
 		}
+	}
+	if sessionID := utils.ExtractUnifiedSessionID(c, bodyBytes); sessionID != "" {
+		bodyBytes, _ = thinkingcache.InjectCachedClaudeThinking(bodyBytes, sessionID, upstream)
 	}
 
 	// 注意：NormalizeSystemRoleToTopLevel（抽取 system 角色到顶层）已上移到

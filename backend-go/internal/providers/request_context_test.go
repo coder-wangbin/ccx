@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/BenedictKing/ccx/internal/config"
+	"github.com/BenedictKing/ccx/internal/thinkingcache"
 	"github.com/gin-gonic/gin"
 )
 
@@ -55,6 +56,46 @@ func TestClaudeProvider_ConvertToProviderRequest_PassbackConvertsRealThinking(t 
 	}
 	if !bytes.Contains(reqBody, []byte(`"type":"thinking"`)) {
 		t.Fatalf("request body should keep real thinking block for compatibility: %s", string(reqBody))
+	}
+}
+
+func TestClaudeProvider_ConvertToProviderRequest_InjectsCachedThinkingForDeepSeek(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	thinkingcache.ResetForTest()
+
+	content := []interface{}{map[string]interface{}{
+		"type":  "tool_use",
+		"id":    "toolu_123",
+		"name":  "Bash",
+		"input": map[string]interface{}{"command": "ls"},
+	}}
+	if !thinkingcache.StoreClaudeThinkingForContent("session-1", content, "cached reasoning") {
+		t.Fatal("expected thinking cache store to succeed")
+	}
+
+	body := []byte(`{
+		"model": "deepseek-v4-pro",
+		"thinking": {"type": "adaptive"},
+		"messages": [
+			{"role": "assistant", "content": [
+				{"type": "tool_use", "id": "toolu_123", "name": "Bash", "input": {"command": "ls"}}
+			]}
+		]
+	}`)
+	c := newGinContext(http.MethodPost, "/v1/messages", body, context.Background())
+	c.Request.Header.Set("X-Claude-Code-Session-Id", "session-1")
+	upstream := &config.UpstreamConfig{
+		BaseURL:     "https://api.deepseek.com",
+		ServiceType: "claude",
+	}
+
+	p := &ClaudeProvider{}
+	_, reqBody, err := p.ConvertToProviderRequest(c, upstream, "sk-ant-test")
+	if err != nil {
+		t.Fatalf("ConvertToProviderRequest() err = %v", err)
+	}
+	if !bytes.Contains(reqBody, []byte(`"type":"thinking"`)) || !bytes.Contains(reqBody, []byte(`"thinking":"cached reasoning"`)) {
+		t.Fatalf("request body missing cached thinking block: %s", string(reqBody))
 	}
 }
 

@@ -13,6 +13,7 @@ import (
 
 	"github.com/BenedictKing/ccx/internal/config"
 	"github.com/BenedictKing/ccx/internal/providers"
+	"github.com/BenedictKing/ccx/internal/thinkingcache"
 	"github.com/BenedictKing/ccx/internal/types"
 	"github.com/BenedictKing/ccx/internal/utils"
 	"github.com/gin-gonic/gin"
@@ -536,6 +537,9 @@ type StreamContext struct {
 	ToolUseBufferOrder    []int                       // tool_use block 的开始顺序，用于正规化重叠块
 	CommittedToolUseCount int                         // 已透传给客户端的 tool_use block 数量
 	ToolUseTruncated      bool                        // 是否已执行截断（注入 end_turn）
+	// DeepSeek Claude thinking 回填缓存
+	ThinkingCollector      *thinkingcache.ClaudeStreamCollector
+	ThinkingCacheSessionID string
 }
 
 // CollectedUsageData 从流事件中收集的 usage 数据
@@ -664,6 +668,7 @@ func ProcessStreamEvents(
 			if !ok {
 				progress.Finish("completed")
 				usage := logStreamCompletion(ctx, envCfg, startTime)
+				storeStreamThinkingCache(ctx, envCfg)
 				return usage, nil
 			}
 			keepaliveTicker.Reset(15 * time.Second)
@@ -794,6 +799,9 @@ func ProcessStreamEvent(
 	}
 
 	recordRawStreamEvent(ctx, event)
+	if ctx.ThinkingCollector != nil {
+		ctx.ThinkingCollector.ProcessEvent(event)
+	}
 
 	// 如果已截断（注入了 end_turn），后续事件只消费不转发
 	if ctx.ToolUseTruncated {
@@ -1150,6 +1158,15 @@ func logStreamCompletion(ctx *StreamContext, envCfg *config.EnvConfig, startTime
 	return usage
 }
 
+func storeStreamThinkingCache(ctx *StreamContext, envCfg *config.EnvConfig) {
+	if ctx == nil || ctx.ThinkingCollector == nil || ctx.ThinkingCacheSessionID == "" || ctx.ToolUseTruncated {
+		return
+	}
+	if ctx.ThinkingCollector.Store(ctx.ThinkingCacheSessionID) && envCfg.EnableResponseLogs && envCfg.ShouldLog("debug") {
+		streamLogf(ctx, "[Messages-ThinkingCache] 已缓存 Claude thinking 回填内容")
+	}
+}
+
 // logPartialResponse 记录部分响应日志
 func logPartialResponse(ctx *StreamContext, envCfg *config.EnvConfig) {
 	if envCfg.EnableResponseLogs && envCfg.IsDevelopment() {
@@ -1270,6 +1287,12 @@ func HandleStreamResponse(
 	ctx.RequestModel = requestModel
 	ctx.LowQuality = upstream.LowQuality
 	ctx.LogTag = RequestLogTag(c)
+	if thinkingcache.ShouldTrackClaudeThinking(upstream, requestBody) {
+		if sessionID := utils.ExtractUnifiedSessionID(c, requestBody); sessionID != "" {
+			ctx.ThinkingCollector = thinkingcache.NewClaudeStreamCollector()
+			ctx.ThinkingCacheSessionID = sessionID
+		}
+	}
 	seedSynthesizerFromRequest(ctx, requestBody)
 
 	// 回放预检测期间缓冲的事件
