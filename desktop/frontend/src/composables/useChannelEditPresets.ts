@@ -78,6 +78,9 @@ export function useChannelEditPresets(options: ChannelEditPresetOptions) {
       noVision: noVisionSet.has(target),
     }))
     options.form.reasoningParamStyle = preset.reasoningParamStyle as typeof options.form.reasoningParamStyle
+    if (preset.serviceType) {
+      options.form.serviceType = preset.serviceType as typeof options.form.serviceType
+    }
     options.form.passbackReasoningContent = preset.passbackReasoningContent
     options.form.passbackThinkingBlocks = preset.passbackThinkingBlocks
     options.form.stripEmptyTextBlocks = preset.stripEmptyTextBlocks
