@@ -7,6 +7,7 @@ export interface ClaudeMessagesPreset {
   modelMapping: Record<string, string>
   reasoningMapping: Partial<Record<string, ClaudeMessagesReasoningEffort>>
   reasoningParamStyle: ClaudeMessagesReasoningParamStyle
+  serviceType?: 'openai' | 'gemini' | 'claude' | 'responses' | 'copilot'
   authHeader: '' | 'auto' | 'bearer' | 'x-api-key'
   passbackReasoningContent: boolean
   passbackThinkingBlocks: boolean
@@ -237,41 +238,17 @@ export const claudeMessagesPresets: Record<string, ClaudeMessagesPreset> = {
       "fable": "glm-5.2",
       "haiku": "deepseek-v4-flash",
       "opus": "glm-5.2",
-      "sonnet": "glm-5.2"
-    },
-    "reasoningMapping": {
-      "fable": "max",
-      "haiku": "high",
-      "opus": "max",
-      "sonnet": "max"
-    },
-    "reasoningParamStyle": "",
-    "authHeader": "",
-    "passbackReasoningContent": false,
-    "passbackThinkingBlocks": false,
-    "stripEmptyTextBlocks": false,
-    "normalizeSystemRoleToTopLevel": true,
-    "stripImageGenerationTool": false,
-    "normalizeNonstandardChatRoles": false,
-    "noVision": false,
-    "noVisionModels": [],
-    "visionFallbackModel": ""
-  },
-  "opencode-go": {
-    "modelMapping": {
-      "fable": "minimax-m3",
-      "haiku": "minimax-m2.7",
-      "opus": "minimax-m3",
       "sonnet": "minimax-m3"
     },
     "reasoningMapping": {
       "fable": "max",
       "haiku": "high",
+      "minimax-m3": "max",
       "opus": "max",
       "sonnet": "max"
     },
-    "reasoningParamStyle": "",
-    "authHeader": "x-api-key",
+    "reasoningParamStyle": "reasoning",
+    "authHeader": "bearer",
     "passbackReasoningContent": false,
     "passbackThinkingBlocks": false,
     "stripEmptyTextBlocks": false,
@@ -279,8 +256,42 @@ export const claudeMessagesPresets: Record<string, ClaudeMessagesPreset> = {
     "stripImageGenerationTool": false,
     "normalizeNonstandardChatRoles": false,
     "noVision": false,
-    "noVisionModels": [],
-    "visionFallbackModel": ""
+    "noVisionModels": [
+      "glm-5.2",
+      "deepseek-v4-flash"
+    ],
+    "visionFallbackModel": "minimax-m3",
+    "serviceType": "openai"
+  },
+  "opencode-go": {
+    "modelMapping": {
+      "fable": "glm-5.2",
+      "haiku": "deepseek-v4-flash",
+      "opus": "glm-5.2",
+      "sonnet": "minimax-m3"
+    },
+    "reasoningMapping": {
+      "fable": "max",
+      "haiku": "high",
+      "minimax-m3": "max",
+      "opus": "max",
+      "sonnet": "max"
+    },
+    "reasoningParamStyle": "reasoning",
+    "authHeader": "bearer",
+    "passbackReasoningContent": false,
+    "passbackThinkingBlocks": false,
+    "stripEmptyTextBlocks": false,
+    "normalizeSystemRoleToTopLevel": true,
+    "stripImageGenerationTool": false,
+    "normalizeNonstandardChatRoles": false,
+    "noVision": false,
+    "noVisionModels": [
+      "glm-5.2",
+      "deepseek-v4-flash"
+    ],
+    "visionFallbackModel": "minimax-m3",
+    "serviceType": "openai"
   },
   "modelscope": {
     "modelMapping": {

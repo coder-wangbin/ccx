@@ -115,31 +115,42 @@
         "fable": "glm-5.2",
         "haiku": "deepseek-v4-flash",
         "opus": "glm-5.2",
-        "sonnet": "glm-5.2"
+        "sonnet": "minimax-m3"
       },
+      "serviceType": "openai",
+      "authHeader": "bearer",
       "reasoningMapping": {
         "fable": "max",
         "haiku": "high",
+        "minimax-m3": "max",
         "opus": "max",
         "sonnet": "max"
       },
-      "normalizeSystemRoleToTopLevel": true
+      "reasoningParamStyle": "reasoning",
+      "normalizeSystemRoleToTopLevel": true,
+      "noVisionModels": ["glm-5.2", "deepseek-v4-flash"],
+      "visionFallbackModel": "minimax-m3"
     },
     "opencode-go": {
       "modelMapping": {
-        "fable": "minimax-m3",
-        "haiku": "minimax-m2.7",
-        "opus": "minimax-m3",
+        "fable": "glm-5.2",
+        "haiku": "deepseek-v4-flash",
+        "opus": "glm-5.2",
         "sonnet": "minimax-m3"
       },
-      "authHeader": "x-api-key",
+      "serviceType": "openai",
+      "authHeader": "bearer",
       "reasoningMapping": {
         "fable": "max",
         "haiku": "high",
+        "minimax-m3": "max",
         "opus": "max",
         "sonnet": "max"
       },
-      "normalizeSystemRoleToTopLevel": true
+      "reasoningParamStyle": "reasoning",
+      "normalizeSystemRoleToTopLevel": true,
+      "noVisionModels": ["glm-5.2", "deepseek-v4-flash"],
+      "visionFallbackModel": "minimax-m3"
     },
     "modelscope": {
       "modelMapping": {

@@ -189,6 +189,7 @@ export interface ${config.interfaceName} {
   modelMapping: Record<string, string>
   reasoningMapping: Partial<Record<string, ${config.typePrefix}ReasoningEffort>>
   reasoningParamStyle: ${config.typePrefix}ReasoningParamStyle
+  serviceType?: 'openai' | 'gemini' | 'claude' | 'responses' | 'copilot'
   authHeader: '' | 'auto' | 'bearer' | 'x-api-key'
   passbackReasoningContent: boolean
   passbackThinkingBlocks: boolean

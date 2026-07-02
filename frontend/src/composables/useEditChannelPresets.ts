@@ -84,6 +84,9 @@ export function useEditChannelPresets(options: EditChannelPresetOptions) {
     options.form.modelMapping = { ...presetConfig.modelMapping }
     options.form.reasoningMapping = { ...(presetConfig.reasoningMapping || {}) } as FormLike['reasoningMapping']
     options.form.reasoningParamStyle = presetConfig.reasoningParamStyle as FormLike['reasoningParamStyle']
+    if (presetConfig.serviceType) {
+      options.form.serviceType = presetConfig.serviceType as FormLike['serviceType']
+    }
     options.form.authHeader = presetConfig.authHeader || 'auto'
     options.syncModelMappingRowsFromForm()
   }
