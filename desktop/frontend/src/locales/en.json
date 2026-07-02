@@ -460,6 +460,8 @@
   "env.groupServerDesc": "Desktop injects some runtime values on start; this section still matches .env.example.",
   "env.fieldPort": "Port",
   "env.descPort": "Preferred startup port. If occupied, the next available port is used automatically.",
+  "env.fieldBindHost": "Bind host",
+  "env.descBindHost": "Leave empty to listen on all interfaces (:PORT / 0.0.0.0). Use 127.0.0.1 for local-only access.",
   "env.fieldEnableHttps": "Enable local HTTPS",
   "env.descEnableHttps": "For clients such as Claude Desktop that only accept HTTPS gateways. WebURL and health checks switch to https when enabled.",
   "env.fieldTlsAutoCert": "Auto-generate local cert",

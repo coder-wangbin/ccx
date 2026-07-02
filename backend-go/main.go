@@ -847,7 +847,7 @@ func main() {
 	}
 
 	// 启动服务器
-	addr := fmt.Sprintf(":%d", envCfg.Port)
+	addr := listenAddressForEnv(envCfg)
 	endpoint := endpointForEnv(envCfg)
 
 	// 创建 HTTP 服务器
@@ -872,6 +872,7 @@ func main() {
 	}
 	fmt.Printf("\n")
 	fmt.Printf("[Server-Info] 协议: %s\n", strings.ToUpper(endpoint.Scheme))
+	fmt.Printf("[Server-Info] 监听地址: %s\n", addr)
 	fmt.Printf("[Server-Info] 管理界面: %s\n", endpoint.URL(""))
 	fmt.Printf("[Server-Info] API 地址: %s\n", endpoint.URL("/v1"))
 	if envCfg.EnableHTTPS {

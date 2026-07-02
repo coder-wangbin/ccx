@@ -460,6 +460,8 @@
   "env.groupServerDesc": "Desktop 会在启动时注入部分运行参数；这里仍完整覆盖 .env.example。",
   "env.fieldPort": "服务端口",
   "env.descPort": "启动时优先使用此端口，被占用时自动递增分配。",
+  "env.fieldBindHost": "监听主机",
+  "env.descBindHost": "留空等价于监听所有网卡（:PORT / 0.0.0.0）；填写 127.0.0.1 则只允许本机访问。",
   "env.fieldEnableHttps": "启用本地 HTTPS",
   "env.descEnableHttps": "用于 Claude Desktop 等只接受 HTTPS 网关的客户端；开启后 WebURL 和健康检查都会切换为 https。",
   "env.fieldTlsAutoCert": "自动生成本地证书",
