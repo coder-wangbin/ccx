@@ -1,3 +1,25 @@
+## [v2.9.29] - 2026-07-03
+
+### 新增
+
+- **token 成本(USD) 统计** - metrics: 新增 token 成本(USD) 统计
+- **loadShed reaper 与 cooldown 软跳过改进** - scheduler: loadShed reaper 自动推进到期状态、cooldown 软跳过与 scoped limiter 清理改进
+- **preflight 空响应详情诊断与敏感信息脱敏** - stream: preflight 空响应详情诊断与敏感信息脱敏
+
+### 修复
+
+- **MiniMax M2 系列上下文与输出元数据** - model-registry: 修正 MiniMax M2 系列上下文与输出元数据
+- **火山方舟 quota exceeded 识别与临时限流误判** - failover: 识别火山方舟 quota exceeded 并修复临时 token-per-minute 限流误判
+- **桌面渠道模型映射下拉框显示** - desktop: 修复渠道模型映射下拉框显示并清理调试日志
+
+### 文档
+
+- **Microsoft Store submission API 凭据获取说明** - skill: 补充 Microsoft Store submission API 凭据获取说明
+
+### 其他
+
+- **desktop-store-update 技能** - skill: 新增 desktop-store-update 技能
+
 ## [v2.9.28] - 2026-07-02
 
 ### 新增
