@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/BenedictKing/ccx/internal/config"
@@ -96,6 +97,44 @@ func TestClaudeProvider_ConvertToProviderRequest_InjectsCachedThinkingForDeepSee
 	}
 	if !bytes.Contains(reqBody, []byte(`"type":"thinking"`)) || !bytes.Contains(reqBody, []byte(`"thinking":"cached reasoning"`)) {
 		t.Fatalf("request body missing cached thinking block: %s", string(reqBody))
+	}
+}
+
+func TestClaudeProvider_ConvertToProviderRequest_StripsDeepSeekClearThinkingContextManagement(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	body := []byte(`{
+		"model": "deepseek-v4-pro",
+		"thinking": {"type": "adaptive"},
+		"context_management": {"edits": [{"keep": "all", "type": "clear_thinking_20251015"}]},
+		"messages": [{"role": "user", "content": [{"type": "text", "text": "hello"}]}]
+	}`)
+	c := newGinContext(http.MethodPost, "/v1/messages", body, context.Background())
+	c.Request.Header.Set("Anthropic-Beta", "claude-code-20250219,context-management-2025-06-27,effort-2025-11-24")
+	upstream := &config.UpstreamConfig{
+		BaseURL:     "https://api.deepseek.com/anthropic",
+		ServiceType: "claude",
+	}
+
+	p := &ClaudeProvider{}
+	req, reqBody, err := p.ConvertToProviderRequest(c, upstream, "sk-ant-test")
+	if err != nil {
+		t.Fatalf("ConvertToProviderRequest() err = %v", err)
+	}
+	if bytes.Contains(reqBody, []byte(`clear_thinking_20251015`)) {
+		t.Fatalf("request body should strip unsupported clear_thinking edit: %s", string(reqBody))
+	}
+	if bytes.Contains(reqBody, []byte(`context_management`)) {
+		t.Fatalf("empty context_management should be removed: %s", string(reqBody))
+	}
+	if !bytes.Contains(reqBody, []byte(`"thinking":{"type":"adaptive"}`)) {
+		t.Fatalf("request body should keep thinking request: %s", string(reqBody))
+	}
+	if got := req.Header.Get("Anthropic-Beta"); strings.Contains(got, "context-management-2025-06-27") {
+		t.Fatalf("Anthropic-Beta should strip unsupported context-management token, got %q", got)
+	}
+	if got := req.Header.Get("Anthropic-Beta"); !strings.Contains(got, "claude-code-20250219") || !strings.Contains(got, "effort-2025-11-24") {
+		t.Fatalf("Anthropic-Beta should keep other tokens, got %q", got)
 	}
 }
 
