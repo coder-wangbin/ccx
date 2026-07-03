@@ -10,6 +10,37 @@
 - Commit an app submission: https://learn.microsoft.com/en-us/windows/uwp/monetize/commit-an-app-submission
 - Get status for an app submission: https://learn.microsoft.com/en-us/windows/uwp/monetize/get-status-for-an-app-submission
 
+## 凭据与 applicationId 获取位置
+
+调用 Microsoft Store submission API 需要 `tenant_id`、`client_id`、`client_secret`、`applicationId` 四个值，全部在 Partner Center（`partner.microsoft.com`）后台获取，只需配置一次。
+
+### tenant_id / client_id / client_secret
+
+路径：**Account settings → Users** 页面，关联一个 Azure AD 应用。
+
+1. 先把组织 Partner Center 账号关联到组织 Azure AD 目录。参考 https://learn.microsoft.com/en-us/windows/apps/publish/partner-center/associate-azure-ad-with-partner-center
+2. 在 Users 页面 add Azure AD application，必须授予 **Manager** 角色（调用 submission API 必需）。
+3. 点进该应用，复制 **Tenant ID** 和 **Client ID**。
+4. 点 **Add new key**，复制 **Key**（即 client secret）。离开页面后无法再查看，必须当场保存。参考 https://learn.microsoft.com/en-us/windows/apps/publish/partner-center/manage-azure-ad-applications-in-partner-center#manage-keys
+
+对应脚本环境变量：`MS_STORE_TENANT_ID`、`MS_STORE_CLIENT_ID`、`MS_STORE_CLIENT_SECRET`。
+
+### applicationId
+
+路径：Partner Center 进入目标 app → **Product identity**（App identity）页面，那里的 **Store ID** 就是 `applicationId`，格式形如 `9NBLGGH4R315`。参考 https://learn.microsoft.com/en-us/windows/apps/publish/view-app-identity-details
+
+对应脚本环境变量：`MS_STORE_APPLICATION_ID`。
+
+### 前置条件（不满足 API 会失败）
+
+1. app 必须已存在：API 不能创建 app，必须先在 Partner Center 预留名称创建。
+2. 至少一次人工提交：该 app 必须先在 Partner Center 手动完成过一次提交，包括 age ratings 问卷；之后才能用 API 创建后续提交。
+3. CCX Desktop 已上架 Store，上述条件通常已满足。
+
+### 备选工具
+
+微软官方开源的 StoreBroker PowerShell 模块封装了这套 API：https://github.com/Microsoft/StoreBroker 。功能与本 skill 脚本等价，可作为替代方案。
+
 ## OAuth
 
 Token endpoint:
