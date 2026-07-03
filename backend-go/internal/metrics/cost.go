@@ -6,7 +6,7 @@ import (
 	"github.com/BenedictKing/ccx/internal/config"
 )
 
-const cnyToUSD = 1.0 / 7.2
+const cnyToUSD = 1.0 / 6.8
 
 // CalculateTokenCostUSD 根据当前模型价格估算 token 成本，返回 USD。
 func CalculateTokenCostUSD(model string, inputTokens, outputTokens, cacheCreationTokens, cacheReadTokens int64) float64 {

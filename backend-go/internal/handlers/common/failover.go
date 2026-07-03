@@ -1136,6 +1136,8 @@ func isInsufficientBalanceMessage(msg string) bool {
 		"ratelimit exceeded",
 		"too many requests",
 		"requests per",
+		"tokens per",
+		"perminute",
 		"请求过于频繁",
 		"请求频率",
 		"限流",
@@ -1181,7 +1183,7 @@ func isInsufficientBalanceMessage(msg string) bool {
 	statusWords := []string{
 		"insufficient", "negative", "exhausted", "depleted",
 		"too low", "expired", "overdue", "reached",
-		"not enough", "not sufficient",
+		"not enough", "not sufficient", "exceeded",
 		"failed",
 		"不足", "耗尽", "已用尽", "已用完", "已过期", "已到期",
 		"过期", "失败",

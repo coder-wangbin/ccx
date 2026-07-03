@@ -27,7 +27,7 @@ func TestCalculateTokenCostUSD_CNYConversion(t *testing.T) {
 		OutputPrice:         floatPtr(8),
 	}
 	cost := calcCostWithPricing(pricing, 1_000_000, 1_000_000, 0, 0)
-	// 10 CNY * (1/7.2) ≈ 1.3889 USD
+	// 10 CNY * (1/6.8) ≈ 1.4706 USD
 	if math.Abs(cost-(10.0*cnyToUSD)) > 0.0001 {
 		t.Fatalf("expected %.4f USD, got %v", 10.0*cnyToUSD, cost)
 	}
