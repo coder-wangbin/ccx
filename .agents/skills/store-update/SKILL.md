@@ -23,7 +23,7 @@ context: fork
 ### 1. 下载 MSIX 并校验
 
 ```bash
-python3 .claude/skills/store-update/scripts/download_store_msix.py --download-dir ./store-msix
+python3 .agents/skills/store-update/scripts/download_store_msix.py --download-dir ./store-msix
 ```
 
 脚本会：
@@ -60,7 +60,7 @@ python3 .claude/skills/store-update/scripts/download_store_msix.py --download-di
 ## 常用参数
 
 ```bash
-python3 .claude/skills/store-update/scripts/download_store_msix.py --help
+python3 .agents/skills/store-update/scripts/download_store_msix.py --help
 ```
 
 常用选项：

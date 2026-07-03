@@ -140,25 +140,31 @@ def download_packages_gh(
             raise DownloadError(f"重复架构 MSIX: {arch}")
         seen_arches.add(arch)
 
+        def release_download_args(pattern: str) -> list[str]:
+            args = ["release", "download"]
+            if tag:
+                args.append(tag)
+            args.extend([
+                "--repo", repo,
+                "--pattern", pattern,
+                "--dir", str(download_dir),
+                "--clobber",
+            ])
+            return args
+
         # Build glob patterns for both MSIX and its sha256 sidecar
         msix_pattern = f"**/*{asset.name}*"
         sha_pattern = f"**/*{asset.name}*.sha256"
 
         log(f"下载 MSIX: {asset.name}")
-        gh(["release", "download", "--repo", repo,
-            "--pattern", msix_pattern,
-            "--dir", str(download_dir),
-            "--clobber"], check=True, capture=False)
+        gh(release_download_args(msix_pattern), check=True, capture=False)
 
         sha_status = "release 中没有对应 .sha256，已计算本地 sha256"
         sha_asset = sha_assets.get(asset.name)
         if sha_asset:
             sha_pattern = f"**/*{sha_asset.name}*"
             log(f"下载 sha256: {sha_asset.name}")
-            gh(["release", "download", "--repo", repo,
-                "--pattern", sha_pattern,
-                "--dir", str(download_dir),
-                "--clobber"], check=True, capture=False)
+            gh(release_download_args(sha_pattern), check=True, capture=False)
 
             sha_path = download_dir / sha_asset.name
             expected = parse_sha256(sha_path.read_text(encoding="utf-8", errors="replace"))

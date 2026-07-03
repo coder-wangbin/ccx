@@ -8,6 +8,7 @@
 
 ### 修复
 
+- **agent skills 路径与 Store MSIX tag 下载** - skill: 修复 `.agents/skills` 内 skill 文档误指向 `.claude/skills` 的路径，并确保 store-update 脚本的 `--tag` 会传递给 `gh release download`
 - **MiniMax M2 系列上下文与输出元数据** - model-registry: 修正 MiniMax M2 系列上下文与输出元数据
 - **火山方舟 quota exceeded 识别与临时限流误判** - failover: 识别火山方舟 quota exceeded 并修复临时 token-per-minute 限流误判
 - **桌面渠道模型映射下拉框显示** - desktop: 修复渠道模型映射下拉框显示并清理调试日志
