@@ -257,4 +257,5 @@ docs/claude-code-investigation-*.md
 __pycache__/
 
 .mcp.json
-.serena/
+store-msix/
+
