@@ -22,6 +22,10 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// endpointPathPattern matches a trailing version segment such as "/v1" or
+// "/v1beta" so buildEndpointURL can skip appending another version prefix.
+var endpointPathPattern = regexp.MustCompile(`/v\d+[a-z]*$`)
+
 func GetUpstreams(cfgManager *config.ConfigManager) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		cfg := cfgManager.GetConfig()
@@ -282,8 +286,7 @@ func buildEndpointURL(baseURL, versionPrefix, endpoint string) string {
 	}
 	trimmed = strings.TrimRight(trimmed, "/")
 
-	versionPattern := regexp.MustCompile(`/v\d+[a-z]*$`)
-	if !skipVersionPrefix && !versionPattern.MatchString(trimmed) {
+	if !skipVersionPrefix && !endpointPathPattern.MatchString(trimmed) {
 		trimmed += versionPrefix
 	}
 	return trimmed + endpoint
