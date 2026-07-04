@@ -1140,5 +1140,21 @@
   "addChannel.pricingUnitLabel": "单位",
   "addChannel.defaultOutputTokensMeta": "默认输出 {tokens}",
   "addChannel.recommendedOutputTokensMeta": "推荐输出 {tokens}",
-  "addChannel.modelPricingUnitHint": "每 100 万 tokens"
+  "addChannel.modelPricingUnitHint": "每 100 万 tokens",
+  "addChannel.embeddingCompatibilityTitle": "Embedding 兼容性",
+  "addChannel.embeddingCompatibilityHint": "key 使用模型重定向后的实际上游模型名；fallback 只会在相同 embeddingSpaceId/实际模型、维度和归一化语义内发生。",
+  "addChannel.embeddingCompatibilityRedirectTargets": "重定向目标",
+  "addChannel.embeddingCompatibilityConfigured": "已配置 Embedding 空间",
+  "addChannel.embeddingCapabilityModelLabel": "实际模型",
+  "addChannel.embeddingCapabilityModelPlaceholder": "选择或输入上游 Embedding 模型",
+  "addChannel.embeddingSpaceIdLabel": "向量空间 ID",
+  "addChannel.embeddingSpaceIdPlaceholder": "留空时使用实际模型名",
+  "addChannel.embeddingDimensionsLabel": "默认维度",
+  "addChannel.embeddingSupportedDimensionsLabel": "支持的请求维度",
+  "addChannel.embeddingSupportedDimensionsPlaceholder": "例如 1024, 1536",
+  "addChannel.embeddingNormalizedLabel": "归一化",
+  "addChannel.embeddingNormalizedUnknown": "未指定",
+  "addChannel.embeddingNormalizedTrue": "已归一化",
+  "addChannel.embeddingNormalizedFalse": "未归一化",
+  "addChannel.embeddingCapabilitiesRowsInvalid": "请检查 Embedding 兼容性行：实际模型不能为空，维度必须为正整数，支持维度列表只能包含正整数。"
 }

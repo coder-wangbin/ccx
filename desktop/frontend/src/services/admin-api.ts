@@ -123,6 +123,13 @@ export interface UpstreamModelCapability {
   sources?: string[]
 }
 
+export interface EmbeddingCapability {
+  embeddingSpaceId?: string
+  dimensions?: number
+  supportedDimensions?: number[]
+  normalized?: boolean
+}
+
 export interface ModelPricing {
   unit?: string
   currency?: string
@@ -156,6 +163,7 @@ export interface Channel {
   insecureSkipVerify?: boolean
   modelMapping?: Record<string, string>
   modelCapabilities?: Record<string, UpstreamModelCapability>
+  embeddingCapabilities?: Record<string, EmbeddingCapability>
   defaultCapability?: UpstreamModelCapability
   allowUnknownContext?: boolean
   reasoningMapping?: Record<string, 'none' | 'low' | 'medium' | 'high' | 'xhigh' | 'max'>

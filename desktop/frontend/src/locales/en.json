@@ -1140,5 +1140,21 @@
   "addChannel.pricingUnitLabel": "Unit",
   "addChannel.defaultOutputTokensMeta": "Default output {tokens}",
   "addChannel.recommendedOutputTokensMeta": "Recommended output {tokens}",
-  "addChannel.modelPricingUnitHint": "Per 1M tokens"
+  "addChannel.modelPricingUnitHint": "Per 1M tokens",
+  "addChannel.embeddingCompatibilityTitle": "Embedding compatibility",
+  "addChannel.embeddingCompatibilityHint": "Keys use the actual upstream model name after model redirect. Fallback only stays within the same embeddingSpaceId/actual model, dimensions, and normalization semantics.",
+  "addChannel.embeddingCompatibilityRedirectTargets": "Redirect targets",
+  "addChannel.embeddingCompatibilityConfigured": "Configured embedding spaces",
+  "addChannel.embeddingCapabilityModelLabel": "Actual model",
+  "addChannel.embeddingCapabilityModelPlaceholder": "Select or enter an upstream embedding model",
+  "addChannel.embeddingSpaceIdLabel": "Vector space ID",
+  "addChannel.embeddingSpaceIdPlaceholder": "Empty uses the actual model name",
+  "addChannel.embeddingDimensionsLabel": "Default dimensions",
+  "addChannel.embeddingSupportedDimensionsLabel": "Supported request dimensions",
+  "addChannel.embeddingSupportedDimensionsPlaceholder": "For example 1024, 1536",
+  "addChannel.embeddingNormalizedLabel": "Normalized",
+  "addChannel.embeddingNormalizedUnknown": "Unspecified",
+  "addChannel.embeddingNormalizedTrue": "Normalized",
+  "addChannel.embeddingNormalizedFalse": "Not normalized",
+  "addChannel.embeddingCapabilitiesRowsInvalid": "Check embedding compatibility rows. Actual model is required; dimensions and supported dimensions must be positive integers."
 }
