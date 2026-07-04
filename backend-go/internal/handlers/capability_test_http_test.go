@@ -84,6 +84,48 @@ func TestCancelCapabilityTestJob_HTTP(t *testing.T) {
 	if stored.Tests[0].ModelResults[1].Outcome != CapabilityOutcomeCancelled {
 		t.Fatalf("running model outcome=%s, want cancelled", stored.Tests[0].ModelResults[1].Outcome)
 	}
+	if stored.Tests[0].Status != CapabilityProtocolStatusFailed {
+		t.Fatalf("protocol status=%s, want failed", stored.Tests[0].Status)
+	}
+}
+
+func TestStartCapabilityTest_DefaultRPM(t *testing.T) {
+	resetCapabilityTestState()
+	gin.SetMode(gin.TestMode)
+
+	tmpDir := t.TempDir()
+	configFile := filepath.Join(tmpDir, "config.json")
+	configBody := `{"upstream":[{"name":"channel","service_type":"claude","base_url":"https://example.com","api_keys":[]}]}`
+	if err := os.WriteFile(configFile, []byte(configBody), 0644); err != nil {
+		t.Fatalf("write config failed: %v", err)
+	}
+	cfgManager, err := config.NewConfigManager(configFile, "")
+	if err != nil {
+		t.Fatalf("create config manager failed: %v", err)
+	}
+	defer cfgManager.Close()
+
+	r := gin.New()
+	r.POST("/messages/channels/:id/capability-test", TestChannelCapability(cfgManager, nil, "messages"))
+
+	req := httptest.NewRequest(http.MethodPost, "/messages/channels/0/capability-test", strings.NewReader(`{"targetProtocols":["messages"]}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status=%d, want=%d, body=%s", w.Code, http.StatusOK, w.Body.String())
+	}
+
+	var resp struct {
+		Job CapabilityTestJob `json:"job"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode response failed: %v", err)
+	}
+	if resp.Job.EffectiveRPM != defaultCapabilityTestRPM {
+		t.Fatalf("effectiveRPM=%d, want=%d", resp.Job.EffectiveRPM, defaultCapabilityTestRPM)
+	}
 }
 
 func TestGetCapabilityTestJobStatus_HTTP(t *testing.T) {

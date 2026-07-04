@@ -79,6 +79,7 @@ func CancelCapabilityTestJob(cfgManager *config.ConfigManager, channelKind strin
 				}
 				job.Tests[i].Lifecycle = CapabilityLifecycleCancelled
 				job.Tests[i].Outcome = CapabilityOutcomeCancelled
+				job.Tests[i].Status = deriveCapabilityProtocolStatus(job.Tests[i].Lifecycle, job.Tests[i].Outcome)
 				reason := "cancelled"
 				job.Tests[i].Reason = &reason
 			}
@@ -239,7 +240,7 @@ func RetryCapabilityTestModel(cfgManager *config.ConfigManager, channelLogStore 
 			identityKey := metrics.GenerateMetricsIdentityKey(baseURL, apiKey, channel.ServiceType)
 			retryRPM := job.EffectiveRPM
 			if retryRPM <= 0 {
-				retryRPM = 10
+				retryRPM = defaultCapabilityTestRPM
 			}
 			if retryRPM > 60 {
 				retryRPM = 60

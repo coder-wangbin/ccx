@@ -34,7 +34,7 @@ const {
   prepareChannelSession,
   startProtocolTest,
   fetchSnapshot,
-  cancelTest,
+  cancelActiveTests,
   retryModelForProtocol,
   copyToTab,
   closeDialog,
@@ -46,7 +46,8 @@ const {
 } = useCapabilityTests()
 
 const isStarting = ref(false)
-const rpmValue = ref(10)
+const DEFAULT_CAPABILITY_TEST_RPM = 30
+const rpmValue = ref(DEFAULT_CAPABILITY_TEST_RPM)
 const copyingKey = ref('')
 const copyMessage = ref<{ type: 'success' | 'error'; text: string } | null>(null)
 
@@ -119,9 +120,9 @@ type ProtocolDisplayState = 'idle' | 'pending' | 'running' | 'success' | 'partia
 
 function getProtocolDisplayState(test: CapabilityProtocolJobResult): ProtocolDisplayState {
   if ((test.status as string) === 'idle') return 'idle'
+  if (test.lifecycle === 'cancelled' || test.outcome === 'cancelled') return 'cancelled'
   if (test.lifecycle === 'active' || test.status === 'running') return 'running'
   if (test.lifecycle === 'pending' || test.status === 'queued') return 'pending'
-  if (test.lifecycle === 'cancelled' || test.outcome === 'cancelled') return 'cancelled'
   if (test.outcome === 'partial') return 'partial'
   if (test.success || test.outcome === 'success') return 'success'
   return 'failed'
@@ -206,13 +207,7 @@ async function handleTestProtocol(protocol: string) {
 }
 
 async function handleCancel() {
-  if (!currentJob.value?.protocolJobRefs) return
-  for (const [, ref] of Object.entries(currentJob.value.protocolJobRefs)) {
-    if (ref.jobId) {
-      await cancelTest(props.channelType, props.channelId, ref.jobId)
-    }
-  }
-  // cancelTest 内部已重取 snapshot
+  await cancelActiveTests(props.channelType, props.channelId, props.channelType)
 }
 
 async function handleRetryModel(protocol: string, model: string) {
@@ -242,8 +237,8 @@ async function handleCopyToTab(targetProtocol: string, serviceProtocol: string) 
 }
 
 function handleRpmBlur() {
-  if (rpmValue.value < 1) rpmValue.value = 1
-  if (rpmValue.value > 60) rpmValue.value = 60
+  const parsedValue = Number.isFinite(rpmValue.value) ? Math.floor(rpmValue.value) : DEFAULT_CAPABILITY_TEST_RPM
+  rpmValue.value = Math.min(60, Math.max(1, parsedValue || DEFAULT_CAPABILITY_TEST_RPM))
 }
 
 function getRunModeLabel(mode: string): string {

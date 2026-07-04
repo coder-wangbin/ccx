@@ -23,6 +23,8 @@ type CapabilityTestRequest struct {
 	SourceTab       string   `json:"sourceTab"` // 可选：当前 Tab 的协议类型（用于跨协议测试）
 }
 
+const defaultCapabilityTestRPM = 30
+
 type ModelTestResult struct {
 	Model              string  `json:"model"`
 	ActualModel        string  `json:"actualModel,omitempty"` // 经 ModelMapping 重定向后实际发送给上游的模型名
@@ -100,7 +102,7 @@ func TestChannelCapability(cfgManager *config.ConfigManager, channelLogStore *me
 
 		effectiveRPM := req.RPM
 		if effectiveRPM <= 0 {
-			effectiveRPM = 10
+			effectiveRPM = defaultCapabilityTestRPM
 		}
 		if effectiveRPM > 60 {
 			effectiveRPM = 60

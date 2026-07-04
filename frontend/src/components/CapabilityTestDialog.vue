@@ -352,10 +352,11 @@ const { t } = useI18n()
 
 const errorMessage = ref('')
 const cancelling = ref(false)
-const rpmValue = ref(10)
+const DEFAULT_CAPABILITY_TEST_RPM = 30
+const rpmValue = ref(DEFAULT_CAPABILITY_TEST_RPM)
 
 watch(() => props.capabilityRpm, (value) => {
-  rpmValue.value = value >= 1 && value <= 60 ? Math.floor(value) : 10
+  rpmValue.value = value >= 1 && value <= 60 ? Math.floor(value) : DEFAULT_CAPABILITY_TEST_RPM
 }, { immediate: true })
 
 watch(() => props.modelValue, (open) => {
@@ -632,8 +633,8 @@ const handleTestProtocol = (protocol: string) => {
 }
 
 const handleRpmBlur = () => {
-  const parsedValue = Number.isFinite(rpmValue.value) ? Math.floor(rpmValue.value) : 10
-  const nextValue = Math.min(60, Math.max(1, parsedValue || 10))
+  const parsedValue = Number.isFinite(rpmValue.value) ? Math.floor(rpmValue.value) : DEFAULT_CAPABILITY_TEST_RPM
+  const nextValue = Math.min(60, Math.max(1, parsedValue || DEFAULT_CAPABILITY_TEST_RPM))
   rpmValue.value = nextValue
   emit('update:capabilityRpm', nextValue)
 }

@@ -26,8 +26,8 @@ const modelResults = computed(() => props.test.modelResults ?? [])
 // 是否显示 pending placeholder
 const shouldShowPendingPlaceholder = computed(() => {
   if (modelResults.value.length > 0) return false
-  const s = props.test.status
-  return s === 'running' || s === 'queued'
+  if (props.test.lifecycle === 'cancelled' || props.test.outcome === 'cancelled') return false
+  return props.test.lifecycle === 'active' || props.test.lifecycle === 'pending' || props.test.status === 'running' || props.test.status === 'queued'
 })
 
 // 是否显示"details unavailable"
@@ -44,6 +44,10 @@ function getModelBadgeClasses(result: CapabilityModelJobResult) {
     const retry = props.retryEnabled && canRetry(result)
     return `${base} bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-500/20 ${retry ? 'cursor-pointer hover:border-blue-500/40 hover:bg-blue-500/10' : ''}`
   }
+  if (isModelCancelledOrSkipped(result)) {
+    const retry = props.retryEnabled && canRetry(result)
+    return `${base} bg-muted/20 text-muted-foreground border border-border ${retry ? 'cursor-pointer hover:border-blue-500/40 hover:bg-blue-500/10' : ''}`
+  }
   if (result.status === 'running') return `${base} bg-blue-500/15 text-blue-700 dark:text-blue-300 border border-blue-500/20`
   if (result.status === 'queued') return `${base} bg-muted/30 text-muted-foreground border border-border`
   // idle / skipped / cancelled
@@ -52,7 +56,7 @@ function getModelBadgeClasses(result: CapabilityModelJobResult) {
 }
 
 function canRetry(result: CapabilityModelJobResult) {
-  return result.status === 'failed' || result.status === 'idle'
+  return result.status === 'failed' || result.status === 'idle' || result.status === 'skipped' || result.lifecycle === 'cancelled' || result.outcome === 'cancelled'
 }
 
 function getRetryHint(result: CapabilityModelJobResult) {
@@ -67,8 +71,16 @@ function isRedirected(result: CapabilityModelJobResult) {
 
 function getModelTooltipView(result: CapabilityModelJobResult) {
   if (result.status === 'success') return 'success'
-  if (result.status === 'running' || result.status === 'queued') return 'pending'
+  if (!isModelCancelledOrSkipped(result) && (result.status === 'running' || result.status === 'queued')) return 'pending'
   return 'failed'
+}
+
+function isModelCancelledOrSkipped(result: CapabilityModelJobResult) {
+  return result.lifecycle === 'cancelled' || result.outcome === 'cancelled' || result.status === 'skipped'
+}
+
+function isModelPending(result: CapabilityModelJobResult) {
+  return !isModelCancelledOrSkipped(result) && (result.status === 'running' || result.status === 'queued')
 }
 
 function formatStreaming(result: CapabilityModelJobResult) {
@@ -168,7 +180,7 @@ onBeforeUnmount(hideTooltip)
           class="h-3 w-3"
         />
         <Loader2
-          v-else-if="result.status === 'running' || result.status === 'queued'"
+          v-else-if="isModelPending(result)"
           class="h-3 w-3 animate-spin"
         />
         <Clock

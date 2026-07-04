@@ -21,8 +21,11 @@ const loading = ref(false)
 const polling = ref(false)
 const cancelling = ref(false)
 const error = ref('')
+const retryPendingUntil = ref<Record<string, number>>({})
 const pollers = new Map<string, ReturnType<typeof setInterval>>()
 const POLL_INTERVAL = 1000
+const RETRY_PENDING_MS = 1000
+const DEFAULT_CAPABILITY_TEST_RPM = 30
 const BASE_PROTOCOL_ORDER = ['messages', 'responses', 'chat', 'gemini'] as const
 type CapabilityChannelKind = typeof BASE_PROTOCOL_ORDER[number]
 type CopyToTabResult = { ok: true } | { ok: false; message: string }
@@ -227,16 +230,58 @@ function markCapabilityModelRetrying(job: CapabilityTestJob, protocol: string, m
   }
 }
 
+function applyCapabilityRetryPending(
+  job: CapabilityTestJob,
+  pendingMap: Record<string, number>,
+  now: number,
+): CapabilityTestJob {
+  return {
+    ...job,
+    tests: job.tests.map(test => {
+      let hasRetryPendingModel = false
+      const modelResults = (test.modelResults ?? []).map(modelResult => {
+        const key = `${test.protocol}:${modelResult.model}`
+        const pendingUntil = pendingMap[key]
+        if (!pendingUntil || now >= pendingUntil) {
+          delete pendingMap[key]
+          return modelResult
+        }
+        if (modelResult.lifecycle === 'active' || modelResult.status === 'running') {
+          return modelResult
+        }
+        if (modelResult.outcome === 'success' || modelResult.status === 'success') {
+          return modelResult
+        }
+        hasRetryPendingModel = true
+        return toRetryingCapabilityModel(modelResult)
+      })
+      if (!hasRetryPendingModel) {
+        return { ...test, modelResults }
+      }
+      return {
+        ...test,
+        status: 'running' as const,
+        lifecycle: 'active' as const,
+        outcome: 'unknown' as const,
+        success: false,
+        error: undefined,
+        reason: undefined,
+        modelResults,
+      }
+    }),
+  }
+}
+
 function isIdleCapabilityTest(test: CapabilityProtocolJobResult): boolean {
   return (test.status as string) === 'idle'
 }
 
 function isActiveCapabilityTest(test: CapabilityProtocolJobResult): boolean {
-  return !isIdleCapabilityTest(test) && (test.lifecycle === 'active' || test.status === 'running')
+  return !isIdleCapabilityTest(test) && test.lifecycle !== 'cancelled' && test.lifecycle !== 'done' && (test.lifecycle === 'active' || test.status === 'running')
 }
 
 function isPendingCapabilityTest(test: CapabilityProtocolJobResult): boolean {
-  return !isIdleCapabilityTest(test) && (test.lifecycle === 'pending' || test.status === 'queued')
+  return !isIdleCapabilityTest(test) && test.lifecycle !== 'cancelled' && test.lifecycle !== 'done' && (test.lifecycle === 'pending' || test.status === 'queued')
 }
 
 function isSuccessfulCapabilityTest(test: CapabilityProtocolJobResult): boolean {
@@ -294,6 +339,11 @@ function buildCapabilityProgress(tests: CapabilityProtocolJobResult[]) {
     for (const modelResult of test.modelResults ?? []) {
       progress.totalModels += 1
       if ((modelResult.status as string) === 'idle') continue
+      if (modelResult.lifecycle === 'cancelled' || modelResult.status === 'skipped') {
+        progress.skippedModels += 1
+        progress.completedModels += 1
+        continue
+      }
       if (modelResult.lifecycle === 'active' || modelResult.status === 'running') {
         progress.runningModels += 1
         continue
@@ -304,11 +354,6 @@ function buildCapabilityProgress(tests: CapabilityProtocolJobResult[]) {
       }
       if (modelResult.status === 'success' || modelResult.outcome === 'success') {
         progress.successModels += 1
-        progress.completedModels += 1
-        continue
-      }
-      if (modelResult.status === 'skipped' || modelResult.lifecycle === 'cancelled') {
-        progress.skippedModels += 1
         progress.completedModels += 1
         continue
       }
@@ -466,15 +511,69 @@ function collectActiveJobIds(job: CapabilityTestJob | null): string[] {
   if (!job) return []
   const seen = new Set<string>()
   for (const test of job.tests) {
-    if (test.lifecycle === 'active' || test.lifecycle === 'pending') {
+    if (isActiveCapabilityTest(test) || isPendingCapabilityTest(test)) {
       const jobId = job.protocolJobRefs?.[test.protocol]?.jobId || job.protocolJobIds?.[test.protocol]
       if (jobId) seen.add(jobId)
     }
   }
-  if (seen.size === 0 && job.jobId && job.tests.some(test => test.lifecycle === 'active' || test.lifecycle === 'pending')) {
+  if (seen.size === 0 && job.jobId && job.tests.some(test => isActiveCapabilityTest(test) || isPendingCapabilityTest(test))) {
     seen.add(job.jobId)
   }
   return Array.from(seen)
+}
+
+function markCapabilityModelCancelled(modelResult: CapabilityModelJobResult): CapabilityModelJobResult {
+  if (modelResult.lifecycle === 'active' || modelResult.status === 'running') {
+    return {
+      ...modelResult,
+      status: 'skipped',
+      lifecycle: 'cancelled',
+      outcome: 'cancelled',
+      success: false,
+      reason: 'cancelled',
+      error: 'cancelled',
+    }
+  }
+  if (modelResult.lifecycle === 'pending' || modelResult.status === 'queued') {
+    return {
+      ...modelResult,
+      status: 'skipped',
+      lifecycle: 'done',
+      outcome: 'unknown',
+      success: false,
+      reason: 'not_run',
+    }
+  }
+  return modelResult
+}
+
+function markActiveCapabilityTestsCancelled(job: CapabilityTestJob): CapabilityTestJob {
+  const now = new Date().toISOString()
+  const tests = job.tests.map(test => {
+    if (!isActiveCapabilityTest(test) && !isPendingCapabilityTest(test)) return test
+    return {
+      ...test,
+      status: 'failed' as const,
+      lifecycle: 'cancelled' as const,
+      outcome: 'cancelled' as const,
+      reason: 'cancelled',
+      success: false,
+      modelResults: (test.modelResults ?? []).map(markCapabilityModelCancelled),
+    }
+  })
+  const aggregate = getCapabilityAggregateState(tests)
+  return {
+    ...job,
+    status: aggregate.status,
+    lifecycle: aggregate.lifecycle,
+    outcome: aggregate.outcome,
+    activeOperations: aggregate.activeOperations,
+    tests,
+    compatibleProtocols: tests.filter(isSuccessfulCapabilityTest).map(test => test.protocol),
+    progress: buildCapabilityProgress(tests),
+    updatedAt: now,
+    finishedAt: aggregate.lifecycle === 'cancelled' || aggregate.lifecycle === 'done' ? now : job.finishedAt,
+  }
 }
 
 export function useCapabilityTests() {
@@ -490,6 +589,7 @@ export function useCapabilityTests() {
   function prepareChannelSession(channelType: string, channelId: number, channelName: string) {
     stopAllPolling()
     snapshot.value = null
+    retryPendingUntil.value = {}
     activeJob.value = buildCapabilityIdleJob(channelType, channelId, channelName)
     loading.value = false
     cancelling.value = false
@@ -553,7 +653,7 @@ export function useCapabilityTests() {
     return startTest(channelType, channelId, {
       targetProtocols: [protocol],
       models,
-      rpm,
+      rpm: rpm ?? DEFAULT_CAPABILITY_TEST_RPM,
       sourceTab: channelType,
       previousJobId: getPreviousJobId(protocol),
     })
@@ -565,7 +665,11 @@ export function useCapabilityTests() {
         ? `/api/${channelType}/channels/${channelId}/capability-snapshot?sourceTab=${sourceTab}`
         : `/api/${channelType}/channels/${channelId}/capability-snapshot`
       snapshot.value = await api.get<CapabilitySnapshot>(url)
-      const snapshotJob = buildCapabilityJobFromSnapshot(snapshot.value, channelType, channelId, channelName || activeJob.value?.channelName || '')
+      const snapshotJob = applyCapabilityRetryPending(
+        buildCapabilityJobFromSnapshot(snapshot.value, channelType, channelId, channelName || activeJob.value?.channelName || ''),
+        retryPendingUntil.value,
+        Date.now(),
+      )
       activeJob.value = snapshotJob
       if (!isCapabilityJobTerminal(snapshotJob)) {
         for (const jobId of collectActiveJobIds(snapshotJob)) {
@@ -582,10 +686,11 @@ export function useCapabilityTests() {
     const job = await api.get<CapabilityTestJob>(
       `/api/${channelType}/channels/${channelId}/capability-test/${jobId}`,
     )
+    const incomingJob = applyCapabilityRetryPending(job, retryPendingUntil.value, Date.now())
     const baseJob = activeJob.value && activeJob.value.channelId === channelId && activeJob.value.channelKind === job.channelKind
       ? activeJob.value
       : buildCapabilityIdleJob(channelType, channelId, job.channelName || '')
-    activeJob.value = mergeCapabilityJob(baseJob, job)
+    activeJob.value = mergeCapabilityJob(baseJob, incomingJob)
     if (activeJob.value && !isCapabilityJobTerminal(activeJob.value)) {
       for (const activeJobId of collectActiveJobIds(activeJob.value)) {
         startPolling(channelType, channelId, activeJobId)
@@ -637,6 +742,7 @@ export function useCapabilityTests() {
 
   function closeDialog() {
     stopAllPolling()
+    retryPendingUntil.value = {}
     loading.value = false
     cancelling.value = false
     clearError()
@@ -670,6 +776,32 @@ export function useCapabilityTests() {
     }
   }
 
+  async function cancelActiveTests(channelType: string, channelId: number, sourceTab = channelType) {
+    const currentJob = activeJob.value
+    if (!currentJob) return
+    const jobIds = collectActiveJobIds(currentJob)
+    if (jobIds.length === 0) return
+
+    cancelling.value = true
+    stopAllPolling()
+    retryPendingUntil.value = {}
+    activeJob.value = markActiveCapabilityTestsCancelled(currentJob)
+
+    try {
+      const results = await Promise.allSettled(
+        jobIds.map(jobId => api.del(`/api/${channelType}/channels/${channelId}/capability-test/${jobId}`)),
+      )
+      results.forEach((result, index) => {
+        if (result.status === 'rejected') {
+          console.error('Failed to cancel capability test job:', jobIds[index], result.reason)
+        }
+      })
+      await fetchSnapshot(channelType, channelId, sourceTab)
+    } finally {
+      cancelling.value = false
+    }
+  }
+
   // ── Retry ──
 
   async function retryModel(channelType: string, channelId: number, jobId: string) {
@@ -691,6 +823,10 @@ export function useCapabilityTests() {
       // 没有 jobId 则启动一个只测该模型的协议测试
       return startProtocolTest(channelType, channelId, protocol, modelGroup)
     }
+    const pendingUntil = Date.now() + RETRY_PENDING_MS
+    for (const retryModel of modelGroup) {
+      retryPendingUntil.value[`${protocol}:${retryModel}`] = pendingUntil
+    }
     if (activeJob.value) {
       activeJob.value = markCapabilityModelRetrying(activeJob.value, protocol, model)
     }
@@ -700,6 +836,9 @@ export function useCapabilityTests() {
         { protocol, model },
       )
     } catch (e) {
+      for (const retryModel of modelGroup) {
+        delete retryPendingUntil.value[`${protocol}:${retryModel}`]
+      }
       if (e instanceof AdminApiError && e.status === 404) {
         return startProtocolTest(channelType, channelId, protocol, modelGroup)
       }
@@ -791,6 +930,7 @@ export function useCapabilityTests() {
     stopAllPolling()
     activeJob.value = null
     snapshot.value = null
+    retryPendingUntil.value = {}
     error.value = ''
     loading.value = false
     cancelling.value = false
@@ -859,6 +999,7 @@ export function useCapabilityTests() {
     fetchSnapshot,
     fetchJobStatus,
     cancelTest,
+    cancelActiveTests,
     retryModel,
     retryModelForProtocol,
     copyToTab,

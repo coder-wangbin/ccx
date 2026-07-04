@@ -22,7 +22,7 @@ const capabilityTestDialogRef = ref<any | null>(null)
 const capabilityTestJobId = ref('')
 const capabilityPollers = ref<Record<string, ReturnType<typeof setInterval>>>({})
 const capabilityTestJob = ref<CapabilityTestJob | null>(null)
-const capabilityTestRpm = ref(10)
+const capabilityTestRpm = ref(30)
 const capabilityTestPreviousJobId = ref('') // 记录上一次的 jobId，用于复用成功结果
 const capabilityRetryPendingUntil = ref<Record<string, number>>({})
 
@@ -172,15 +172,15 @@ const isIdleCapabilityTest = (test: CapabilityProtocolJobResult): boolean => {
 }
 
 const isActiveCapabilityTest = (test: CapabilityProtocolJobResult): boolean => {
-  return test.lifecycle === 'active' || test.status === 'running'
+  return !isIdleCapabilityTest(test) && test.lifecycle !== 'cancelled' && test.lifecycle !== 'done' && (test.lifecycle === 'active' || test.status === 'running')
 }
 
 const isBusyCapabilityTest = (test: CapabilityProtocolJobResult): boolean => {
-  return !isIdleCapabilityTest(test) && (test.lifecycle === 'pending' || test.lifecycle === 'active' || test.status === 'queued' || test.status === 'running')
+  return !isIdleCapabilityTest(test) && test.lifecycle !== 'cancelled' && test.lifecycle !== 'done' && (test.lifecycle === 'pending' || test.lifecycle === 'active' || test.status === 'queued' || test.status === 'running')
 }
 
 const isPendingCapabilityTest = (test: CapabilityProtocolJobResult): boolean => {
-  return !isIdleCapabilityTest(test) && test.lifecycle === 'pending'
+  return !isIdleCapabilityTest(test) && test.lifecycle !== 'cancelled' && test.lifecycle !== 'done' && (test.lifecycle === 'pending' || test.status === 'queued')
 }
 
 const isSuccessfulCapabilityTest = (test: CapabilityProtocolJobResult): boolean => {
@@ -234,6 +234,11 @@ const buildCapabilityProgress = (tests: CapabilityProtocolJobResult[]) => {
     for (const modelResult of test.modelResults ?? []) {
       progress.totalModels += 1
       if ((modelResult.status as string) === 'idle') continue
+      if (modelResult.lifecycle === 'cancelled' || modelResult.status === 'skipped') {
+        progress.skippedModels += 1
+        progress.completedModels += 1
+        continue
+      }
       if (modelResult.lifecycle === 'active' || modelResult.status === 'running') {
         progress.runningModels += 1
         continue
@@ -244,11 +249,6 @@ const buildCapabilityProgress = (tests: CapabilityProtocolJobResult[]) => {
       }
       if (modelResult.status === 'success' || modelResult.outcome === 'success') {
         progress.successModels += 1
-        progress.completedModels += 1
-        continue
-      }
-      if (modelResult.status === 'skipped' || modelResult.lifecycle === 'cancelled') {
-        progress.skippedModels += 1
         progress.completedModels += 1
         continue
       }
@@ -702,7 +702,7 @@ const handleCopyToTab = async (targetProtocol: string, serviceProtocol = targetP
     rateLimitBurst: sourceChannel.rateLimitBurst,
     rateLimitMaxConcurrent: sourceChannel.rateLimitMaxConcurrent,
     rateLimitAutoFromHeaders: sourceChannel.rateLimitAutoFromHeaders,
-    rpm: sourceChannel.rpm ?? 10,
+    rpm: sourceChannel.rpm ?? 30,
   }
 
   try {

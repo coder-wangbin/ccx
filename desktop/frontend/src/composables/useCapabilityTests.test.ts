@@ -6,6 +6,7 @@ import type { CapabilityTestJob } from '@/services/admin-api'
 
 const apiPost = vi.fn()
 const apiGet = vi.fn()
+const apiDel = vi.fn()
 
 vi.mock('@/composables/useAdminApi', async () => {
   const actual = await vi.importActual<typeof import('@/composables/useAdminApi')>('@/composables/useAdminApi')
@@ -14,7 +15,7 @@ vi.mock('@/composables/useAdminApi', async () => {
     useAdminApi: () => ({
       post: apiPost,
       get: apiGet,
-      del: vi.fn(),
+      del: apiDel,
     }),
   }
 })
@@ -133,6 +134,48 @@ describe('useCapabilityTests', () => {
       .find(test => test.protocol === 'messages')
       ?.modelResults?.find(modelResult => modelResult.model === 'claude-b')
     expect(retriedModel?.status).toBe('queued')
+  })
+
+  it('keeps a retried model running when the first refresh still returns queued', async () => {
+    const capability = useCapabilityTests()
+    capability.prepareChannelSession('messages', 1, 'channel')
+
+    capability.activeJob.value = buildJob('job-1', [
+      {
+        model: 'claude-a',
+        status: 'failed',
+        lifecycle: 'done',
+        outcome: 'failed',
+        success: false,
+        latency: 0,
+        streamingSupported: false,
+      },
+    ])
+
+    apiPost.mockResolvedValueOnce({})
+    const queuedJob = buildJob('job-1', [
+      {
+        model: 'claude-a',
+        status: 'queued',
+        lifecycle: 'pending',
+        outcome: 'unknown',
+        success: false,
+        latency: 0,
+        streamingSupported: false,
+      },
+    ], 'queued', 'pending')
+    apiGet.mockResolvedValueOnce(queuedJob)
+    apiGet.mockResolvedValueOnce(queuedJob)
+
+    await capability.retryModelForProtocol('messages', 1, 'messages', 'claude-a')
+    await nextTick()
+
+    const protocol = capability.activeJob.value?.tests.find(test => test.protocol === 'messages')
+    const retriedModel = protocol?.modelResults?.find(modelResult => modelResult.model === 'claude-a')
+    expect(protocol?.status).toBe('running')
+    expect(protocol?.lifecycle).toBe('active')
+    expect(retriedModel?.status).toBe('running')
+    expect(retriedModel?.lifecycle).toBe('active')
   })
 
   it('falls back with all source models mapped to the same actual model', async () => {
@@ -258,6 +301,96 @@ describe('useCapabilityTests', () => {
       ['gpt-5.5', 'success', 'gpt-5.5', 88],
       ['gpt-5.4-mini', 'success', 'gpt-5.5', 88],
     ])
+  })
+
+  it('cancels active protocol jobs in parallel and marks the UI cancelled immediately', async () => {
+    const capability = useCapabilityTests()
+    capability.prepareChannelSession('messages', 1, 'channel')
+
+    const messagesJob = buildJob('job-messages', [
+      {
+        model: 'claude-a',
+        status: 'running',
+        lifecycle: 'active',
+        outcome: 'unknown',
+        success: false,
+        latency: 0,
+        streamingSupported: false,
+      },
+    ], 'running', 'active', 'messages', 'messages')
+    const chatJob = buildJob('job-chat', [
+      {
+        model: 'gpt-a',
+        status: 'queued',
+        lifecycle: 'pending',
+        outcome: 'unknown',
+        success: false,
+        latency: 0,
+        streamingSupported: false,
+      },
+    ], 'queued', 'pending', 'messages', 'chat')
+
+    capability.activeJob.value = {
+      ...messagesJob,
+      tests: [messagesJob.tests[0], chatJob.tests[0]],
+      protocolJobIds: { messages: 'job-messages', chat: 'job-chat' },
+      protocolJobRefs: {
+        messages: { jobId: 'job-messages', channelKind: 'messages', channelId: 1 },
+        chat: { jobId: 'job-chat', channelKind: 'messages', channelId: 1 },
+      },
+      progress: {
+        totalModels: 2,
+        queuedModels: 1,
+        runningModels: 1,
+        successModels: 0,
+        failedModels: 0,
+        skippedModels: 0,
+        completedModels: 0,
+      },
+    }
+
+    const cancelResolvers: Array<() => void> = []
+    apiDel.mockImplementation(() => new Promise<void>(resolve => {
+      cancelResolvers.push(resolve)
+    }))
+    apiGet.mockImplementationOnce(async () => ({
+      protocolJobIds: { messages: 'job-messages', chat: 'job-chat' },
+      protocolJobRefs: {
+        messages: { jobId: 'job-messages', channelKind: 'messages', channelId: 1 },
+        chat: { jobId: 'job-chat', channelKind: 'messages', channelId: 1 },
+      },
+      sourceType: 'messages',
+      tests: capability.activeJob.value?.tests ?? [],
+      compatibleProtocols: [],
+      totalDuration: 0,
+      progress: capability.activeJob.value?.progress ?? {
+        totalModels: 0,
+        queuedModels: 0,
+        runningModels: 0,
+        successModels: 0,
+        failedModels: 0,
+        skippedModels: 0,
+        completedModels: 0,
+      },
+      lifecycle: 'cancelled',
+      outcome: 'cancelled',
+      updatedAt: new Date().toISOString(),
+    }))
+
+    const cancelPromise = capability.cancelActiveTests('messages', 1)
+
+    expect(apiDel).toHaveBeenCalledTimes(2)
+    expect(apiDel).toHaveBeenNthCalledWith(1, '/api/messages/channels/1/capability-test/job-messages')
+    expect(apiDel).toHaveBeenNthCalledWith(2, '/api/messages/channels/1/capability-test/job-chat')
+    expect(capability.activeJob.value?.status).toBe('cancelled')
+    expect(capability.activeJob.value?.progress.runningModels).toBe(0)
+    expect(capability.activeJob.value?.progress.skippedModels).toBe(2)
+
+    cancelResolvers.forEach(resolve => resolve())
+    await cancelPromise
+
+    expect(apiGet).toHaveBeenCalledTimes(1)
+    expect(apiGet).toHaveBeenCalledWith('/api/messages/channels/1/capability-snapshot?sourceTab=messages')
   })
 })
 
