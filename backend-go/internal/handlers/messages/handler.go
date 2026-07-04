@@ -95,6 +95,10 @@ func Handler(envCfg *config.EnvConfig, cfgManager *config.ConfigManager, channel
 			return
 		}
 
+		if handleClaudeCodeModelSwitchProbe(c, claudeReq) {
+			return
+		}
+
 		// 检查是否为多渠道模式
 		isMultiChannel := channelScheduler.IsMultiChannelMode(scheduler.ChannelKindMessages)
 
@@ -642,6 +646,10 @@ func responseTextString(value interface{}) string {
 
 const claudeDesktopConnectionTestText = "I'm ready to help. What would you like to work on?"
 
+// claudeCodeModelSwitchProbeText 是 Claude Code 模型切换探针请求的内置响应文本。
+// 探针请求 max_tokens=1，仅验证模型可用性，不需要实质内容；返回非空文本避免被空响应拦截误判。
+const claudeCodeModelSwitchProbeText = "ok"
+
 var claudeDesktopConnectionTestDeltas = []string{
 	"I",
 	"'m",
@@ -743,6 +751,116 @@ func writeClaudeDesktopConnectionTestStream(c *gin.Context, model string) {
 		"usage": gin.H{
 			"input_tokens":                15,
 			"output_tokens":               14,
+			"cache_creation_input_tokens": 0,
+			"cache_read_input_tokens":     0,
+		},
+	})
+	writeClaudeSSEEvent(c, "message_stop", gin.H{
+		"type": "message_stop",
+	})
+}
+
+// handleClaudeCodeModelSwitchProbe 处理 Claude Code（CLI/桌面端）切换模型时发出的探针请求。
+// 探针特征：max_tokens=1 + 单条短 user 消息 + 无 tools，用于验证目标模型可用性。
+// 部分上游（如 MiMo）在 max_tokens=1 下返回空 content，会被 Fuzzy 模式空响应拦截误判为故障，
+// 触发 failover 最终报错，导致模型切换失败。命中探针时直接返回内置最小非空响应，不请求上游。
+func handleClaudeCodeModelSwitchProbe(c *gin.Context, req types.ClaudeRequest) bool {
+	if !isClaudeCodeModelSwitchProbe(req) {
+		return false
+	}
+
+	common.RequestLogf(c, "[Messages-ModelSwitchProbe] 命中 Claude Code 模型切换探针内置响应: model=%s, stream=%t", req.Model, req.Stream)
+	if req.Stream {
+		writeClaudeCodeModelSwitchProbeStream(c, req.Model)
+		return true
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"id":            "msg_ccx_model_switch_probe",
+		"type":          "message",
+		"role":          "assistant",
+		"model":         req.Model,
+		"content":       []gin.H{{"type": "text", "text": claudeCodeModelSwitchProbeText}},
+		"stop_reason":   "end_turn",
+		"stop_sequence": nil,
+		"usage": gin.H{
+			"input_tokens":                1,
+			"output_tokens":               1,
+			"cache_creation_input_tokens": 0,
+			"cache_read_input_tokens":     0,
+		},
+	})
+	return true
+}
+
+// isClaudeCodeModelSwitchProbe 判定是否为 Claude Code 模型切换探针请求。
+// 判据：max_tokens=1 + 单条 user 消息 + 无 tools/tool_choice + 单条短文本（1~16 字符）。
+// 不限制 model（任意目标模型）；不强制 system 含 Claude Code 标识，特征组合已足够区分。
+func isClaudeCodeModelSwitchProbe(req types.ClaudeRequest) bool {
+	if req.MaxTokens != 1 || len(req.Messages) != 1 || len(req.Tools) > 0 || req.ToolChoice != nil {
+		return false
+	}
+
+	msg := req.Messages[0]
+	if msg.Role != "user" {
+		return false
+	}
+	texts := extractRawUserTextBlocks(msg)
+	if len(texts) != 1 {
+		return false
+	}
+	trimmed := strings.TrimSpace(texts[0])
+	return len(trimmed) > 0 && len([]rune(trimmed)) <= 16
+}
+
+// writeClaudeCodeModelSwitchProbeStream 写入模型切换探针的流式内置响应。
+func writeClaudeCodeModelSwitchProbeStream(c *gin.Context, model string) {
+	c.Header("Content-Type", "text/event-stream")
+	c.Header("Cache-Control", "no-cache")
+	c.Header("Connection", "keep-alive")
+	c.Header("X-Accel-Buffering", "no")
+	c.Status(http.StatusOK)
+
+	writeClaudeSSEEvent(c, "message_start", gin.H{
+		"type": "message_start",
+		"message": gin.H{
+			"id":      "msg_ccx_model_switch_probe",
+			"type":    "message",
+			"role":    "assistant",
+			"model":   model,
+			"content": []interface{}{},
+			"usage": gin.H{
+				"input_tokens":                1,
+				"output_tokens":               0,
+				"cache_creation_input_tokens": 0,
+				"cache_read_input_tokens":     0,
+			},
+		},
+	})
+	writeClaudeSSEEvent(c, "content_block_start", gin.H{
+		"type":          "content_block_start",
+		"index":         0,
+		"content_block": gin.H{"type": "text", "text": ""},
+	})
+	writeClaudeSSEEvent(c, "content_block_delta", gin.H{
+		"type":  "content_block_delta",
+		"index": 0,
+		"delta": gin.H{"type": "text_delta", "text": claudeCodeModelSwitchProbeText},
+	})
+	writeClaudeSSEEvent(c, "content_block_stop", gin.H{
+		"type":  "content_block_stop",
+		"index": 0,
+	})
+	writeClaudeSSEEvent(c, "message_delta", gin.H{
+		"type": "message_delta",
+		"delta": gin.H{
+			"stop_reason":   "end_turn",
+			"stop_sequence": nil,
+			"stop_details":  nil,
+		},
+		"usage": gin.H{
+			"input_tokens":                1,
+			"output_tokens":               1,
 			"cache_creation_input_tokens": 0,
 			"cache_read_input_tokens":     0,
 		},
