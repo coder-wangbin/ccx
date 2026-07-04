@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -13,6 +14,7 @@ import BasicConfigPanel from './channel-edit/BasicConfigPanel.vue'
 import AuthPanel from './channel-edit/AuthPanel.vue'
 import ModelMappingPanel from './channel-edit/ModelMappingPanel.vue'
 import ModelCapabilityPanel from './channel-edit/ModelCapabilityPanel.vue'
+import EmbeddingCompatibilityPanel from './channel-edit/EmbeddingCompatibilityPanel.vue'
 import AdvancedPanel from './channel-edit/AdvancedPanel.vue'
 import CustomHeadersPanel from './channel-edit/CustomHeadersPanel.vue'
 import CustomParamsPanel from './channel-edit/CustomParamsPanel.vue'
@@ -70,6 +72,7 @@ const {
   detectedApiKeys,
   generatedChannelName,
   errors,
+  embeddingCapabilitiesError,
   isValid,
   serviceTypeOptions,
   headerServiceTypeItems,
@@ -130,6 +133,10 @@ const {
   handleDiagnoseCompat,
   t,
 } = useChannelEditDialog(props, emit)
+
+const embeddingTargetModels = computed(() =>
+  targetModelDatalist.value.map(m => ({ title: m, value: m }))
+)
 </script>
 
 <template>
@@ -343,7 +350,7 @@ const {
                         @append-supported-model-filter="toggleSupportedModelFilter"
                       />
                       <ModelCapabilityPanel
-                        v-if="channelType !== 'images'"
+                        v-if="channelType !== 'images' && channelType !== 'vectors'"
                         class="mt-6"
                         :rows="modelCapabilityRows"
                         :target-models="targetModelDatalist"
@@ -352,6 +359,18 @@ const {
                         :fetch-models-error="fetchedModelsError"
                         :error="errors.modelCapabilitiesText"
                         @update:rows="updateModelCapabilityRows"
+                        @sync-upstream-models="syncUpstreamModels"
+                      />
+                      <EmbeddingCompatibilityPanel
+                        v-if="channelType === 'vectors'"
+                        class="mt-6"
+                        :rows="form.embeddingCapabilityRows"
+                        :target-models="embeddingTargetModels"
+                        :mapped-target-models="mappedTargetModels"
+                        :fetching-models="fetchingModels"
+                        :fetch-models-error="fetchedModelsError"
+                        :error="embeddingCapabilitiesError"
+                        @update:rows="(rows) => form.embeddingCapabilityRows = rows"
                         @sync-upstream-models="syncUpstreamModels"
                       />
                     </section>

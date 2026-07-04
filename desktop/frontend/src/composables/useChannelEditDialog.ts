@@ -4,8 +4,11 @@ import { useLanguage } from '@/composables/useLanguage'
 import { useAdminApi } from '@/composables/useAdminApi'
 import {
   buildChannelPayload,
+  embeddingCapabilitiesToRows,
+  embeddingCapabilityRowsToRecord,
   modelCapabilitiesToRows,
   modelCapabilityRowsToRecord,
+  type EmbeddingCapabilityRow,
   type ModelCapabilityRow,
 } from '@/utils/channel-payload'
 import { supportsAdvancedChannelOptions, supportsReasoningMapping } from '@/utils/channel-advanced-options'
@@ -101,6 +104,8 @@ const { t } = useLanguage()
 
   let rowId = 0
   const nextRowId = () => ++rowId
+  let embeddingRowId = 0
+  const nextEmbeddingRowId = () => ++embeddingRowId
   const dialogRef = ref<HTMLElement | null>(null)
   const {
     activeSection,
@@ -148,6 +153,7 @@ const { t } = useLanguage()
     modelMappingText: '{}',
     modelCapabilitiesText: '',
     modelCapabilityRows: [] as ModelCapabilityRow[],
+    embeddingCapabilityRows: [] as EmbeddingCapabilityRow[],
     defaultContextWindowTokens: '' as string | number,
     defaultMaxOutputTokens: '' as string | number,
     allowUnknownContext: false,
@@ -330,6 +336,7 @@ const { t } = useLanguage()
     form.modelMappingText = '{}'
     form.modelCapabilitiesText = ''
     form.modelCapabilityRows = []
+    form.embeddingCapabilityRows = []
     form.defaultContextWindowTokens = ''
     form.defaultMaxOutputTokens = ''
     form.allowUnknownContext = false
@@ -411,6 +418,7 @@ const { t } = useLanguage()
     localRestoredKeys.value = new Set()
     modelMappingRows.value = modelMappingFromChannel(ch)
     modelCapabilityRows.value = modelCapabilitiesToRows(ch.modelCapabilities || {}, () => ++rowId)
+    form.embeddingCapabilityRows = embeddingCapabilitiesToRows(ch.embeddingCapabilities || {}, nextEmbeddingRowId)
     form.modelCapabilityRows = modelCapabilityRows.value
     headerRows.value = headerRowsFromChannel(ch)
     form.customHeadersText = stringifyJson(ch.customHeaders)
@@ -487,6 +495,12 @@ const { t } = useLanguage()
     return false
   })
 
+  const embeddingCapabilitiesError = computed(() => {
+    return props.channelType === 'vectors' && embeddingCapabilityRowsToRecord(form.embeddingCapabilityRows) === null
+      ? t('addChannel.embeddingCapabilitiesRowsInvalid')
+      : ''
+  })
+
   const errors = computed(() => {
     const errs: Record<string, string> = {}
     if (isEditMode.value && !form.name.trim()) errs.name = t('channelEditor.basic.name.required')
@@ -509,6 +523,9 @@ const { t } = useLanguage()
     }
     if (modelCapabilityRowsToRecord(modelCapabilityRows.value) === null) {
       errs.modelCapabilitiesText = t('addChannel.modelCapabilitiesRowsInvalid')
+    }
+    if (embeddingCapabilitiesError.value) {
+      errs.embeddingCapabilities = embeddingCapabilitiesError.value
     }
     return errs
   })
@@ -581,6 +598,7 @@ const { t } = useLanguage()
           apiKeys: submitApiKeys.value,
           modelMapping: parseJsonObject<Record<string, string>>(form.modelMappingText, 'Model mapping'),
           modelCapabilityRows: modelCapabilityRows.value,
+          embeddingCapabilityRows: form.embeddingCapabilityRows,
           reasoningMapping: parseJsonObject<Record<string, 'none' | 'low' | 'medium' | 'high' | 'xhigh' | 'max'>>(form.reasoningMappingText, 'Reasoning mapping'),
           reasoningParamStyle: form.reasoningParamStyle,
           textVerbosity: form.textVerbosity,
@@ -855,6 +873,7 @@ const { t } = useLanguage()
       apiKeys: getSubmitApiKeys(),
       modelMapping,
       modelCapabilityRows: modelCapabilityRows.value,
+      embeddingCapabilityRows: form.embeddingCapabilityRows,
       reasoningMapping,
       reasoningParamStyle: form.reasoningParamStyle,
       textVerbosity: form.textVerbosity,
@@ -938,6 +957,7 @@ const { t } = useLanguage()
     detectedApiKeys,
     generatedChannelName,
     errors,
+    embeddingCapabilitiesError,
     isValid,
     serviceTypeOptions,
     headerServiceTypeItems,
