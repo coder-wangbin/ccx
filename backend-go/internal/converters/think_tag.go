@@ -33,6 +33,9 @@ type thinkTagStateMachine struct {
 	LeadingWS strings.Builder // 缓存开头的空白字符，如果最终匹配到 <think> 则丢弃，否则作为正文输出
 }
 
+// ThinkTagStateMachine 是可跨包复用的 <think> 标签流式解析状态机。
+type ThinkTagStateMachine = thinkTagStateMachine
+
 // Reset 把状态机恢复到初始状态。FirstChunk 路径应调用。
 func (m *thinkTagStateMachine) Reset() {
 	m.State = thinkStateNone
@@ -212,4 +215,9 @@ func extractThinkTag(content string) (text string, thinking string, hasThink boo
 	remaining := inner[closeIdx+len(thinkCloseTag):]
 	remaining = strings.TrimLeft(remaining, " \t\r\n")
 	return remaining, thinking, true
+}
+
+// ExtractThinkTag 从完整文本中提取开头位置的 <think>...</think>。
+func ExtractThinkTag(content string) (text string, thinking string, hasThink bool) {
+	return extractThinkTag(content)
 }

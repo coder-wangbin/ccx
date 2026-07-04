@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/BenedictKing/ccx/internal/config"
+	"github.com/BenedictKing/ccx/internal/converters"
 	"github.com/BenedictKing/ccx/internal/types"
 	"github.com/BenedictKing/ccx/internal/utils"
 	"github.com/gin-gonic/gin"
@@ -343,18 +344,32 @@ func (p *OpenAIProvider) ConvertToClaudeResponse(providerResp *types.ProviderRes
 		choice := openaiResp.Choices[0]
 		msg := choice.Message
 
+		reasoning := msg.GetReasoningContent()
+		text := ""
+		if str, ok := msg.Content.(string); ok && str != "" {
+			remaining, taggedThinking, hasThink := converters.ExtractThinkTag(str)
+			if hasThink && taggedThinking != "" {
+				if reasoning != "" {
+					reasoning += "\n" + taggedThinking
+				} else {
+					reasoning = taggedThinking
+				}
+			}
+			text = remaining
+		}
+
 		// 添加文本内容
-		if reasoning := msg.GetReasoningContent(); reasoning != "" {
+		if reasoning != "" {
 			claudeResp.Content = append(claudeResp.Content, types.ClaudeContent{
 				Type:     "thinking",
 				Thinking: reasoning,
 			})
 		}
 
-		if str, ok := msg.Content.(string); ok && str != "" {
+		if text != "" {
 			claudeResp.Content = append(claudeResp.Content, types.ClaudeContent{
 				Type: "text",
-				Text: str,
+				Text: text,
 			})
 		}
 
@@ -444,6 +459,104 @@ func (p *OpenAIProvider) HandleStreamResponse(body io.ReadCloser) (<-chan string
 		thinkingBlockIndex := -1
 		textBlockStarted := false
 		textBlockIndex := -1
+		lastModel := ""
+		var thinkTag converters.ThinkTagStateMachine
+		thinkTag.Reset()
+
+		emitThinkingDelta := func(model, reasoning string) {
+			if reasoning == "" {
+				return
+			}
+			if !messageStartSent {
+				eventChan <- buildMessageStartEvent(model)
+				messageStartSent = true
+			}
+			if textBlockStarted {
+				emitContentBlockStop(textBlockIndex)
+				textBlockStarted = false
+			}
+			if !thinkingBlockStarted {
+				thinkingBlockIndex = nextBlockIndex
+				nextBlockIndex++
+				startEvent := map[string]interface{}{
+					"type":  "content_block_start",
+					"index": thinkingBlockIndex,
+					"content_block": map[string]string{
+						"type":     "thinking",
+						"thinking": "",
+					},
+				}
+				startJSON, _ := json.Marshal(startEvent)
+				eventChan <- fmt.Sprintf("event: content_block_start\ndata: %s\n\n", startJSON)
+				thinkingBlockStarted = true
+			}
+
+			deltaEvent := map[string]interface{}{
+				"type":  "content_block_delta",
+				"index": thinkingBlockIndex,
+				"delta": map[string]string{
+					"type":     "thinking_delta",
+					"thinking": reasoning,
+				},
+			}
+			deltaJSON, _ := json.Marshal(deltaEvent)
+			eventChan <- fmt.Sprintf("event: content_block_delta\ndata: %s\n\n", deltaJSON)
+		}
+
+		emitTextDelta := func(model, content string) {
+			if content == "" {
+				return
+			}
+			// 在第一个 content_block 之前发送 message_start
+			if !messageStartSent {
+				eventChan <- buildMessageStartEvent(model)
+				messageStartSent = true
+			}
+			if thinkingBlockStarted {
+				emitContentBlockStop(thinkingBlockIndex)
+				thinkingBlockStarted = false
+			}
+			// 如果是第一个文本块,发送 content_block_start
+			if !textBlockStarted {
+				textBlockIndex = nextBlockIndex
+				nextBlockIndex++
+				startEvent := map[string]interface{}{
+					"type":  "content_block_start",
+					"index": textBlockIndex,
+					"content_block": map[string]string{
+						"type": "text",
+						"text": "",
+					},
+				}
+				startJSON, _ := json.Marshal(startEvent)
+				eventChan <- fmt.Sprintf("event: content_block_start\ndata: %s\n\n", startJSON)
+				textBlockStarted = true
+			}
+
+			// 发送 content_block_delta
+			deltaEvent := map[string]interface{}{
+				"type":  "content_block_delta",
+				"index": textBlockIndex,
+				"delta": map[string]string{
+					"type": "text_delta",
+					"text": content,
+				},
+			}
+			deltaJSON, _ := json.Marshal(deltaEvent)
+			eventChan <- fmt.Sprintf("event: content_block_delta\ndata: %s\n\n", deltaJSON)
+		}
+
+		flushThinkTagDrain := func(model string) {
+			remaining, toReasoning := thinkTag.Drain()
+			if remaining == "" {
+				return
+			}
+			if toReasoning {
+				emitThinkingDelta(model, remaining)
+				return
+			}
+			emitTextDelta(model, remaining)
+		}
 
 		for scanner.Scan() {
 			line := normalizeSSEFieldLine(scanner.Text())
@@ -496,6 +609,9 @@ func (p *OpenAIProvider) HandleStreamResponse(body io.ReadCloser) (<-chan string
 			model := ""
 			if m, ok := chunk["model"].(string); ok {
 				model = m
+				lastModel = model
+			} else {
+				model = lastModel
 			}
 
 			// 处理推理内容：优先 reasoning_content（DeepSeek/OpenAI），回退 reasoning（vLLM）
@@ -504,81 +620,18 @@ func (p *OpenAIProvider) HandleStreamResponse(body io.ReadCloser) (<-chan string
 				reasoning, _ = delta["reasoning"].(string)
 			}
 			if reasoning != "" {
-				if !messageStartSent {
-					eventChan <- buildMessageStartEvent(model)
-					messageStartSent = true
-				}
-				if textBlockStarted {
-					emitContentBlockStop(textBlockIndex)
-					textBlockStarted = false
-				}
-				if !thinkingBlockStarted {
-					thinkingBlockIndex = nextBlockIndex
-					nextBlockIndex++
-					startEvent := map[string]interface{}{
-						"type":  "content_block_start",
-						"index": thinkingBlockIndex,
-						"content_block": map[string]string{
-							"type":     "thinking",
-							"thinking": "",
-						},
-					}
-					startJSON, _ := json.Marshal(startEvent)
-					eventChan <- fmt.Sprintf("event: content_block_start\ndata: %s\n\n", startJSON)
-					thinkingBlockStarted = true
-				}
-
-				deltaEvent := map[string]interface{}{
-					"type":  "content_block_delta",
-					"index": thinkingBlockIndex,
-					"delta": map[string]string{
-						"type":     "thinking_delta",
-						"thinking": reasoning,
-					},
-				}
-				deltaJSON, _ := json.Marshal(deltaEvent)
-				eventChan <- fmt.Sprintf("event: content_block_delta\ndata: %s\n\n", deltaJSON)
+				emitThinkingDelta(model, reasoning)
 			}
 
-			// 处理文本内容
+			// 处理文本内容，并兼容把 <think>...</think> 放在 content 里的 OpenAI 兼容上游
 			if content, ok := delta["content"].(string); ok && content != "" {
-				// 在第一个 content_block 之前发送 message_start
-				if !messageStartSent {
-					eventChan <- buildMessageStartEvent(model)
-					messageStartSent = true
+				reasoningParts, contentParts := thinkTag.Feed(content)
+				for _, part := range reasoningParts {
+					emitThinkingDelta(model, part)
 				}
-				if thinkingBlockStarted {
-					emitContentBlockStop(thinkingBlockIndex)
-					thinkingBlockStarted = false
+				for _, part := range contentParts {
+					emitTextDelta(model, part)
 				}
-				// 如果是第一个文本块,发送 content_block_start
-				if !textBlockStarted {
-					textBlockIndex = nextBlockIndex
-					nextBlockIndex++
-					startEvent := map[string]interface{}{
-						"type":  "content_block_start",
-						"index": textBlockIndex,
-						"content_block": map[string]string{
-							"type": "text",
-							"text": "",
-						},
-					}
-					startJSON, _ := json.Marshal(startEvent)
-					eventChan <- fmt.Sprintf("event: content_block_start\ndata: %s\n\n", startJSON)
-					textBlockStarted = true
-				}
-
-				// 发送 content_block_delta
-				deltaEvent := map[string]interface{}{
-					"type":  "content_block_delta",
-					"index": textBlockIndex,
-					"delta": map[string]string{
-						"type": "text_delta",
-						"text": content,
-					},
-				}
-				deltaJSON, _ := json.Marshal(deltaEvent)
-				eventChan <- fmt.Sprintf("event: content_block_delta\ndata: %s\n\n", deltaJSON)
 			}
 
 			// 处理工具调用（跳过空数组，vLLM 等上游可能在每个 delta 都带 tool_calls:[]）
@@ -648,6 +701,8 @@ func (p *OpenAIProvider) HandleStreamResponse(body io.ReadCloser) (<-chan string
 
 			// 处理结束原因
 			if finishReason, ok := choice["finish_reason"].(string); ok {
+				flushThinkTagDrain(model)
+
 				// 如果有未关闭的 thinking / 文本块,先关闭它
 				if thinkingBlockStarted {
 					emitContentBlockStop(thinkingBlockIndex)
@@ -668,6 +723,8 @@ func (p *OpenAIProvider) HandleStreamResponse(body io.ReadCloser) (<-chan string
 				}
 			}
 		}
+
+		flushThinkTagDrain(lastModel)
 
 		// 确保流结束时关闭任何未关闭的 thinking / 文本块
 		if thinkingBlockStarted {

@@ -102,6 +102,43 @@ func TestOpenAIProvider_HandleStreamResponse_AcceptsNoSpaceDataLines(t *testing.
 	}
 }
 
+func TestOpenAIProvider_HandleStreamResponse_ExtractsThinkTagContentToThinkingDelta(t *testing.T) {
+	body := strings.Join([]string{
+		`data: {"id":"chatcmpl-think","model":"glm-5.2","choices":[{"delta":{"content":"<thi"},"finish_reason":null}]}`,
+		`data: {"id":"chatcmpl-think","model":"glm-5.2","choices":[{"delta":{"content":"nk>plan"},"finish_reason":null}]}`,
+		`data: {"id":"chatcmpl-think","model":"glm-5.2","choices":[{"delta":{"content":"</think>answer"},"finish_reason":null}]}`,
+		`data: {"id":"chatcmpl-think","model":"glm-5.2","choices":[{"delta":{},"finish_reason":"stop"}]}`,
+		`data: [DONE]`,
+		"",
+	}, "\n")
+
+	provider := &OpenAIProvider{}
+	eventChan, errChan, err := provider.HandleStreamResponse(io.NopCloser(strings.NewReader(body)))
+	if err != nil {
+		t.Fatalf("HandleStreamResponse returned error: %v", err)
+	}
+
+	events := collectStreamEvents(eventChan)
+	select {
+	case streamErr := <-errChan:
+		if streamErr != nil {
+			t.Fatalf("unexpected stream error: %v", streamErr)
+		}
+	default:
+	}
+
+	joined := strings.Join(events, "\n")
+	if strings.Contains(joined, "<think>") || strings.Contains(joined, "</think>") {
+		t.Fatalf("think tags should not leak into Claude stream events: %v", events)
+	}
+	if !strings.Contains(joined, `"type":"thinking_delta"`) || !strings.Contains(joined, `"thinking":"plan"`) {
+		t.Fatalf("expected thinking_delta from leading think tag, got %v", events)
+	}
+	if !strings.Contains(joined, `"type":"text_delta"`) || !strings.Contains(joined, `"text":"answer"`) {
+		t.Fatalf("expected text_delta after think tag, got %v", events)
+	}
+}
+
 func TestClaudeProvider_HandleStreamResponse_WrapsBareJSONLines(t *testing.T) {
 	body := strings.Join([]string{
 		`{}`,
@@ -326,6 +363,59 @@ func TestOpenAIProvider_ConvertToClaudeResponse_MapsVLLMReasoningToThinking(t *t
 	}
 	if claudeResp.Content[1].Type != "text" || claudeResp.Content[1].Text != "final answer" {
 		t.Fatalf("expected text block after thinking, got %#v", claudeResp.Content[1])
+	}
+}
+
+func TestOpenAIProvider_ConvertToClaudeResponse_ExtractsThinkTagContent(t *testing.T) {
+	provider := &OpenAIProvider{}
+	claudeResp, err := provider.ConvertToClaudeResponse(&types.ProviderResponse{
+		Body: []byte(`{
+			"id": "chatcmpl-think",
+			"choices": [{
+				"message": {
+					"role": "assistant",
+					"content": "<think>think-here</think>answer-here"
+				},
+				"finish_reason": "stop"
+			}]
+		}`),
+	})
+	if err != nil {
+		t.Fatalf("ConvertToClaudeResponse() error = %v", err)
+	}
+	if len(claudeResp.Content) != 2 {
+		t.Fatalf("Content len = %d, want 2: %#v", len(claudeResp.Content), claudeResp.Content)
+	}
+	if claudeResp.Content[0].Type != "thinking" || claudeResp.Content[0].Thinking != "think-here" {
+		t.Fatalf("expected think tag mapped to thinking block, got %#v", claudeResp.Content[0])
+	}
+	if claudeResp.Content[1].Type != "text" || claudeResp.Content[1].Text != "answer-here" {
+		t.Fatalf("expected remaining content mapped to text block, got %#v", claudeResp.Content[1])
+	}
+}
+
+func TestOpenAIProvider_ConvertToClaudeResponse_KeepsMidTextThinkTagLiteral(t *testing.T) {
+	provider := &OpenAIProvider{}
+	claudeResp, err := provider.ConvertToClaudeResponse(&types.ProviderResponse{
+		Body: []byte(`{
+			"id": "chatcmpl-literal",
+			"choices": [{
+				"message": {
+					"role": "assistant",
+					"content": "Hello <think>not reasoning</think>"
+				},
+				"finish_reason": "stop"
+			}]
+		}`),
+	})
+	if err != nil {
+		t.Fatalf("ConvertToClaudeResponse() error = %v", err)
+	}
+	if len(claudeResp.Content) != 1 {
+		t.Fatalf("Content len = %d, want 1: %#v", len(claudeResp.Content), claudeResp.Content)
+	}
+	if claudeResp.Content[0].Type != "text" || claudeResp.Content[0].Text != "Hello <think>not reasoning</think>" {
+		t.Fatalf("expected mid-text think tag to stay literal, got %#v", claudeResp.Content[0])
 	}
 }
 
