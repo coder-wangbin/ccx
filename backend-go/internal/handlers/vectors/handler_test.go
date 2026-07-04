@@ -1345,6 +1345,298 @@ func TestHandlerStripsStreamFieldBeforeForwardingToUpstream(t *testing.T) {
 	}
 }
 
+func TestEmbeddingNormalizedStateThreeValues(t *testing.T) {
+	tests := []struct {
+		name  string
+		input *bool
+		want  int
+	}{
+		{name: "nil returns -1", input: nil, want: -1},
+		{name: "false returns 0", input: boolPtr(false), want: 0},
+		{name: "true returns 1", input: boolPtr(true), want: 1},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := embeddingNormalizedState(tt.input)
+			if got != tt.want {
+				t.Fatalf("embeddingNormalizedState(%v) = %d, want %d", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestEmbeddingCompatibilityKeyForRejectsInvalidSupportedDimensions(t *testing.T) {
+	tests := []struct {
+		name        string
+		capability  config.EmbeddingCapability
+		reqDims     int
+		wantValid   bool
+	}{
+		{
+			name:      "negative default dimensions",
+			capability: config.EmbeddingCapability{Dimensions: -1},
+			reqDims:   0,
+			wantValid: false,
+		},
+		{
+			name:      "zero in supported dimensions",
+			capability: config.EmbeddingCapability{Dimensions: 1536, SupportedDimensions: []int{512, 0, 1536}},
+			reqDims:   0,
+			wantValid: false,
+		},
+		{
+			name:      "negative in supported dimensions",
+			capability: config.EmbeddingCapability{Dimensions: 1536, SupportedDimensions: []int{-1, 1536}},
+			reqDims:   0,
+			wantValid: false,
+		},
+		{
+			name:      "unsupported request dimensions",
+			capability: config.EmbeddingCapability{Dimensions: 1536, SupportedDimensions: []int{1024, 1536}},
+			reqDims:   512,
+			wantValid: false,
+		},
+		{
+			name:      "valid default dimensions",
+			capability: config.EmbeddingCapability{Dimensions: 1536, SupportedDimensions: []int{1024, 1536}},
+			reqDims:   0,
+			wantValid: true,
+		},
+		{
+			name:      "valid request dimensions in supported list",
+			capability: config.EmbeddingCapability{Dimensions: 1536, SupportedDimensions: []int{512, 1024, 1536}},
+			reqDims:   512,
+			wantValid: true,
+		},
+		{
+			name:      "valid request dimensions matches default",
+			capability: config.EmbeddingCapability{Dimensions: 1536, SupportedDimensions: []int{1024, 1536}},
+			reqDims:   1536,
+			wantValid: true,
+		},
+		{
+			name:      "missing space id falls back to actual model",
+			capability: config.EmbeddingCapability{Dimensions: 1536},
+			reqDims:   0,
+			wantValid: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			resolved := config.ResolvedEmbeddingCapability{
+				Capability:  tt.capability,
+				ActualModel: "test-model",
+				Known:       true,
+			}
+			_, ok, _ := embeddingCompatibilityKeyFor(resolved, tt.reqDims)
+			if ok != tt.wantValid {
+				t.Fatalf("embeddingCompatibilityKeyFor() valid = %v, want %v", ok, tt.wantValid)
+			}
+		})
+	}
+}
+
+func TestHandlerNormalizedInconsistencyBlocksFallback(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	cfgManager := newVectorsTestConfigManager(t)
+	defer cfgManager.Close()
+
+	var primaryAttempts int32
+	primaryServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt32(&primaryAttempts, 1)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte(`{"error":{"message":"primary failed"}}`))
+	}))
+	defer primaryServer.Close()
+
+	var secondaryAttempts int32
+	secondaryServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt32(&secondaryAttempts, 1)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"object":"list","data":[{"object":"embedding","embedding":[0.9],"index":0}],"usage":{"prompt_tokens":1,"total_tokens":1}}`))
+	}))
+	defer secondaryServer.Close()
+
+	if err := cfgManager.AddVectorsUpstream(config.UpstreamConfig{
+		Name:         "secondary-normalized-false",
+		ServiceType:  "openai",
+		BaseURL:      secondaryServer.URL,
+		APIKeys:      []string{"sk-secondary"},
+		Priority:     2,
+		ModelMapping: map[string]string{"embed-public": "embedding-model-b"},
+		EmbeddingCapabilities: map[string]config.EmbeddingCapability{
+			"embedding-model-b": {EmbeddingSpaceID: "shared-space", Dimensions: 1536, Normalized: boolPtr(false)},
+		},
+	}); err != nil {
+		t.Fatalf("AddVectorsUpstream(secondary) error = %v", err)
+	}
+	if err := cfgManager.AddVectorsUpstream(config.UpstreamConfig{
+		Name:         "primary-normalized-true",
+		ServiceType:  "openai",
+		BaseURL:      primaryServer.URL,
+		APIKeys:      []string{"sk-primary"},
+		Priority:     1,
+		ModelMapping: map[string]string{"embed-public": "embedding-model-a"},
+		EmbeddingCapabilities: map[string]config.EmbeddingCapability{
+			"embedding-model-a": {EmbeddingSpaceID: "shared-space", Dimensions: 1536, Normalized: boolPtr(true)},
+		},
+	}); err != nil {
+		t.Fatalf("AddVectorsUpstream(primary) error = %v", err)
+	}
+
+	vectorsMetrics := metrics.NewMetricsManager()
+	sch := newVectorsTestScheduler(cfgManager, vectorsMetrics)
+	w := serveVectorsEmbeddingRequest(cfgManager, sch, `{"model":"embed-public","input":"hello"}`)
+
+	if w.Code != http.StatusInternalServerError {
+		t.Fatalf("expected 500, got %d, body=%s", w.Code, w.Body.String())
+	}
+	if got := atomic.LoadInt32(&primaryAttempts); got != 1 {
+		t.Fatalf("primary attempts = %d, want 1", got)
+	}
+	if got := atomic.LoadInt32(&secondaryAttempts); got != 0 {
+		t.Fatalf("secondary attempts = %d, want 0 (normalized mismatch should block fallback)", got)
+	}
+}
+
+func TestHandlerModelNotFoundTriggersFailover(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	cfgManager := newVectorsTestConfigManager(t)
+	defer cfgManager.Close()
+
+	var primaryAttempts int32
+	primaryServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt32(&primaryAttempts, 1)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusServiceUnavailable)
+		_, _ = w.Write([]byte(`{"error":{"code":"model_not_found","message":"No available channel for model text-embedding-3-small under group vectors","type":"new_api_error"}}`))
+	}))
+	defer primaryServer.Close()
+
+	var secondaryAttempts int32
+	secondaryServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt32(&secondaryAttempts, 1)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"object":"list","data":[{"object":"embedding","embedding":[0.42],"index":0}],"usage":{"prompt_tokens":5,"total_tokens":5}}`))
+	}))
+	defer secondaryServer.Close()
+
+	if err := cfgManager.AddVectorsUpstream(config.UpstreamConfig{
+		Name:        "secondary-vectors",
+		ServiceType: "openai",
+		BaseURL:     secondaryServer.URL,
+		APIKeys:     []string{"sk-secondary"},
+		Priority:    2,
+	}); err != nil {
+		t.Fatalf("AddVectorsUpstream(secondary) error = %v", err)
+	}
+	if err := cfgManager.AddVectorsUpstream(config.UpstreamConfig{
+		Name:        "primary-vectors",
+		ServiceType: "openai",
+		BaseURL:     primaryServer.URL,
+		APIKeys:     []string{"sk-primary"},
+		Priority:    1,
+	}); err != nil {
+		t.Fatalf("AddVectorsUpstream(primary) error = %v", err)
+	}
+
+	vectorsMetrics := metrics.NewMetricsManager()
+	sch := newVectorsTestScheduler(cfgManager, vectorsMetrics)
+	w := serveVectorsEmbeddingRequest(cfgManager, sch, `{"model":"text-embedding-3-small","input":"hello"}`)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d, body=%s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), `"embedding":[0.42]`) {
+		t.Fatalf("expected secondary embeddings response, got: %s", w.Body.String())
+	}
+	if got := atomic.LoadInt32(&primaryAttempts); got != 1 {
+		t.Fatalf("primary attempts = %d, want 1", got)
+	}
+	if got := atomic.LoadInt32(&secondaryAttempts); got != 1 {
+		t.Fatalf("secondary attempts = %d, want 1", got)
+	}
+
+	primaryMetrics := vectorsMetrics.GetKeyMetrics(primaryServer.URL, "sk-primary", "openai")
+	if primaryMetrics == nil {
+		t.Fatal("expected primary key metrics to be recorded")
+	}
+	if primaryMetrics.RequestCount != 1 {
+		t.Fatalf("primary request count = %d, want 1", primaryMetrics.RequestCount)
+	}
+	if primaryMetrics.FailureCount != 1 {
+		t.Fatalf("primary failure count = %d, want 1", primaryMetrics.FailureCount)
+	}
+}
+
+func TestHandlerEmptyResponseBodyTriggersFailover(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	cfgManager := newVectorsTestConfigManager(t)
+	defer cfgManager.Close()
+
+	var primaryAttempts int32
+	primaryServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt32(&primaryAttempts, 1)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte{})
+	}))
+	defer primaryServer.Close()
+
+	var secondaryAttempts int32
+	secondaryServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt32(&secondaryAttempts, 1)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"object":"list","data":[{"object":"embedding","embedding":[0.77],"index":0}],"usage":{"prompt_tokens":3,"total_tokens":3}}`))
+	}))
+	defer secondaryServer.Close()
+
+	if err := cfgManager.AddVectorsUpstream(config.UpstreamConfig{
+		Name:        "secondary-vectors",
+		ServiceType: "openai",
+		BaseURL:     secondaryServer.URL,
+		APIKeys:     []string{"sk-secondary"},
+		Priority:    2,
+	}); err != nil {
+		t.Fatalf("AddVectorsUpstream(secondary) error = %v", err)
+	}
+	if err := cfgManager.AddVectorsUpstream(config.UpstreamConfig{
+		Name:        "primary-vectors",
+		ServiceType: "openai",
+		BaseURL:     primaryServer.URL,
+		APIKeys:     []string{"sk-primary"},
+		Priority:    1,
+	}); err != nil {
+		t.Fatalf("AddVectorsUpstream(primary) error = %v", err)
+	}
+
+	vectorsMetrics := metrics.NewMetricsManager()
+	sch := newVectorsTestScheduler(cfgManager, vectorsMetrics)
+	w := serveVectorsEmbeddingRequest(cfgManager, sch, `{"model":"text-embedding-3-small","input":"hello"}`)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d, body=%s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), `"embedding":[0.77]`) {
+		t.Fatalf("expected secondary embeddings response, got: %s", w.Body.String())
+	}
+	if got := atomic.LoadInt32(&primaryAttempts); got != 1 {
+		t.Fatalf("primary attempts = %d, want 1", got)
+	}
+	if got := atomic.LoadInt32(&secondaryAttempts); got != 1 {
+		t.Fatalf("secondary attempts = %d, want 1", got)
+	}
+
+	primaryMetrics := vectorsMetrics.GetKeyMetrics(primaryServer.URL, "sk-primary", "openai")
+	if primaryMetrics == nil {
+		t.Fatal("expected primary key metrics to be recorded")
+	}
+	if primaryMetrics.RequestCount != 1 || primaryMetrics.FailureCount != 1 {
+		t.Fatalf("primary metrics counts = requests:%d failures:%d, want 1/1", primaryMetrics.RequestCount, primaryMetrics.FailureCount)
+	}
+}
+
 func BenchmarkEmbeddingCompatibilityFilter(b *testing.B) {
 	b.Run("all_available_same_space_64", func(b *testing.B) {
 		benchmarkEmbeddingCompatibilityFilter(b, 64, false, false)
