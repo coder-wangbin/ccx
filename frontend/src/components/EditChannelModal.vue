@@ -69,6 +69,118 @@
 
             <!-- 模型重定向（模型映射 + Vision 回退 + 模型过滤） -->
             <section :ref="(el: any) => setSectionRef('redirect', el)" data-section-id="redirect" class="pa-6 scroll-mt-4">
+              <v-alert
+                v-if="supportsChannelDiscovery"
+                class="mb-4"
+                variant="tonal"
+                color="info"
+                density="comfortable"
+                rounded="lg"
+              >
+                <div class="d-flex align-center justify-space-between ga-3 flex-wrap">
+                  <div class="d-flex align-center ga-2">
+                    <v-icon color="info">mdi-auto-fix</v-icon>
+                    <div>
+                      <div class="text-subtitle-2 font-weight-medium">{{ t('channelDiscovery.title') }}</div>
+                      <div class="text-caption text-medium-emphasis">{{ t('channelDiscovery.hint') }}</div>
+                    </div>
+                  </div>
+                  <v-btn
+                    color="info"
+                    variant="tonal"
+                    size="small"
+                    :loading="discoveringChannelConfig"
+                    @click="handleDiscoverChannelConfig"
+                  >
+                    <v-icon start size="small">mdi-radar</v-icon>
+                    {{ t('channelDiscovery.button') }}
+                  </v-btn>
+                </div>
+
+                <v-alert v-if="channelDiscoveryError" class="mt-3" type="error" variant="tonal" density="compact">
+                  {{ channelDiscoveryError }}
+                </v-alert>
+
+                <div v-if="channelDiscoveryResult" class="mt-3 d-flex flex-column ga-3">
+                  <div class="d-flex align-center ga-2 flex-wrap">
+                    <v-chip size="small" color="primary" variant="tonal">
+                      {{ t('channelDiscovery.recommendedKind', { kind: channelDiscoveryResult.recommendation.channelKind || '-' }) }}
+                    </v-chip>
+                    <v-chip size="small" color="success" variant="tonal">
+                      {{ t('channelDiscovery.modelsFound', { count: channelDiscoveryResult.models.items.length }) }}
+                    </v-chip>
+                    <v-chip
+                      v-for="protocol in channelDiscoverySuccessfulProtocols"
+                      :key="protocol.protocol"
+                      size="small"
+                      color="success"
+                      variant="tonal"
+                    >
+                      {{ protocol.protocol }} {{ protocol.successModels?.length || 0 }}
+                    </v-chip>
+                  </div>
+
+                  <div class="d-flex align-center ga-2 flex-wrap">
+                    <v-chip v-if="channelDiscoveryResult.models.selected.strong" size="small" color="secondary" variant="outlined">
+                      strong: {{ channelDiscoveryResult.models.selected.strong }}
+                    </v-chip>
+                    <v-chip v-if="channelDiscoveryResult.models.selected.primary" size="small" color="secondary" variant="outlined">
+                      primary: {{ channelDiscoveryResult.models.selected.primary }}
+                    </v-chip>
+                    <v-chip v-if="channelDiscoveryResult.models.selected.fast" size="small" color="secondary" variant="outlined">
+                      fast: {{ channelDiscoveryResult.models.selected.fast }}
+                    </v-chip>
+                  </div>
+
+                  <div v-if="channelDiscoveryModelMappingEntries.length" class="d-flex flex-column ga-1">
+                    <div class="text-caption font-weight-medium">{{ t('channelDiscovery.mapping') }}</div>
+                    <div class="d-flex align-center ga-1 flex-wrap">
+                      <v-chip
+                        v-for="[source, target] in channelDiscoveryModelMappingEntries"
+                        :key="source"
+                        size="small"
+                        color="primary"
+                        variant="tonal"
+                      >
+                        {{ source }} → {{ target }}
+                      </v-chip>
+                    </div>
+                  </div>
+
+                  <div v-if="channelDiscoveryCompatEntries.length" class="d-flex flex-column ga-1">
+                    <div class="text-caption font-weight-medium">{{ t('channelDiscovery.compat') }}</div>
+                    <div class="d-flex align-center ga-1 flex-wrap">
+                      <v-chip
+                        v-for="[key, value] in channelDiscoveryCompatEntries"
+                        :key="key"
+                        size="small"
+                        :color="value ? 'warning' : 'grey'"
+                        variant="tonal"
+                      >
+                        {{ key }}={{ value }}
+                      </v-chip>
+                    </div>
+                  </div>
+
+                  <div v-if="channelDiscoveryResult.models.warnings?.length" class="text-caption text-warning">
+                    {{ channelDiscoveryResult.models.warnings.join(' / ') }}
+                  </div>
+
+                  <div class="d-flex justify-end">
+                    <v-btn
+                      color="primary"
+                      variant="elevated"
+                      size="small"
+                      :disabled="!channelDiscoveryModelMappingEntries.length && !channelDiscoveryCompatEntries.length"
+                      @click="applyChannelDiscoveryRecommendation"
+                    >
+                      <v-icon start size="small">mdi-check</v-icon>
+                      {{ t('channelDiscovery.apply') }}
+                    </v-btn>
+                  </div>
+                </div>
+              </v-alert>
+
               <ModelMappingSection
                 v-if="form.serviceType"
                 :mapping-rows="modelMappingRows"
@@ -287,6 +399,7 @@ const {
   supportsOpenAIAdvancedOptions,
   supportsReasoningMappingOptions,
   supportsChatRoleNormalization,
+  supportsChannelDiscovery,
   showModelMappingPresets,
   showMessagesOpenAIChannelPresets,
   showClaudeChannelPresets,
@@ -331,6 +444,14 @@ const {
   ensureTargetModelsLoaded,
   updateForm,
   syncUpstreamModels,
+  discoveringChannelConfig,
+  channelDiscoveryResult,
+  channelDiscoveryError,
+  channelDiscoveryModelMappingEntries,
+  channelDiscoveryCompatEntries,
+  channelDiscoverySuccessfulProtocols,
+  handleDiscoverChannelConfig,
+  applyChannelDiscoveryRecommendation,
   applyPreset,
   handleSubmit,
   handleCancel,

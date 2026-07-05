@@ -608,6 +608,8 @@ func main() {
 		apiGroup.POST("/copilot/oauth/token", copilot.PollAccessToken())
 		apiGroup.POST("/copilot/oauth/verify", copilot.VerifyToken())
 
+		apiGroup.POST("/channel-discovery", handlers.ChannelDiscovery(cfgManager))
+
 		apiGroup.POST("/responses/channels/:id/copilot/diagnose", responses.DiagnoseCopilotChannel(cfgManager))
 
 		// Messages 渠道管理

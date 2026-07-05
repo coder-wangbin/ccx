@@ -11,6 +11,8 @@ import type {
   CapabilityTestResult,
   Channel,
   ChannelDashboardResponse,
+  ChannelDiscoveryRequest,
+  ChannelDiscoveryResponse,
   ChannelKeyMetricsHistoryResponse,
   ChannelLogsResponse,
   ChannelMetrics,
@@ -214,6 +216,13 @@ export class ApiService {
     id: number
   ): Promise<CompatDiagnoseResult> {
     return this.request(`/${type}/channels/${id}/compat-diagnose`, { method: 'POST', body: '{}' })
+  }
+
+  async discoverChannelConfig(request: ChannelDiscoveryRequest): Promise<ChannelDiscoveryResponse> {
+    return this.request('/channel-discovery', {
+      method: 'POST',
+      body: JSON.stringify(request)
+    })
   }
 
   // ============== 能力测试 API ==============

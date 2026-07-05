@@ -837,5 +837,18 @@
   "addChannel.pricingUnitLabel": "Unit",
   "addChannel.defaultOutputTokensMeta": "Output default {tokens}",
   "addChannel.recommendedOutputTokensMeta": "Output rekomendasi {tokens}",
-  "addChannel.modelPricingUnitHint": "Per 1 juta token"
+  "addChannel.modelPricingUnitHint": "Per 1 juta token",
+  "channelDiscovery.title": "Temukan konfigurasi yang bisa dipakai",
+  "channelDiscovery.hint": "Uji model, protokol, redirect, dan switch kompatibilitas dengan Base URL dan API key saat ini.",
+  "channelDiscovery.button": "Temukan konfigurasi",
+  "channelDiscovery.failed": "Gagal menemukan konfigurasi",
+  "channelDiscovery.missingBaseUrl": "Isi Base URL terlebih dahulu.",
+  "channelDiscovery.missingApiKey": "Isi API key terlebih dahulu.",
+  "channelDiscovery.missingServiceType": "Pilih tipe layanan terlebih dahulu.",
+  "channelDiscovery.recommendedKind": "Rekomendasi {kind}",
+  "channelDiscovery.modelsFound": "{count} model",
+  "channelDiscovery.mapping": "Redirect rekomendasi",
+  "channelDiscovery.compat": "Switch kompatibilitas",
+  "channelDiscovery.apply": "Terapkan rekomendasi",
+  "channelDiscovery.applied": "Rekomendasi discovery diterapkan. Periksa lalu simpan."
 }

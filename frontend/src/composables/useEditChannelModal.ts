@@ -1,6 +1,6 @@
 import { ref, reactive, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { useTheme } from 'vuetify'
-import type { Channel } from '../services/api'
+import type { Channel, ChannelDiscoveryResponse, ChannelDiscoveryTargetClient } from '../services/api'
 import { ApiService } from '../services/api'
 import { supportsAdvancedChannelOptions, supportsReasoningMapping } from '../utils/channelAdvancedOptions'
 import {
@@ -93,6 +93,9 @@ const { t } = useI18n()
   const supportsReasoningMappingOptions = computed(() => props.channelType !== 'vectors' && supportsReasoningMapping(form.serviceType))
   const supportsChatRoleNormalization = computed(() => {
     return props.channelType === 'chat' || (props.channelType === 'responses' && form.serviceType === 'openai')
+  })
+  const supportsChannelDiscovery = computed(() => {
+    return props.channelType !== 'images' && props.channelType !== 'vectors'
   })
 
   // 模型优先级排序规则（索引越小优先级越高）
@@ -314,6 +317,118 @@ const { t } = useI18n()
       ? t('addChannel.modelCapabilitiesRowsInvalid')
       : ''
   })
+
+  const discoveringChannelConfig = ref(false)
+  const channelDiscoveryResult = ref<ChannelDiscoveryResponse | null>(null)
+  const channelDiscoveryError = ref('')
+  const channelDiscoveryModelMappingEntries = computed(() => {
+    const mapping = channelDiscoveryResult.value?.recommendation?.modelMapping ?? {}
+    return Object.entries(mapping)
+  })
+  const channelDiscoveryCompatEntries = computed(() => {
+    const compat = channelDiscoveryResult.value?.recommendation?.compat ?? {}
+    return Object.entries(compat).filter(([, value]) => value !== undefined)
+  })
+  const channelDiscoverySuccessfulProtocols = computed(() => {
+    return channelDiscoveryResult.value?.protocols.filter(protocol => protocol.success) ?? []
+  })
+
+  const discoveryTargetClients = (): ChannelDiscoveryTargetClient[] => {
+    if (props.channelType === 'responses') return ['codex']
+    if (props.channelType === 'messages') return ['claude-code']
+    return []
+  }
+
+  const firstDraftApiKey = () => {
+    return form.apiKeys.map(key => key.trim()).find(Boolean) || ''
+  }
+
+  const draftBaseUrls = () => {
+    return baseUrlsText.value
+      .split('\n')
+      .map(line => line.trim())
+      .filter(Boolean)
+  }
+
+  const handleDiscoverChannelConfig = async () => {
+    if (!supportsChannelDiscovery.value) return
+    const baseUrls = draftBaseUrls()
+    if (baseUrls.length === 0) {
+      channelDiscoveryError.value = t('channelDiscovery.missingBaseUrl')
+      return
+    }
+    const apiKey = firstDraftApiKey()
+    if (!apiKey) {
+      channelDiscoveryError.value = t('channelDiscovery.missingApiKey')
+      return
+    }
+    if (!form.serviceType) {
+      channelDiscoveryError.value = t('channelDiscovery.missingServiceType')
+      return
+    }
+
+    syncModelMappingToForm()
+    discoveringChannelConfig.value = true
+    channelDiscoveryError.value = ''
+    channelDiscoveryResult.value = null
+    try {
+      channelDiscoveryResult.value = await apiService.discoverChannelConfig({
+        channelKind: props.channelType as 'messages' | 'chat' | 'responses' | 'gemini',
+        serviceType: form.serviceType,
+        baseUrls,
+        apiKey,
+        authHeader: form.authHeader,
+        customHeaders: form.customHeaders,
+        proxyUrl: form.proxyUrl,
+        insecureSkipVerify: form.insecureSkipVerify,
+        modelMapping: form.modelMapping,
+        reasoningMapping: form.reasoningMapping,
+        targetClients: discoveryTargetClients(),
+      })
+    } catch (e) {
+      channelDiscoveryError.value = e instanceof Error ? e.message : t('channelDiscovery.failed')
+    } finally {
+      discoveringChannelConfig.value = false
+    }
+  }
+
+  const applyChannelDiscoveryRecommendation = () => {
+    const recommendation = channelDiscoveryResult.value?.recommendation
+    if (!recommendation) return
+
+    if (recommendation.serviceType) {
+      updateForm({ serviceType: recommendation.serviceType })
+    }
+    if (recommendation.baseUrls?.length) {
+      baseUrlsText.value = recommendation.baseUrls.join('\n')
+    }
+    if (recommendation.urlRecommendation?.recommended) {
+      const current = recommendation.urlRecommendation.current
+      const recommended = recommendation.urlRecommendation.recommended
+      const nextLines = draftBaseUrls().map(line => (line === current ? recommended : line))
+      baseUrlsText.value = Array.from(new Set(nextLines.length ? nextLines : [recommended])).join('\n')
+    }
+
+    const mapping = recommendation.modelMapping ?? {}
+    modelMappingRows.value = Object.entries(mapping).map(([source, target]) => ({
+      id: ++rowIdCounter,
+      source,
+      target,
+      reasoning: (recommendation.reasoningMapping?.[source] || '') as ModelMappingRow['reasoning'],
+      noVision: false,
+    }))
+    form.modelMapping = { ...mapping }
+    form.reasoningMapping = { ...(recommendation.reasoningMapping || {}) } as typeof form.reasoningMapping
+    if (recommendation.supportedModels) {
+      form.supportedModels = [...recommendation.supportedModels]
+    }
+    for (const [key, value] of Object.entries(recommendation.compat || {})) {
+      if (typeof value === 'boolean' && key in form) {
+        ;(form as Record<string, unknown>)[key] = value
+      }
+    }
+    emit('success', t('channelDiscovery.applied'))
+  }
   const embeddingCapabilitiesError = computed(() => {
     return props.channelType === 'vectors' && embeddingCapabilityRowsToRecord(form.embeddingCapabilityRows) === null
       ? t('addChannel.embeddingCapabilitiesRowsInvalid')
@@ -969,6 +1084,7 @@ const { t } = useI18n()
     supportsOpenAIAdvancedOptions,
     supportsReasoningMappingOptions,
     supportsChatRoleNormalization,
+    supportsChannelDiscovery,
     showModelMappingPresets,
     showMessagesOpenAIChannelPresets,
     showClaudeChannelPresets,
@@ -1013,6 +1129,14 @@ const { t } = useI18n()
     ensureTargetModelsLoaded,
     updateForm,
     syncUpstreamModels,
+    discoveringChannelConfig,
+    channelDiscoveryResult,
+    channelDiscoveryError,
+    channelDiscoveryModelMappingEntries,
+    channelDiscoveryCompatEntries,
+    channelDiscoverySuccessfulProtocols,
+    handleDiscoverChannelConfig,
+    applyChannelDiscoveryRecommendation,
     applyPreset,
     handleSubmit,
     handleCancel,

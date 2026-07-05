@@ -126,22 +126,26 @@ func DiagnoseChannelCompat(cfgManager *config.ConfigManager, channelKind string)
 // ============== 诊断逻辑 ==============
 
 func runCompatDiagnose(channel *config.UpstreamConfig, channelKind, apiKey, baseURL string) CompatDiagnoseResult {
+	return runCompatDiagnoseWithProbeModel(channel, channelKind, apiKey, baseURL, "")
+}
+
+func runCompatDiagnoseWithProbeModel(channel *config.UpstreamConfig, channelKind, apiKey, baseURL, probeModel string) CompatDiagnoseResult {
 	recs := make(map[string]bool)
 	evid := make(map[string]string)
-	urlRec := diagnoseBaseURLHash(channel, channelKind, apiKey, baseURL)
+	urlRec := diagnoseBaseURLHashWithModel(channel, channelKind, apiKey, baseURL, probeModel)
 	if urlRec != nil {
 		evid["baseUrl"] = urlRec.Reason
 	}
 
 	switch channel.ServiceType {
 	case "claude", "messages":
-		diagnoseClaudeChannel(channel, apiKey, baseURL, recs, evid)
+		diagnoseClaudeChannelWithModel(channel, apiKey, baseURL, probeModel, recs, evid)
 	case "gemini":
-		diagnoseGeminiChannel(channel, apiKey, baseURL, recs, evid)
+		diagnoseGeminiChannelWithModel(channel, apiKey, baseURL, probeModel, recs, evid)
 	default:
 		log.Printf("[CompatDiagnose] serviceType %q: no diagnose rules", channel.ServiceType)
 	}
-	diagnoseImageGenerationTool(channel, channelKind, apiKey, baseURL, recs, evid)
+	diagnoseImageGenerationToolWithModel(channel, channelKind, apiKey, baseURL, probeModel, recs, evid)
 
 	return CompatDiagnoseResult{Recommendations: recs, URLRecommendations: urlRec, Evidence: evid}
 }
@@ -239,6 +243,10 @@ func containsAnyCompatKeyword(signal string, keywords []string) bool {
 // # 是 CCX 的高级语义：显式禁止自动追加 /v1、/v1beta 等。
 // 当前 URL 探测失败而反向 # 形态探测成功时，才给出覆盖建议。
 func diagnoseBaseURLHash(channel *config.UpstreamConfig, channelKind, apiKey, baseURL string) *URLRecommendation {
+	return diagnoseBaseURLHashWithModel(channel, channelKind, apiKey, baseURL, "")
+}
+
+func diagnoseBaseURLHashWithModel(channel *config.UpstreamConfig, channelKind, apiKey, baseURL, probeModel string) *URLRecommendation {
 	trimmed := strings.TrimSpace(baseURL)
 	if trimmed == "" {
 		return nil
@@ -254,10 +262,10 @@ func diagnoseBaseURLHash(channel *config.UpstreamConfig, channelKind, apiKey, ba
 		return nil
 	}
 
-	if probeBaseURLCandidate(channel, channelKind, apiKey, trimmed) != compatBaseURLProbeFailed {
+	if probeBaseURLCandidateWithModel(channel, channelKind, apiKey, trimmed, probeModel) != compatBaseURLProbeFailed {
 		return nil
 	}
-	if probeBaseURLCandidate(channel, channelKind, apiKey, candidate) != compatBaseURLProbeSucceeded {
+	if probeBaseURLCandidateWithModel(channel, channelKind, apiKey, candidate, probeModel) != compatBaseURLProbeSucceeded {
 		return nil
 	}
 
@@ -279,6 +287,10 @@ const (
 )
 
 func probeBaseURLCandidate(channel *config.UpstreamConfig, channelKind, apiKey, baseURL string) compatBaseURLProbeStatus {
+	return probeBaseURLCandidateWithModel(channel, channelKind, apiKey, baseURL, "")
+}
+
+func probeBaseURLCandidateWithModel(channel *config.UpstreamConfig, channelKind, apiKey, baseURL, probeModel string) compatBaseURLProbeStatus {
 	candidate := *channel
 	candidate.BaseURL = baseURL
 	candidate.BaseURLs = nil
@@ -293,13 +305,14 @@ func probeBaseURLCandidate(channel *config.UpstreamConfig, channelKind, apiKey, 
 	protocol := compatProbeProtocol(channel, channelKind)
 	switch protocol {
 	case "gemini":
-		req, err = buildGeminiCompatRequest(baseURL, "/v1beta/models/gemini-3.5-flash:streamGenerateContent?alt=sse", buildGeminiCompatProbeBody(), &candidate, apiKey)
+		model := compatProbeModel("gemini-3.5-flash", probeModel)
+		req, err = buildGeminiCompatRequest(baseURL, "/v1beta/models/"+model+":streamGenerateContent?alt=sse", buildGeminiCompatProbeBody(), &candidate, apiKey)
 	case "chat":
-		req, err = buildOpenAIChatCompatRequest(baseURL, buildOpenAIChatCompatProbeBody(), &candidate, apiKey)
+		req, err = buildOpenAIChatCompatRequest(baseURL, buildOpenAIChatCompatProbeBody(probeModel), &candidate, apiKey)
 	case "responses":
-		req, err = buildResponsesCompatRequest(baseURL, buildResponsesCompatProbeBody(), &candidate, apiKey)
+		req, err = buildResponsesCompatRequest(baseURL, buildResponsesCompatProbeBody(probeModel), &candidate, apiKey)
 	default:
-		req, err = buildClaudeCompatRequest(baseURL, buildSystemRoleInMessagesProbeBody(capabilityProbeModelClaudeFable5), &candidate, apiKey)
+		req, err = buildClaudeCompatRequest(baseURL, buildSystemRoleInMessagesProbeBody(compatProbeModel(capabilityProbeModelClaudeFable5, probeModel)), &candidate, apiKey)
 	}
 	if err != nil {
 		return compatBaseURLProbeFailed
@@ -350,6 +363,10 @@ func shouldProbeImageGenerationTool(channel *config.UpstreamConfig, channelKind 
 }
 
 func diagnoseImageGenerationTool(channel *config.UpstreamConfig, channelKind, apiKey, baseURL string, recs map[string]bool, evid map[string]string) {
+	diagnoseImageGenerationToolWithModel(channel, channelKind, apiKey, baseURL, "", recs, evid)
+}
+
+func diagnoseImageGenerationToolWithModel(channel *config.UpstreamConfig, channelKind, apiKey, baseURL, probeModel string, recs map[string]bool, evid map[string]string) {
 	protocol := shouldProbeImageGenerationTool(channel, channelKind)
 	if protocol == "" {
 		return
@@ -364,9 +381,9 @@ func diagnoseImageGenerationTool(channel *config.UpstreamConfig, channelKind, ap
 	)
 	switch protocol {
 	case "responses":
-		req, err = buildResponsesCompatRequest(baseURL, buildResponsesImageGenerationToolProbeBody(), channel, apiKey)
+		req, err = buildResponsesCompatRequest(baseURL, buildResponsesImageGenerationToolProbeBody(probeModel), channel, apiKey)
 	case "chat":
-		req, err = buildOpenAIChatCompatRequest(baseURL, buildOpenAIChatImageGenerationToolProbeBody(), channel, apiKey)
+		req, err = buildOpenAIChatCompatRequest(baseURL, buildOpenAIChatImageGenerationToolProbeBody(probeModel), channel, apiKey)
 	default:
 		return
 	}
@@ -408,7 +425,11 @@ func diagnoseImageGenerationTool(channel *config.UpstreamConfig, channelKind, ap
 // diagnoseClaudeChannel 探测 Claude 兼容渠道
 // 检测：passbackReasoningContent、passbackThinkingBlocks、stripEmptyTextBlocks、normalizeSystemRoleToTopLevel
 func diagnoseClaudeChannel(channel *config.UpstreamConfig, apiKey, baseURL string, recs map[string]bool, evid map[string]string) {
-	probeModel := capabilityProbeModelClaudeFable5
+	diagnoseClaudeChannelWithModel(channel, apiKey, baseURL, "", recs, evid)
+}
+
+func diagnoseClaudeChannelWithModel(channel *config.UpstreamConfig, apiKey, baseURL, probeModel string, recs map[string]bool, evid map[string]string) {
+	probeModel = compatProbeModel(capabilityProbeModelClaudeFable5, probeModel)
 	shouldPassbackThinkingBlocks := shouldPassbackThinkingBlocksByDefault(channel, baseURL)
 	shouldUseThinkingCache := shouldUseThinkingCacheForClaudePassback(channel, baseURL)
 	shouldStripEmptyTextBlocks := shouldStripEmptyTextBlocksByDefault(channel, baseURL)
@@ -538,10 +559,14 @@ func diagnoseClaudeThinkingBlockPassback(channel *config.UpstreamConfig, apiKey,
 // diagnoseGeminiChannel 探测 Gemini 兼容渠道
 // 检测：stripThoughtSignature
 func diagnoseGeminiChannel(channel *config.UpstreamConfig, apiKey, baseURL string, recs map[string]bool, evid map[string]string) {
+	diagnoseGeminiChannelWithModel(channel, apiKey, baseURL, "", recs, evid)
+}
+
+func diagnoseGeminiChannelWithModel(channel *config.UpstreamConfig, apiKey, baseURL, probeModel string, recs map[string]bool, evid map[string]string) {
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 
-	probeModel := "gemini-3.5-flash"
+	probeModel = compatProbeModel("gemini-3.5-flash", probeModel)
 	body := buildGeminiCompatProbeBody()
 	endpoint := "/v1beta/models/" + probeModel + ":streamGenerateContent?alt=sse"
 
@@ -633,6 +658,15 @@ func buildResponsesCompatRequest(baseURL string, body []byte, channel *config.Up
 
 // ============== 探测请求体 ==============
 
+func compatProbeModel(defaultModel string, candidates ...string) string {
+	for _, candidate := range candidates {
+		if trimmed := strings.TrimSpace(candidate); trimmed != "" {
+			return trimmed
+		}
+	}
+	return defaultModel
+}
+
 // buildClaudeThinkingProbeBody 带 thinking enabled 的最小探测，nonce 防止上游缓存命中
 func buildClaudeThinkingProbeBody(model string) []byte {
 	nonce := fmt.Sprintf("%d", time.Now().UnixNano())
@@ -703,10 +737,10 @@ func buildGeminiCompatProbeBody() []byte {
 	return body
 }
 
-func buildOpenAIChatCompatProbeBody() []byte {
+func buildOpenAIChatCompatProbeBody(models ...string) []byte {
 	nonce := fmt.Sprintf("%d", time.Now().UnixNano())
 	body, _ := json.Marshal(map[string]interface{}{
-		"model": "gpt-5.4-mini",
+		"model": compatProbeModel("gpt-5.4-mini", models...),
 		"messages": []map[string]string{
 			{"role": "user", "content": "Reply with one word. Nonce: " + nonce},
 		},
@@ -716,10 +750,10 @@ func buildOpenAIChatCompatProbeBody() []byte {
 	return body
 }
 
-func buildOpenAIChatImageGenerationToolProbeBody() []byte {
+func buildOpenAIChatImageGenerationToolProbeBody(models ...string) []byte {
 	nonce := fmt.Sprintf("%d", time.Now().UnixNano())
 	body, _ := json.Marshal(map[string]interface{}{
-		"model": "gpt-5.4-mini",
+		"model": compatProbeModel("gpt-5.4-mini", models...),
 		"messages": []map[string]string{
 			{"role": "user", "content": "Reply with ok. Nonce: " + nonce},
 		},
@@ -732,10 +766,10 @@ func buildOpenAIChatImageGenerationToolProbeBody() []byte {
 	return body
 }
 
-func buildResponsesCompatProbeBody() []byte {
+func buildResponsesCompatProbeBody(models ...string) []byte {
 	nonce := fmt.Sprintf("%d", time.Now().UnixNano())
 	body, _ := json.Marshal(map[string]interface{}{
-		"model":             "gpt-5.4-mini",
+		"model":             compatProbeModel("gpt-5.4-mini", models...),
 		"input":             "Reply with one word. Nonce: " + nonce,
 		"max_output_tokens": 16,
 		"stream":            true,
@@ -743,10 +777,10 @@ func buildResponsesCompatProbeBody() []byte {
 	return body
 }
 
-func buildResponsesImageGenerationToolProbeBody() []byte {
+func buildResponsesImageGenerationToolProbeBody(models ...string) []byte {
 	nonce := fmt.Sprintf("%d", time.Now().UnixNano())
 	body, _ := json.Marshal(map[string]interface{}{
-		"model":             "gpt-5.4-mini",
+		"model":             compatProbeModel("gpt-5.4-mini", models...),
 		"input":             "Reply with ok. Nonce: " + nonce,
 		"max_output_tokens": 16,
 		"stream":            true,
