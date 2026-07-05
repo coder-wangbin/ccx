@@ -1156,5 +1156,18 @@
   "addChannel.embeddingNormalizedUnknown": "Unspecified",
   "addChannel.embeddingNormalizedTrue": "Normalized",
   "addChannel.embeddingNormalizedFalse": "Not normalized",
-  "addChannel.embeddingCapabilitiesRowsInvalid": "Check embedding compatibility rows. Actual model is required; dimensions and supported dimensions must be positive integers."
+  "addChannel.embeddingCapabilitiesRowsInvalid": "Check embedding compatibility rows. Actual model is required; dimensions and supported dimensions must be positive integers.",
+  "channelDiscovery.title": "Discover usable config",
+  "channelDiscovery.hint": "Probe models, protocols, redirects, and compatibility switches with the current Base URL and API key.",
+  "channelDiscovery.button": "Discover config",
+  "channelDiscovery.failed": "Config discovery failed",
+  "channelDiscovery.missingBaseUrl": "Enter a Base URL first.",
+  "channelDiscovery.missingApiKey": "Enter an API key first.",
+  "channelDiscovery.missingServiceType": "Choose a service type first.",
+  "channelDiscovery.recommendedKind": "Recommended {kind}",
+  "channelDiscovery.modelsFound": "{count} models",
+  "channelDiscovery.mapping": "Recommended redirects",
+  "channelDiscovery.compat": "Compatibility switches",
+  "channelDiscovery.apply": "Apply recommendation",
+  "channelDiscovery.applied": "Discovery recommendation applied. Review and save."
 }

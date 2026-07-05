@@ -430,6 +430,77 @@ export interface CompatDiagnoseResult {
   cached: boolean
 }
 
+export type ChannelDiscoveryKind = 'messages' | 'chat' | 'gemini' | 'responses'
+export type ChannelDiscoveryTargetClient = 'codex' | 'claude-code' | 'claude'
+
+export interface ChannelDiscoveryRequest {
+  channelKind?: ChannelDiscoveryKind
+  serviceType: Channel['serviceType'] | ''
+  baseUrl?: string
+  baseUrls?: string[]
+  apiKey: string
+  authHeader?: ChannelAuthHeader | ''
+  customHeaders?: Record<string, string>
+  proxyUrl?: string
+  insecureSkipVerify?: boolean
+  modelMapping?: Record<string, string>
+  reasoningMapping?: Record<string, string>
+  targetClients?: ChannelDiscoveryTargetClient[]
+}
+
+export interface DiscoverySelectedModels {
+  strong?: string
+  primary?: string
+  fast?: string
+}
+
+export interface DiscoveryModelsResult {
+  source: string
+  url?: string
+  statusCode?: number
+  items: string[]
+  selected: DiscoverySelectedModels
+  warnings?: string[]
+}
+
+export interface DiscoveryProtocolResult {
+  protocol: ChannelDiscoveryKind
+  success: boolean
+  successModels?: string[]
+  failedModels?: string[]
+  latencyMs?: number
+  error?: string
+}
+
+export interface DiscoveryEvidence {
+  type: string
+  key?: string
+  message: string
+}
+
+export interface ChannelDiscoveryRecommendation {
+  channelKind: ChannelDiscoveryKind | ''
+  serviceType: Channel['serviceType'] | ''
+  baseUrls?: string[]
+  modelMapping: Record<string, string>
+  reasoningMapping?: Record<string, string>
+  supportedModels?: string[]
+  compat?: Partial<Record<string, boolean>>
+  urlRecommendation?: {
+    current: string
+    recommended: string
+    reason: string
+  } | null
+  evidence?: DiscoveryEvidence[]
+}
+
+export interface ChannelDiscoveryResponse {
+  models: DiscoveryModelsResult
+  protocols: DiscoveryProtocolResult[]
+  recommendation: ChannelDiscoveryRecommendation
+  evidence?: DiscoveryEvidence[]
+}
+
 // ============== 历史/图表类型 ==============
 
 export interface HistoryDataPoint {

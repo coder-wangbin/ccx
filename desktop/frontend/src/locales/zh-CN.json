@@ -1156,5 +1156,18 @@
   "addChannel.embeddingNormalizedUnknown": "未指定",
   "addChannel.embeddingNormalizedTrue": "已归一化",
   "addChannel.embeddingNormalizedFalse": "未归一化",
-  "addChannel.embeddingCapabilitiesRowsInvalid": "请检查 Embedding 兼容性行：实际模型不能为空，维度必须为正整数，支持维度列表只能包含正整数。"
+  "addChannel.embeddingCapabilitiesRowsInvalid": "请检查 Embedding 兼容性行：实际模型不能为空，维度必须为正整数，支持维度列表只能包含正整数。",
+  "channelDiscovery.title": "发现可用配置",
+  "channelDiscovery.hint": "用当前 Base URL 和 API Key 直接探测模型、协议、重定向和适配开关。",
+  "channelDiscovery.button": "发现配置",
+  "channelDiscovery.failed": "发现配置失败",
+  "channelDiscovery.missingBaseUrl": "请先填写 Base URL。",
+  "channelDiscovery.missingApiKey": "请先填写 API Key。",
+  "channelDiscovery.missingServiceType": "请先选择服务类型。",
+  "channelDiscovery.recommendedKind": "推荐 {kind}",
+  "channelDiscovery.modelsFound": "模型 {count}",
+  "channelDiscovery.mapping": "推荐重定向",
+  "channelDiscovery.compat": "适配开关",
+  "channelDiscovery.apply": "应用推荐",
+  "channelDiscovery.applied": "已应用发现推荐，请检查后保存"
 }

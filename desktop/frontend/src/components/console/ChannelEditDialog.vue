@@ -6,7 +6,9 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import {
   CheckCircle2,
   Copy,
+  Check,
   Loader2,
+  Radar,
 } from 'lucide-vue-next'
 import ChannelEditorHeader from './channel-edit/ChannelEditorHeader.vue'
 import QuickCreatePanel from './channel-edit/QuickCreatePanel.vue'
@@ -79,6 +81,7 @@ const {
   supportsOpenAIAdvancedOptions,
   supportsReasoningMappingOptions,
   supportsChatRoleNormalization,
+  supportsChannelDiscovery,
   modelMappingHint,
   targetModelPlaceholder,
   showModelMappingPresets,
@@ -92,6 +95,12 @@ const {
   supportedModelsError,
   selectedSupportedModelSet,
   sourceMappingError,
+  discoveringChannelConfig,
+  channelDiscoveryResult,
+  channelDiscoveryError,
+  channelDiscoveryModelMappingEntries,
+  channelDiscoveryCompatEntries,
+  channelDiscoverySuccessfulProtocols,
   expectedRequestUrls,
   quickExpectedRequestUrls,
   clearCopilotPollTimer,
@@ -131,6 +140,8 @@ const {
   handleDisabledKeyRestore,
   handleTestCapability,
   handleDiagnoseCompat,
+  handleDiscoverChannelConfig,
+  applyChannelDiscoveryRecommendation,
   t,
 } = useChannelEditDialog(props, emit)
 
@@ -301,6 +312,120 @@ const embeddingTargetModels = computed(() =>
 
                     <!-- Section: 模型重定向 -->
                     <section :ref="(el: any) => setSectionRef('redirect', el)" data-section-id="redirect" class="scroll-mt-4">
+                      <div
+                        v-if="supportsChannelDiscovery"
+                        class="mb-6 space-y-4 rounded-xl border border-primary/20 bg-primary/[0.04] p-5 shadow-sm"
+                      >
+                        <div class="flex flex-wrap items-center justify-between gap-3">
+                          <div class="flex min-w-0 items-center gap-3">
+                            <span class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-primary/20 bg-primary/10 text-primary">
+                              <Radar class="h-4 w-4" />
+                            </span>
+                            <div class="min-w-0">
+                              <h4 class="text-xs font-bold uppercase tracking-wider text-foreground">
+                                {{ t('channelDiscovery.title') }}
+                              </h4>
+                              <p class="mt-1 text-xs leading-5 text-muted-foreground">
+                                {{ t('channelDiscovery.hint') }}
+                              </p>
+                            </div>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            class="h-8 border-primary/30 bg-background/70 text-primary hover:bg-primary/10"
+                            :disabled="discoveringChannelConfig"
+                            @click="handleDiscoverChannelConfig"
+                          >
+                            <Loader2 v-if="discoveringChannelConfig" class="mr-2 h-3.5 w-3.5 animate-spin" />
+                            <Radar v-else class="mr-2 h-3.5 w-3.5" />
+                            {{ t('channelDiscovery.button') }}
+                          </Button>
+                        </div>
+
+                        <div v-if="channelDiscoveryError" class="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive">
+                          {{ channelDiscoveryError }}
+                        </div>
+
+                        <div v-if="channelDiscoveryResult" class="space-y-3">
+                          <div class="flex flex-wrap items-center gap-2">
+                            <span class="rounded-full border border-primary/20 bg-primary/10 px-2.5 py-1 text-[10px] font-medium text-primary">
+                              {{ t('channelDiscovery.recommendedKind', { kind: channelDiscoveryResult.recommendation.channelKind || '-' }) }}
+                            </span>
+                            <span class="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1 text-[10px] font-medium text-emerald-700 dark:text-emerald-300">
+                              {{ t('channelDiscovery.modelsFound', { count: String(channelDiscoveryResult.models.items.length) }) }}
+                            </span>
+                            <span
+                              v-for="protocol in channelDiscoverySuccessfulProtocols"
+                              :key="protocol.protocol"
+                              class="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1 text-[10px] font-medium text-emerald-700 dark:text-emerald-300"
+                            >
+                              {{ protocol.protocol }} {{ protocol.successModels?.length || 0 }}
+                            </span>
+                          </div>
+
+                          <div class="flex flex-wrap items-center gap-2 text-[10px]">
+                            <span v-if="channelDiscoveryResult.models.selected.strong" class="rounded-md border border-border/70 bg-background/60 px-2 py-1 font-mono">
+                              strong: {{ channelDiscoveryResult.models.selected.strong }}
+                            </span>
+                            <span v-if="channelDiscoveryResult.models.selected.primary" class="rounded-md border border-border/70 bg-background/60 px-2 py-1 font-mono">
+                              primary: {{ channelDiscoveryResult.models.selected.primary }}
+                            </span>
+                            <span v-if="channelDiscoveryResult.models.selected.fast" class="rounded-md border border-border/70 bg-background/60 px-2 py-1 font-mono">
+                              fast: {{ channelDiscoveryResult.models.selected.fast }}
+                            </span>
+                          </div>
+
+                          <div v-if="channelDiscoveryModelMappingEntries.length" class="space-y-1.5">
+                            <div class="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">
+                              {{ t('channelDiscovery.mapping') }}
+                            </div>
+                            <div class="flex flex-wrap items-center gap-1.5">
+                              <span
+                                v-for="[source, target] in channelDiscoveryModelMappingEntries"
+                                :key="source"
+                                class="rounded-md border border-primary/20 bg-primary/10 px-2 py-1 font-mono text-[10px] text-primary"
+                              >
+                                {{ source }} -> {{ target }}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div v-if="channelDiscoveryCompatEntries.length" class="space-y-1.5">
+                            <div class="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">
+                              {{ t('channelDiscovery.compat') }}
+                            </div>
+                            <div class="flex flex-wrap items-center gap-1.5">
+                              <span
+                                v-for="[key, value] in channelDiscoveryCompatEntries"
+                                :key="key"
+                                class="rounded-md border border-amber-500/20 bg-amber-500/10 px-2 py-1 font-mono text-[10px] text-amber-700 dark:text-amber-300"
+                              >
+                                {{ key }}={{ value }}
+                              </span>
+                            </div>
+                          </div>
+
+                          <p v-if="channelDiscoveryResult.models.warnings?.length" class="text-xs leading-5 text-amber-700 dark:text-amber-300">
+                            {{ channelDiscoveryResult.models.warnings.join(' / ') }}
+                          </p>
+
+                          <div class="flex justify-end">
+                            <Button
+                              type="button"
+                              size="sm"
+                              class="h-8"
+                              :disabled="!channelDiscoveryModelMappingEntries.length && !channelDiscoveryCompatEntries.length"
+                              @click="applyChannelDiscoveryRecommendation"
+                            >
+                              <Check class="mr-2 h-3.5 w-3.5" />
+                              {{ t('channelDiscovery.apply') }}
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+
                       <ModelMappingPanel
                         :model-mapping-rows="modelMappingRows"
                         :new-model-mapping="newModelMapping"

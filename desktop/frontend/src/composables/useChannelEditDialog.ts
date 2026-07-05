@@ -17,7 +17,13 @@ import type { ManagedChannelType } from '@/utils/channel-type-api'
 import { buildExpectedRequestUrls } from '@/utils/expected-request-urls'
 import { parseQuickInput } from '@/utils/quick-input-parser'
 import { defaultStreamTimeouts } from '@/utils/stream-timeout-presets'
-import type { Channel, CompatDiagnoseResult, DisabledKeyInfo } from '@/services/admin-api'
+import type {
+  Channel,
+  ChannelDiscoveryResponse,
+  ChannelDiscoveryTargetClient,
+  CompatDiagnoseResult,
+  DisabledKeyInfo,
+} from '@/services/admin-api'
 import { useChannelEditSectionNav } from '@/composables/useChannelEditSectionNav'
 import { useCopilotOAuth } from '@/composables/useCopilotOAuth'
 import { useModelAutocomplete } from '@/composables/useModelAutocomplete'
@@ -51,6 +57,9 @@ const { t } = useLanguage()
   const success = ref('')
   const diagnosingCompat = ref(false)
   const diagnoseResult = ref<{ type: 'success' | 'error'; message: string; appliedCount: number } | null>(null)
+  const discoveringChannelConfig = ref(false)
+  const channelDiscoveryResult = ref<ChannelDiscoveryResponse | null>(null)
+  const channelDiscoveryError = ref('')
   let diagnoseTimer: ReturnType<typeof setTimeout> | null = null
   const quickInput = ref('')
   const quickServiceTypeTouched = ref(false)
@@ -186,6 +195,7 @@ const { t } = useLanguage()
   const supportsOpenAIAdvanced = computed(() => props.channelType !== 'vectors' && supportsAdvancedChannelOptions(form.serviceType))
   const supportsOpenAIAdvancedOptions = computed(() => props.channelType !== 'vectors' && supportsAdvancedChannelOptions(form.serviceType))
   const supportsReasoningMappingOptions = computed(() => props.channelType !== 'vectors' && supportsReasoningMapping(form.serviceType))
+  const supportsChannelDiscovery = computed(() => props.channelType !== 'images' && props.channelType !== 'vectors')
   const {
     modelMappingRows,
     modelCapabilityRows,
@@ -552,6 +562,105 @@ const { t } = useLanguage()
       .split('\n')
       .map(s => s.trim())
       .filter(Boolean)
+  }
+
+  const channelDiscoveryModelMappingEntries = computed(() => {
+    const mapping = channelDiscoveryResult.value?.recommendation?.modelMapping ?? {}
+    return Object.entries(mapping)
+  })
+
+  const channelDiscoveryCompatEntries = computed(() => {
+    const compat = channelDiscoveryResult.value?.recommendation?.compat ?? {}
+    return Object.entries(compat).filter(([, value]) => value !== undefined)
+  })
+
+  const channelDiscoverySuccessfulProtocols = computed(() => {
+    return channelDiscoveryResult.value?.protocols.filter(protocol => protocol.success) ?? []
+  })
+
+  function discoveryTargetClients(): ChannelDiscoveryTargetClient[] {
+    if (props.channelType === 'responses') return ['codex']
+    if (props.channelType === 'messages') return ['claude-code']
+    return []
+  }
+
+  async function handleDiscoverChannelConfig() {
+    if (!supportsChannelDiscovery.value) return
+    const baseUrls = parseLines(form.baseUrlsText)
+    if (baseUrls.length === 0) {
+      channelDiscoveryError.value = t('channelDiscovery.missingBaseUrl')
+      return
+    }
+    const apiKey = getSubmitApiKeys().map(key => key.trim()).find(Boolean) || ''
+    if (!apiKey) {
+      channelDiscoveryError.value = t('channelDiscovery.missingApiKey')
+      return
+    }
+    if (!form.serviceType) {
+      channelDiscoveryError.value = t('channelDiscovery.missingServiceType')
+      return
+    }
+
+    discoveringChannelConfig.value = true
+    channelDiscoveryError.value = ''
+    channelDiscoveryResult.value = null
+    try {
+      channelDiscoveryResult.value = await adminApi.post<ChannelDiscoveryResponse>('/api/channel-discovery', {
+        channelKind: props.channelType,
+        serviceType: form.serviceType,
+        baseUrls,
+        apiKey,
+        authHeader: form.authHeader,
+        customHeaders: getHeadersAsObject(),
+        proxyUrl: form.proxyUrl,
+        insecureSkipVerify: form.insecureSkipVerify,
+        modelMapping: getModelMappingAsObject(),
+        reasoningMapping: getReasoningMappingAsObject(),
+        targetClients: discoveryTargetClients(),
+      })
+    } catch (e) {
+      channelDiscoveryError.value = e instanceof Error ? e.message : t('channelDiscovery.failed')
+    } finally {
+      discoveringChannelConfig.value = false
+    }
+  }
+
+  function applyChannelDiscoveryRecommendation() {
+    const recommendation = channelDiscoveryResult.value?.recommendation
+    if (!recommendation) return
+
+    if (recommendation.serviceType) {
+      form.serviceType = recommendation.serviceType
+    }
+    if (recommendation.baseUrls?.length) {
+      form.baseUrlsText = recommendation.baseUrls.join('\n')
+    }
+    if (recommendation.urlRecommendation?.recommended) {
+      const current = recommendation.urlRecommendation.current
+      const recommended = recommendation.urlRecommendation.recommended
+      const nextLines = parseLines(form.baseUrlsText).map(line => (line === current ? recommended : line))
+      form.baseUrlsText = Array.from(new Set(nextLines.length ? nextLines : [recommended])).join('\n')
+    }
+
+    const mapping = recommendation.modelMapping ?? {}
+    modelMappingRows.value = Object.entries(mapping).map(([source, target]) => ({
+      id: nextRowId(),
+      source,
+      target,
+      reasoning: (recommendation.reasoningMapping?.[source] || '') as ReasoningEffort | '',
+      noVision: false,
+    }))
+    form.modelMappingText = stringifyJson(mapping)
+    form.reasoningMappingText = stringifyJson(recommendation.reasoningMapping)
+    if (recommendation.supportedModels) {
+      form.supportedModelsText = recommendation.supportedModels.join('\n')
+    }
+    for (const [key, value] of Object.entries(recommendation.compat || {})) {
+      if (typeof value === 'boolean' && key in form) {
+        ;(form as Record<string, unknown>)[key] = value
+      }
+    }
+    success.value = t('channelDiscovery.applied')
   }
 
   function handleQuickPaste(text: string) {
@@ -964,6 +1073,7 @@ const { t } = useLanguage()
     supportsOpenAIAdvancedOptions,
     supportsReasoningMappingOptions,
     supportsChatRoleNormalization,
+    supportsChannelDiscovery,
     modelMappingHint,
     targetModelPlaceholder,
     showModelMappingPresets,
@@ -977,6 +1087,12 @@ const { t } = useLanguage()
     supportedModelsError,
     selectedSupportedModelSet,
     sourceMappingError,
+    discoveringChannelConfig,
+    channelDiscoveryResult,
+    channelDiscoveryError,
+    channelDiscoveryModelMappingEntries,
+    channelDiscoveryCompatEntries,
+    channelDiscoverySuccessfulProtocols,
     expectedRequestUrls,
     quickExpectedRequestUrls,
     clearCopilotPollTimer,
@@ -1016,6 +1132,8 @@ const { t } = useLanguage()
     handleDisabledKeyRestore,
     handleTestCapability,
     handleDiagnoseCompat,
+    handleDiscoverChannelConfig,
+    applyChannelDiscoveryRecommendation,
     t,
   }
 }
