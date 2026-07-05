@@ -14,6 +14,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode"
 
 	"github.com/BenedictKing/ccx/internal/config"
 	"github.com/BenedictKing/ccx/internal/copilot"
@@ -104,6 +105,22 @@ func ModelsHandler(envCfg *config.EnvConfig, cfgManager *config.ConfigManager, c
 				log.Printf("[Models] 实时发现失败，返回缓存: routePrefix=%q, channel=%q, merged=%d",
 					req.routePrefix, req.channelName, len(cached.Data))
 				c.JSON(http.StatusOK, cached)
+				return
+			}
+			if configuredModels := configuredModelsFromAllKinds(req); len(configuredModels) > 0 {
+				response := buildModelsResponse(configuredModels)
+				log.Printf("[Models] 实时发现失败，返回配置模型回退: routePrefix=%q, channel=%q, merged=%d",
+					req.routePrefix, req.channelName, len(response.Data))
+				c.JSON(http.StatusOK, response)
+				return
+			}
+			if hasModelsDiscoveryCandidate(req) {
+				c.JSON(http.StatusServiceUnavailable, gin.H{
+					"error": gin.H{
+						"message": "models endpoint temporarily unavailable from configured upstreams",
+						"type":    "upstream_unavailable",
+					},
+				})
 				return
 			}
 			c.JSON(http.StatusNotFound, gin.H{
@@ -280,6 +297,137 @@ func collectModelsFromAllKinds(req modelsCollectionRequest) map[scheduler.Channe
 
 	wg.Wait()
 	return results
+}
+
+func configuredModelsFromAllKinds(req modelsCollectionRequest) []ModelEntry {
+	cfg := req.cfgManager.GetConfig()
+	globalCapabilities := cfg.UpstreamModelCapabilities
+	modelLists := make([][]ModelEntry, 0, 6)
+
+	for _, kind := range []scheduler.ChannelKind{
+		scheduler.ChannelKindMessages,
+		scheduler.ChannelKindResponses,
+		scheduler.ChannelKindChat,
+		scheduler.ChannelKindGemini,
+		scheduler.ChannelKindImages,
+		scheduler.ChannelKindVectors,
+	} {
+		if models := configuredModelsForKind(cfg, kind, req.routePrefix, req.channelName, globalCapabilities); len(models) > 0 {
+			modelLists = append(modelLists, models)
+		}
+	}
+
+	return mergeModels(modelLists...)
+}
+
+func hasModelsDiscoveryCandidate(req modelsCollectionRequest) bool {
+	cfg := req.cfgManager.GetConfig()
+
+	for _, kind := range []scheduler.ChannelKind{
+		scheduler.ChannelKindMessages,
+		scheduler.ChannelKindResponses,
+		scheduler.ChannelKindChat,
+		scheduler.ChannelKindGemini,
+		scheduler.ChannelKindImages,
+		scheduler.ChannelKindVectors,
+	} {
+		for _, upstream := range modelsUpstreamsForKind(cfg, kind) {
+			if isConfigFallbackEligible(upstream, req.routePrefix, req.channelName) {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+func configuredModelsForKind(cfg config.Config, kind scheduler.ChannelKind, routePrefix, channelName string, globalCapabilities map[string]config.UpstreamModelCapability) []ModelEntry {
+	upstreams := modelsUpstreamsForKind(cfg, kind)
+	modelLists := make([][]ModelEntry, 0, len(upstreams))
+
+	for i := range upstreams {
+		upstream := upstreams[i]
+		if !isConfigFallbackEligible(upstream, routePrefix, channelName) {
+			continue
+		}
+		if models := configuredModelsForUpstream(&upstream, globalCapabilities); len(models) > 0 {
+			modelLists = append(modelLists, models)
+		}
+	}
+
+	return mergeModels(modelLists...)
+}
+
+func modelsUpstreamsForKind(cfg config.Config, kind scheduler.ChannelKind) []config.UpstreamConfig {
+	switch kind {
+	case scheduler.ChannelKindResponses:
+		return cfg.ResponsesUpstream
+	case scheduler.ChannelKindGemini:
+		return cfg.GeminiUpstream
+	case scheduler.ChannelKindChat:
+		return cfg.ChatUpstream
+	case scheduler.ChannelKindImages:
+		return cfg.ImagesUpstream
+	case scheduler.ChannelKindVectors:
+		return cfg.VectorsUpstream
+	default:
+		return cfg.Upstream
+	}
+}
+
+func isConfigFallbackEligible(upstream config.UpstreamConfig, routePrefix, channelName string) bool {
+	if config.GetChannelStatus(&upstream) == "disabled" {
+		return false
+	}
+	if len(upstream.APIKeys) == 0 {
+		return false
+	}
+	if routePrefix != "" {
+		if upstream.RoutePrefix != routePrefix {
+			return false
+		}
+	} else if upstream.RoutePrefix != "" {
+		return false
+	}
+	if channelName != "" && upstream.Name != channelName {
+		return false
+	}
+	return true
+}
+
+func configuredModelsForUpstream(upstream *config.UpstreamConfig, globalCapabilities map[string]config.UpstreamModelCapability) []ModelEntry {
+	explicitModels := explicitSupportedModelIDs(upstream.SupportedModels)
+	models := make([]ModelEntry, 0, len(explicitModels))
+	for _, modelID := range explicitModels {
+		models = append(models, ModelEntry{ID: modelID, Object: "model"})
+	}
+	return enrichModelsForUpstream(models, upstream, globalCapabilities)
+}
+
+func explicitSupportedModelIDs(rules []string) []string {
+	seen := make(map[string]bool, len(rules))
+	models := make([]string, 0, len(rules))
+
+	for _, raw := range rules {
+		for _, rule := range splitSupportedModelFallbackInput(raw) {
+			if rule == "" || strings.HasPrefix(rule, "!") || strings.Contains(rule, "*") {
+				continue
+			}
+			if seen[rule] {
+				continue
+			}
+			seen[rule] = true
+			models = append(models, rule)
+		}
+	}
+
+	return models
+}
+
+func splitSupportedModelFallbackInput(raw string) []string {
+	return strings.FieldsFunc(raw, func(r rune) bool {
+		return unicode.IsSpace(r) || r == ',' || r == '，' || r == '、'
+	})
 }
 
 func collectModelsFromChannels(req modelsCollectionRequest, kind scheduler.ChannelKind, maxSuccess int) []ModelEntry {

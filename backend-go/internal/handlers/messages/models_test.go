@@ -785,6 +785,50 @@ func TestModelsHandler_ReturnsRecentCacheWhenDiscoveryFails(t *testing.T) {
 	}
 }
 
+func TestModelsHandler_ReturnsConfiguredModelsWhenDiscoveryFails(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer upstream.Close()
+
+	cfgManager := setupModelsConfigManager(t, config.Config{
+		ChatUpstream: []config.UpstreamConfig{{
+			Name:            "chat-configured",
+			BaseURL:         upstream.URL,
+			APIKeys:         []string{"sk-configured"},
+			ServiceType:     "openai",
+			ModelMapping:    map[string]string{"agent": "upstream-agent"},
+			SupportedModels: []string{"gpt-5", "gpt-*", "!gpt-5-bad", "codex-mini，codex-pro"},
+		}},
+	})
+	sch := newModelsTestScheduler(cfgManager)
+	router := newModelsRouterForAggregate(&config.EnvConfig{ProxyAccessKey: "test-key"}, cfgManager, sch)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/models", nil)
+	req.Header.Set("Authorization", "Bearer test-key")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, body=%s", w.Code, w.Body.String())
+	}
+
+	var resp ModelsResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("解析配置回退响应失败: %v", err)
+	}
+	for _, id := range []string{"agent", "gpt-5", "codex-mini", "codex-pro"} {
+		if findModelEntry(resp.Data, id) == nil {
+			t.Fatalf("缺少配置回退模型 %q: %#v", id, resp.Data)
+		}
+	}
+	for _, id := range []string{"gpt-*", "!gpt-5-bad", "upstream-agent"} {
+		if findModelEntry(resp.Data, id) != nil {
+			t.Fatalf("不应暴露模型 %q: %#v", id, resp.Data)
+		}
+	}
+}
+
 func TestModelsHandler_CacheSeparatesPinnedChannel(t *testing.T) {
 	defaultUpstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -821,7 +865,7 @@ func TestModelsHandler_CacheSeparatesPinnedChannel(t *testing.T) {
 	w = httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
-	if w.Code != http.StatusNotFound {
+	if w.Code != http.StatusServiceUnavailable {
 		t.Fatalf("pinned status = %d, body=%s", w.Code, w.Body.String())
 	}
 }
@@ -1476,7 +1520,7 @@ func TestModelsHandler_CopilotResolvesTokenAndHitsModelsEndpoint(t *testing.T) {
 }
 
 // TestModelsHandler_CopilotTokenExchangeFailure 验证 copilot token exchange 失败时
-// /v1/models 代理不命中 Copilot API 并最终返回 404。
+// /v1/models 代理不命中 Copilot API，并返回上游临时不可用。
 func TestModelsHandler_CopilotTokenExchangeFailure(t *testing.T) {
 	var copilotHits int32
 	copilotAPISrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -1510,8 +1554,8 @@ func TestModelsHandler_CopilotTokenExchangeFailure(t *testing.T) {
 	if atomic.LoadInt32(&copilotHits) != 0 {
 		t.Fatalf("token exchange 失败时不应命中 Copilot API，实际命中 %d 次", atomic.LoadInt32(&copilotHits))
 	}
-	if w.Code != http.StatusNotFound {
-		t.Errorf("期望 token exchange 失败后返回 404，实际 %d", w.Code)
+	if w.Code != http.StatusServiceUnavailable {
+		t.Errorf("期望 token exchange 失败后返回 503，实际 %d", w.Code)
 	}
 }
 
