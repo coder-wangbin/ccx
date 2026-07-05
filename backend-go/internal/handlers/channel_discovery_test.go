@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -69,6 +70,44 @@ func TestBuildDiscoveryMappingRecommendationUsesOnlySuccessfulModels(t *testing.
 	}
 	if rec.ModelMapping["codex"] == "actual-pro" {
 		t.Fatalf("codex should not map to failed actual-pro: %#v", rec.ModelMapping)
+	}
+	if _, ok := rec.ModelMapping["gpt-5"]; ok {
+		t.Fatalf("codex recommendation should keep stable source aliases only: %#v", rec.ModelMapping)
+	}
+	if rec.ReasoningMapping["gpt"] != "max" || rec.ReasoningMapping["mini"] != "high" || rec.ReasoningMapping["codex"] != "high" {
+		t.Fatalf("unexpected reasoning mapping: %#v", rec.ReasoningMapping)
+	}
+	if len(rec.Evidence) != 1 || rec.Evidence[0].Type != "reasoning" || !strings.Contains(rec.Evidence[0].Message, "未逐档测试") {
+		t.Fatalf("reasoning evidence should explain untested effort levels: %#v", rec.Evidence)
+	}
+}
+
+func TestBuildDiscoveryMappingRecommendationUsesStableClaudeSourceAliases(t *testing.T) {
+	selected := DiscoverySelectedModels{Strong: "claude-opus-4-7", Primary: "claude-opus-4-7", Fast: "claude-opus-4-7"}
+	successByProtocol := map[string][]string{"messages": {"claude-opus-4-7"}}
+
+	rec := buildDiscoveryMappingRecommendation("messages", selected, successByProtocol, []string{"claude-code"})
+	wantSources := map[string]string{
+		"fable":  "claude-opus-4-7",
+		"haiku":  "claude-opus-4-7",
+		"opus":   "claude-opus-4-7",
+		"sonnet": "claude-opus-4-7",
+	}
+	if len(rec.ModelMapping) != len(wantSources) {
+		t.Fatalf("unexpected source alias count: %#v", rec.ModelMapping)
+	}
+	for source, target := range wantSources {
+		if rec.ModelMapping[source] != target {
+			t.Fatalf("modelMapping[%q]=%q, want %q; full mapping=%#v", source, rec.ModelMapping[source], target, rec.ModelMapping)
+		}
+	}
+	for _, internalRole := range []string{"strong", "primary", "fast"} {
+		if _, ok := rec.ModelMapping[internalRole]; ok {
+			t.Fatalf("internal role %q should not be exposed as source alias: %#v", internalRole, rec.ModelMapping)
+		}
+	}
+	if rec.ReasoningMapping["opus"] != "max" || rec.ReasoningMapping["sonnet"] != "max" || rec.ReasoningMapping["haiku"] != "high" || rec.ReasoningMapping["fable"] != "max" {
+		t.Fatalf("unexpected Claude reasoning mapping: %#v", rec.ReasoningMapping)
 	}
 }
 

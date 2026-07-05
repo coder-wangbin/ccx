@@ -329,6 +329,10 @@ const { t } = useI18n()
     const compat = channelDiscoveryResult.value?.recommendation?.compat ?? {}
     return Object.entries(compat).filter(([, value]) => value !== undefined)
   })
+  const channelDiscoveryReasoningEntries = computed(() => {
+    const reasoning = channelDiscoveryResult.value?.recommendation?.reasoningMapping ?? {}
+    return Object.entries(reasoning)
+  })
   const channelDiscoverySuccessfulProtocols = computed(() => {
     return channelDiscoveryResult.value?.protocols.filter(protocol => protocol.success) ?? []
   })
@@ -422,6 +426,7 @@ const { t } = useI18n()
     if (recommendation.supportedModels) {
       form.supportedModels = [...recommendation.supportedModels]
     }
+    syncModelCapabilitiesFromMapping()
     for (const [key, value] of Object.entries(recommendation.compat || {})) {
       if (typeof value === 'boolean' && key in form) {
         ;(form as Record<string, unknown>)[key] = value
@@ -1134,6 +1139,7 @@ const { t } = useI18n()
     channelDiscoveryError,
     channelDiscoveryModelMappingEntries,
     channelDiscoveryCompatEntries,
+    channelDiscoveryReasoningEntries,
     channelDiscoverySuccessfulProtocols,
     handleDiscoverChannelConfig,
     applyChannelDiscoveryRecommendation,

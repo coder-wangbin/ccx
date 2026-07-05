@@ -120,18 +120,6 @@
                     </v-chip>
                   </div>
 
-                  <div class="d-flex align-center ga-2 flex-wrap">
-                    <v-chip v-if="channelDiscoveryResult.models.selected.strong" size="small" color="secondary" variant="outlined">
-                      strong: {{ channelDiscoveryResult.models.selected.strong }}
-                    </v-chip>
-                    <v-chip v-if="channelDiscoveryResult.models.selected.primary" size="small" color="secondary" variant="outlined">
-                      primary: {{ channelDiscoveryResult.models.selected.primary }}
-                    </v-chip>
-                    <v-chip v-if="channelDiscoveryResult.models.selected.fast" size="small" color="secondary" variant="outlined">
-                      fast: {{ channelDiscoveryResult.models.selected.fast }}
-                    </v-chip>
-                  </div>
-
                   <div v-if="channelDiscoveryModelMappingEntries.length" class="d-flex flex-column ga-1">
                     <div class="text-caption font-weight-medium">{{ t('channelDiscovery.mapping') }}</div>
                     <div class="d-flex align-center ga-1 flex-wrap">
@@ -145,6 +133,22 @@
                         {{ source }} → {{ target }}
                       </v-chip>
                     </div>
+                  </div>
+
+                  <div v-if="channelDiscoveryReasoningEntries.length" class="d-flex flex-column ga-1">
+                    <div class="text-caption font-weight-medium">{{ t('channelDiscovery.reasoning') }}</div>
+                    <div class="d-flex align-center ga-1 flex-wrap">
+                      <v-chip
+                        v-for="[source, effort] in channelDiscoveryReasoningEntries"
+                        :key="source"
+                        size="small"
+                        color="secondary"
+                        variant="outlined"
+                      >
+                        {{ source }}={{ effort }}
+                      </v-chip>
+                    </div>
+                    <div class="text-caption text-medium-emphasis">{{ t('channelDiscovery.reasoningNote') }}</div>
                   </div>
 
                   <div v-if="channelDiscoveryCompatEntries.length" class="d-flex flex-column ga-1">
@@ -171,7 +175,7 @@
                       color="primary"
                       variant="elevated"
                       size="small"
-                      :disabled="!channelDiscoveryModelMappingEntries.length && !channelDiscoveryCompatEntries.length"
+                      :disabled="!channelDiscoveryResult"
                       @click="applyChannelDiscoveryRecommendation"
                     >
                       <v-icon start size="small">mdi-check</v-icon>
@@ -449,6 +453,7 @@ const {
   channelDiscoveryError,
   channelDiscoveryModelMappingEntries,
   channelDiscoveryCompatEntries,
+  channelDiscoveryReasoningEntries,
   channelDiscoverySuccessfulProtocols,
   handleDiscoverChannelConfig,
   applyChannelDiscoveryRecommendation,

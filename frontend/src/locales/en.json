@@ -848,6 +848,8 @@
   "channelDiscovery.recommendedKind": "Recommended {kind}",
   "channelDiscovery.modelsFound": "{count} models",
   "channelDiscovery.mapping": "Recommended redirects",
+  "channelDiscovery.reasoning": "Recommended reasoning effort",
+  "channelDiscovery.reasoningNote": "Reasoning effort is a role-based default recommendation. Discovery does not test every effort level.",
   "channelDiscovery.compat": "Compatibility switches",
   "channelDiscovery.apply": "Apply recommendation",
   "channelDiscovery.applied": "Discovery recommendation applied. Review and save."

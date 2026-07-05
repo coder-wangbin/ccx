@@ -848,6 +848,8 @@
   "channelDiscovery.recommendedKind": "推荐 {kind}",
   "channelDiscovery.modelsFound": "模型 {count}",
   "channelDiscovery.mapping": "推荐重定向",
+  "channelDiscovery.reasoning": "推荐思考强度",
+  "channelDiscovery.reasoningNote": "思考强度是按源模型角色给出的默认值，发现流程目前不逐档测试。",
   "channelDiscovery.compat": "适配开关",
   "channelDiscovery.apply": "应用推荐",
   "channelDiscovery.applied": "已应用发现推荐，请检查后保存"

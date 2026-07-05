@@ -848,6 +848,8 @@
   "channelDiscovery.recommendedKind": "Rekomendasi {kind}",
   "channelDiscovery.modelsFound": "{count} model",
   "channelDiscovery.mapping": "Redirect rekomendasi",
+  "channelDiscovery.reasoning": "Rekomendasi effort reasoning",
+  "channelDiscovery.reasoningNote": "Effort reasoning adalah rekomendasi default berbasis peran model. Discovery tidak menguji semua level effort.",
   "channelDiscovery.compat": "Switch kompatibilitas",
   "channelDiscovery.apply": "Terapkan rekomendasi",
   "channelDiscovery.applied": "Rekomendasi discovery diterapkan. Periksa lalu simpan."

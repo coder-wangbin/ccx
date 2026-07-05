@@ -213,6 +213,8 @@ import {
   mdiTimer,
   mdiUpdate,
   mdiCached,
+  mdiAutoFix,
+  mdiRadar,
   mdiPlusCircleOutline,
   mdiFastForward,
   mdiImageMultiple,
@@ -443,6 +445,8 @@ const iconMap: Record<string, string> = {
   'timer': mdiTimer,
   'update': mdiUpdate,
   'cached': mdiCached,
+  'auto-fix': mdiAutoFix,
+  'radar': mdiRadar,
 }
 
 // 自定义 SVG iconset - 处理 mdi-xxx 字符串格式

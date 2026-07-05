@@ -327,10 +327,17 @@ func buildDiscoveryMappingRecommendation(
 		add("flash", selected.Fast)
 	}
 
+	reasoningMapping := discoveryReasoningMapping(channelKind, modelMapping)
+	evidence := []DiscoveryEvidence(nil)
+	if len(reasoningMapping) > 0 {
+		evidence = append(evidence, DiscoveryEvidence{Type: "reasoning", Message: "思考强度为按源模型角色给出的默认建议，未逐档测试；发现流程只验证基础请求可用"})
+	}
 	return DiscoveryRecommendation{
-		ChannelKind:     channelKind,
-		ModelMapping:    modelMapping,
-		SupportedModels: discoverySupportedModelPatterns(modelMapping, targetClients),
+		ChannelKind:      channelKind,
+		ModelMapping:     modelMapping,
+		ReasoningMapping: reasoningMapping,
+		SupportedModels:  discoverySupportedModelPatterns(modelMapping, targetClients),
+		Evidence:         evidence,
 	}
 }
 
@@ -341,6 +348,30 @@ func firstSuccessfulDiscoveryModel(successful map[string]struct{}, models ...str
 		}
 	}
 	return ""
+}
+
+func discoveryReasoningMapping(channelKind string, modelMapping map[string]string) map[string]string {
+	reasoning := make(map[string]string)
+	add := func(alias, effort string) {
+		if _, ok := modelMapping[alias]; ok {
+			reasoning[alias] = effort
+		}
+	}
+	switch channelKind {
+	case "messages":
+		add("fable", "max")
+		add("opus", "max")
+		add("sonnet", "max")
+		add("haiku", "high")
+	case "responses", "chat":
+		add("gpt", "max")
+		add("mini", "high")
+		add("codex", "high")
+	}
+	if len(reasoning) == 0 {
+		return nil
+	}
+	return reasoning
 }
 
 func discoverySupportedModelPatterns(modelMapping map[string]string, targetClients []string) []string {

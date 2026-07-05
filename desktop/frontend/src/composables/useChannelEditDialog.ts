@@ -574,6 +574,11 @@ const { t } = useLanguage()
     return Object.entries(compat).filter(([, value]) => value !== undefined)
   })
 
+  const channelDiscoveryReasoningEntries = computed(() => {
+    const reasoning = channelDiscoveryResult.value?.recommendation?.reasoningMapping ?? {}
+    return Object.entries(reasoning)
+  })
+
   const channelDiscoverySuccessfulProtocols = computed(() => {
     return channelDiscoveryResult.value?.protocols.filter(protocol => protocol.success) ?? []
   })
@@ -655,6 +660,7 @@ const { t } = useLanguage()
     if (recommendation.supportedModels) {
       form.supportedModelsText = recommendation.supportedModels.join('\n')
     }
+    syncModelCapabilitiesFromMapping()
     for (const [key, value] of Object.entries(recommendation.compat || {})) {
       if (typeof value === 'boolean' && key in form) {
         ;(form as Record<string, unknown>)[key] = value
@@ -1092,6 +1098,7 @@ const { t } = useLanguage()
     channelDiscoveryError,
     channelDiscoveryModelMappingEntries,
     channelDiscoveryCompatEntries,
+    channelDiscoveryReasoningEntries,
     channelDiscoverySuccessfulProtocols,
     expectedRequestUrls,
     quickExpectedRequestUrls,

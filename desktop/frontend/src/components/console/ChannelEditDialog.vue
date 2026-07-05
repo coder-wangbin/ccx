@@ -100,6 +100,7 @@ const {
   channelDiscoveryError,
   channelDiscoveryModelMappingEntries,
   channelDiscoveryCompatEntries,
+  channelDiscoveryReasoningEntries,
   channelDiscoverySuccessfulProtocols,
   expectedRequestUrls,
   quickExpectedRequestUrls,
@@ -365,18 +366,6 @@ const embeddingTargetModels = computed(() =>
                             </span>
                           </div>
 
-                          <div class="flex flex-wrap items-center gap-2 text-[10px]">
-                            <span v-if="channelDiscoveryResult.models.selected.strong" class="rounded-md border border-border/70 bg-background/60 px-2 py-1 font-mono">
-                              strong: {{ channelDiscoveryResult.models.selected.strong }}
-                            </span>
-                            <span v-if="channelDiscoveryResult.models.selected.primary" class="rounded-md border border-border/70 bg-background/60 px-2 py-1 font-mono">
-                              primary: {{ channelDiscoveryResult.models.selected.primary }}
-                            </span>
-                            <span v-if="channelDiscoveryResult.models.selected.fast" class="rounded-md border border-border/70 bg-background/60 px-2 py-1 font-mono">
-                              fast: {{ channelDiscoveryResult.models.selected.fast }}
-                            </span>
-                          </div>
-
                           <div v-if="channelDiscoveryModelMappingEntries.length" class="space-y-1.5">
                             <div class="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">
                               {{ t('channelDiscovery.mapping') }}
@@ -390,6 +379,24 @@ const embeddingTargetModels = computed(() =>
                                 {{ source }} -> {{ target }}
                               </span>
                             </div>
+                          </div>
+
+                          <div v-if="channelDiscoveryReasoningEntries.length" class="space-y-1.5">
+                            <div class="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">
+                              {{ t('channelDiscovery.reasoning') }}
+                            </div>
+                            <div class="flex flex-wrap items-center gap-1.5">
+                              <span
+                                v-for="[source, effort] in channelDiscoveryReasoningEntries"
+                                :key="source"
+                                class="rounded-md border border-secondary/30 bg-secondary/10 px-2 py-1 font-mono text-[10px] text-secondary-foreground"
+                              >
+                                {{ source }}={{ effort }}
+                              </span>
+                            </div>
+                            <p class="text-xs leading-5 text-muted-foreground">
+                              {{ t('channelDiscovery.reasoningNote') }}
+                            </p>
                           </div>
 
                           <div v-if="channelDiscoveryCompatEntries.length" class="space-y-1.5">
@@ -416,7 +423,7 @@ const embeddingTargetModels = computed(() =>
                               type="button"
                               size="sm"
                               class="h-8"
-                              :disabled="!channelDiscoveryModelMappingEntries.length && !channelDiscoveryCompatEntries.length"
+                              :disabled="!channelDiscoveryResult"
                               @click="applyChannelDiscoveryRecommendation"
                             >
                               <Check class="mr-2 h-3.5 w-3.5" />
