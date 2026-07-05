@@ -55,7 +55,7 @@ func TestGetChannelDashboard_IncludesBreakerFields(t *testing.T) {
 	defer chatMetrics.Stop()
 	defer imagesMetrics.Stop()
 
-	for i := 0; i < 3; i++ {
+	for i := 0; i < 5; i++ {
 		messagesMetrics.RecordFailure("https://example.com", "sk-test", "claude")
 	}
 
@@ -141,7 +141,7 @@ func TestGetChannelDashboard_GeminiFallbackServiceTypeReadsMetrics(t *testing.T)
 	defer chatMetrics.Stop()
 	defer imagesMetrics.Stop()
 
-	for i := 0; i < 3; i++ {
+	for i := 0; i < 5; i++ {
 		geminiMetrics.RecordFailure("https://example.com", "sk-test", "gemini")
 	}
 
@@ -390,7 +390,7 @@ func TestGetChannelDashboard_ChatFallbackServiceTypeReadsMetrics(t *testing.T) {
 	defer chatMetrics.Stop()
 	defer imagesMetrics.Stop()
 
-	for i := 0; i < 3; i++ {
+	for i := 0; i < 5; i++ {
 		chatMetrics.RecordFailure("https://example.com", "sk-test", "openai")
 	}
 

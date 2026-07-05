@@ -200,6 +200,12 @@ func (m *MetricsManager) handleBreakerFailureLocked(metrics *KeyMetrics, failure
 		m.moveCircuitToOpenLocked(metrics, now, true)
 		log.Printf("[Metrics-Circuit] Key [%s] (%s) half-open 探针失败，重新进入 open（失败率: %.1f%%）", metrics.KeyMask, metrics.BaseURL, m.calculateKeyBreakerFailureRateInternal(metrics)*100)
 	case CircuitStateClosed:
+		if failureClass.OpensCircuitImmediately() {
+			m.moveCircuitToOpenLocked(metrics, now, false)
+			log.Printf("[Metrics-Circuit] Key [%s] (%s) 因上游临时过载进入熔断状态（失败率: %.1f%%）", metrics.KeyMask, metrics.BaseURL, m.calculateKeyBreakerFailureRateInternal(metrics)*100)
+			statelog.LogStateTransition("Metrics-Circuit", "key", metrics.KeyMask, "closed", "open", "overloaded", "baseURL="+metrics.BaseURL)
+			return
+		}
 		if m.isKeyCircuitBroken(metrics) {
 			m.moveCircuitToOpenLocked(metrics, now, false)
 			log.Printf("[Metrics-Circuit] Key [%s] (%s) 进入熔断状态（失败率: %.1f%%）", metrics.KeyMask, metrics.BaseURL, m.calculateKeyBreakerFailureRateInternal(metrics)*100)

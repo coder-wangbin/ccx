@@ -183,7 +183,7 @@ func TestChannelMetricsHandlers_FallbackServiceTypeForLegacyConfig(t *testing.T)
 			serviceType: "gemini",
 			baseURL:     "https://example.com",
 			record: func(mm *metrics.MetricsManager, baseURL, apiKey, serviceType string) {
-				for i := 0; i < 3; i++ {
+				for i := 0; i < 5; i++ {
 					mm.RecordFailure(baseURL, apiKey, serviceType)
 				}
 			},
@@ -209,7 +209,7 @@ func TestChannelMetricsHandlers_FallbackServiceTypeForLegacyConfig(t *testing.T)
 			serviceType: "openai",
 			baseURL:     "https://example.com",
 			record: func(mm *metrics.MetricsManager, baseURL, apiKey, serviceType string) {
-				for i := 0; i < 3; i++ {
+				for i := 0; i < 5; i++ {
 					mm.RecordFailure(baseURL, apiKey, serviceType)
 				}
 			},

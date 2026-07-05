@@ -61,6 +61,53 @@ func TestMoveKeyToHalfOpenKeepsBreakerHistory(t *testing.T) {
 	}
 }
 
+func TestOverloadedFailureClassOpensCircuitImmediately(t *testing.T) {
+	m := NewMetricsManager()
+	defer m.Stop()
+
+	m.RecordFailureWithClass("https://example.com", "sk-test", "claude", FailureClassOverloaded)
+
+	if got := m.GetKeyCircuitState("https://example.com", "sk-test", "claude"); got != CircuitStateOpen {
+		t.Fatalf("circuit state = %v, want %v", got, CircuitStateOpen)
+	}
+
+	metricsKey := GenerateMetricsIdentityKey("https://example.com", "sk-test", "claude")
+	m.mu.RLock()
+	keyMetrics := m.keyMetrics[metricsKey]
+	m.mu.RUnlock()
+	if keyMetrics == nil {
+		t.Fatal("metrics should be created")
+	}
+	if keyMetrics.NextRetryAt == nil {
+		t.Fatal("NextRetryAt should be set")
+	}
+	if keyMetrics.ConsecutiveFailures != 1 {
+		t.Fatalf("ConsecutiveFailures = %d, want 1", keyMetrics.ConsecutiveFailures)
+	}
+}
+
+func TestQuotaFailureClassDoesNotAffectCircuit(t *testing.T) {
+	m := NewMetricsManager()
+	defer m.Stop()
+
+	m.RecordFailureWithClass("https://example.com", "sk-test", "claude", FailureClassQuota)
+
+	if got := m.GetKeyCircuitState("https://example.com", "sk-test", "claude"); got != CircuitStateClosed {
+		t.Fatalf("circuit state = %v, want %v", got, CircuitStateClosed)
+	}
+
+	metricsKey := GenerateMetricsIdentityKey("https://example.com", "sk-test", "claude")
+	m.mu.RLock()
+	keyMetrics := m.keyMetrics[metricsKey]
+	m.mu.RUnlock()
+	if keyMetrics == nil {
+		t.Fatal("metrics should be created")
+	}
+	if keyMetrics.ConsecutiveFailures != 0 {
+		t.Fatalf("ConsecutiveFailures = %d, want 0", keyMetrics.ConsecutiveFailures)
+	}
+}
+
 func TestToResponseMultiURLCircuitStateUsesChannelAvailability(t *testing.T) {
 	m := NewMetricsManager()
 	defer m.Stop()

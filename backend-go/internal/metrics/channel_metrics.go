@@ -17,6 +17,7 @@ type FailureClass string
 const (
 	FailureClassNone         FailureClass = ""
 	FailureClassRetryable    FailureClass = "retryable"
+	FailureClassOverloaded   FailureClass = "overloaded"
 	FailureClassNonRetryable FailureClass = "non_retryable"
 	FailureClassQuota        FailureClass = "quota"
 	FailureClassClientCancel FailureClass = "client_cancel"
@@ -24,7 +25,11 @@ const (
 
 // IsBreakerRelevant 判断失败类型是否应影响 breaker 状态机。
 func (fc FailureClass) IsBreakerRelevant() bool {
-	return fc == FailureClassRetryable
+	return fc == FailureClassRetryable || fc == FailureClassOverloaded
+}
+
+func (fc FailureClass) OpensCircuitImmediately() bool {
+	return fc == FailureClassOverloaded
 }
 
 // CircuitState 表示 Key 当前的熔断状态。
@@ -190,8 +195,8 @@ func (m *MetricsManager) GetAPIType() string {
 func NewMetricsManager() *MetricsManager {
 	m := &MetricsManager{
 		keyMetrics:                   make(map[string]*KeyMetrics),
-		windowSize:                   20,   // 默认基于最近 20 次请求计算失败率（均衡策略 = 原温和）
-		failureThreshold:             0.7,  // 默认 70% 失败率阈值（均衡策略 = 原温和）
+		windowSize:                   20,  // 默认基于最近 20 次请求计算失败率（均衡策略 = 原温和）
+		failureThreshold:             0.7, // 默认 70% 失败率阈值（均衡策略 = 原温和）
 		consecutiveFailuresThreshold: defaultConsecutiveRetryableFailuresThreshold,
 		circuitRecoveryTime:          defaultCircuitBackoffBase,
 		circuitBackoffBase:           defaultCircuitBackoffBase,
