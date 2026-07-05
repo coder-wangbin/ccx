@@ -28,7 +28,7 @@ import (
 
 const (
 	modelsRequestTimeout      = 5 * time.Second
-	modelsCollectTimeout      = 1 * time.Second
+	modelsCollectTimeout      = 2 * time.Second
 	modelsBatchSize           = 2
 	modelsMaxChannels         = 2
 	modelsMaxAttempts         = 3
