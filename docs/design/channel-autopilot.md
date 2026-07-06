@@ -293,6 +293,7 @@ const (
 | ChannelProfile | 不持久化，运行时从 KeyEndpoint 聚合 | 内存计算 |
 | ModelProfile | SQLite `model_profiles` 表 + 内存缓存 | 持久化，运行时 10min 刷新 |
 | RequestProfile | 内存 | 请求级，不持久化 |
+| TimeBucketMetrics | SQLite `time_bucket_metrics` 表 + 内存聚合桶 | 7 天滚动清理 |
 | 健康证据 | SQLite `health_evidence` 表 | 7 天滚动清理 |
 | 模型列表快照 | SQLite `model_list_snapshots` 表 | 30 天滚动清理，用于检测分组变更 |
 | 画像变更日志 | SQLite `profile_changelog` 表 | 30 天滚动清理 |
@@ -418,37 +419,238 @@ L2 探测：定期轻量探测           │ 每 2h 一次            │ 拉 /m
 5. 通知前端：endpoint 模型列表已变更
 ```
 
+### 3.7 时序感知 — 快照到持续评估
+
+**⚠️ 画像不是"探测一次定终身"。上游同一分组在忙时和闲时的质量差异可能很大。**
+
+一个 endpoint 在凌晨 3 点测试通过，不代表早高峰 9 点仍然可用。画像系统必须从"静态快照"升级为"持续滚动评估"。
+
+#### 时间桶指标 (TimeBucketMetrics)
+
+```go
+// backend-go/internal/autopilot/time_series.go
+
+// TimeBucketMetrics 按固定时间桶记录 endpoint 的质量快照
+type TimeBucketMetrics struct {
+    ChannelID   int    `json:"channelId"`
+    MetricsKey  string `json:"metricsKey"`
+    BucketStart time.Time `json:"bucketStart"` // 桶起始时间（UTC，15 分钟对齐）
+    BucketSize  time.Duration `json:"bucketSize"` // 桶大小，默认 15 分钟
+
+    // ── 该桶内的聚合指标 ──
+    RequestCount    int     `json:"requestCount"`
+    SuccessCount    int     `json:"successCount"`
+    FailureCount    int     `json:"failureCount"`
+    OverloadedCount int     `json:"overloadedCount"` // 429
+    StreamBreakCount int    `json:"streamBreakCount"`
+    EmptyResponseCount int  `json:"emptyResponseCount"`
+
+    P50LatencyMs  int64   `json:"p50LatencyMs"`
+    P95LatencyMs  int64   `json:"p95LatencyMs"`
+    P99LatencyMs  int64   `json:"p99LatencyMs"`
+
+    SuccessRate   float64 `json:"successRate"`
+    AvgInputTokens  int   `json:"avgInputTokens"`
+    AvgOutputTokens int   `json:"avgOutputTokens"`
+}
+```
+
+#### 质量趋势 (QualityTrend)
+
+```go
+// QualityTrend 描述 endpoint 质量的变化方向和幅度
+type QualityTrend struct {
+    MetricsKey  string    `json:"metricsKey"`
+    DetectedAt  time.Time `json:"detectedAt"`
+
+    // ── 趋势方向 ──
+    Direction   TrendDirection `json:"direction"` // improving | stable | degrading | volatile
+
+    // ── 对比基准 ──
+    BaselineWindow   string  `json:"baselineWindow"`   // "7d" | "24h" | "1h"
+    BaselineSuccessRate float64 `json:"baselineSuccessRate"`
+    CurrentSuccessRate  float64 `json:"currentSuccessRate"`
+    DeltaPercent        float64 `json:"deltaPercent"`   // 当前 vs 基准的变化百分比
+
+    // ── 时段模式 ──
+    HourlyPattern []HourlyQuality `json:"hourlyPattern,omitempty"` // 24 小时质量热力图
+    PeakHours     []int           `json:"peakHours,omitempty"`     // 质量低谷的小时列表
+    OffPeakQuality QualityTier    `json:"offPeakQuality,omitempty"`
+
+    // ── 触发动作 ──
+    ShouldReevaluate bool   `json:"shouldReevaluate"` // 是否需要重新评估画像
+    ReevalReason     string `json:"reevalReason,omitempty"`
+}
+
+type TrendDirection string
+const (
+    TrendImproving TrendDirection = "improving"
+    TrendStable    TrendDirection = "stable"
+    TrendDegrading TrendDirection = "degrading"
+    TrendVolatile  TrendDirection = "volatile" // 忙闲交替剧烈
+)
+
+// HourlyQuality 某个小时的平均质量（UTC）
+type HourlyQuality struct {
+    Hour         int     `json:"hour"`         // 0-23 UTC
+    AvgSuccessRate float64 `json:"avgSuccessRate"`
+    AvgP95Latency  int64   `json:"avgP95Latency"`
+    SampleCount    int     `json:"sampleCount"` // 该小时总请求数（跨多天）
+}
+```
+
+#### 趋势检测逻辑
+
+```go
+// backend-go/internal/autopilot/quality_trend_detector.go
+
+type QualityTrendDetector struct {
+    profileStore *ProfileStore
+}
+
+// DetectTrend 分析 endpoint 的质量趋势
+func (d *QualityTrendDetector) DetectTrend(
+    channelID int,
+    metricsKey string,
+    currentTime time.Time,
+) QualityTrend {
+    // 1. 取最近 7 天的时间桶数据
+    buckets := d.profileStore.GetTimeBuckets(channelID, metricsKey, currentTime.Add(-7*24*time.Hour))
+
+    // 2. 构建三个窗口的基准
+    current1h  := aggregateBuckets(buckets, currentTime.Add(-1*time.Hour), currentTime)  // 最近 1 小时
+    baseline24h := aggregateBuckets(buckets, currentTime.Add(-24*time.Hour), currentTime.Add(-1*time.Hour)) // 前 24 小时
+    baseline7d  := aggregateBuckets(buckets, currentTime.Add(-7*24*time.Hour), currentTime.Add(-24*time.Hour)) // 前 7 天
+
+    // 3. 判断趋势方向
+    //    degrading：当前 1h 成功率比 24h 基准下降 > 15%，且比 7d 基准下降 > 10%
+    //    improving：当前 1h 成功率比 24h 基准上升 > 10%
+    //    volatile：最近 24h 内，小时成功率的标准差 > 20%
+    //    stable：其他情况
+
+    // 4. 构建 24 小时质量热力图（UTC 小时 × 平均成功率）
+    hourlyPattern := buildHourlyPattern(buckets)
+    peakHours := findQualityTroughs(hourlyPattern, threshold: 0.70)
+
+    // 5. 判断是否需要重新评估
+    shouldReevaluate := false
+    var reason string
+    switch {
+    case current1h.SuccessRate < baseline7d.SuccessRate * 0.75:
+        shouldReevaluate = true
+        reason = fmt.Sprintf("成功率从 %.0f%% 降至 %.0f%%", baseline7d.SuccessRate*100, current1h.SuccessRate*100)
+    case current1h.P95Latency > baseline7d.P95Latency * 2:
+        shouldReevaluate = true
+        reason = fmt.Sprintf("p95 延迟从 %dms 升至 %dms", baseline7d.P95Latency, current1h.P95Latency)
+    case len(peakHours) > 0 && currentHourInList(currentTime, peakHours):
+        // 当前正处于已知质量低谷
+        reason = fmt.Sprintf("当前处于已知低谷时段 %v", peakHours)
+        // 不触发重评估，但标记为时段性降级
+    }
+
+    return QualityTrend{
+        MetricsKey:          metricsKey,
+        DetectedAt:          currentTime,
+        Direction:           trendDir,
+        BaselineWindow:      "7d",
+        BaselineSuccessRate: baseline7d.SuccessRate,
+        CurrentSuccessRate:  current1h.SuccessRate,
+        DeltaPercent:        (current1h.SuccessRate - baseline7d.SuccessRate) / baseline7d.SuccessRate * 100,
+        HourlyPattern:       hourlyPattern,
+        PeakHours:           peakHours,
+        ShouldReevaluate:    shouldReevaluate,
+        ReevalReason:        reason,
+    }
+}
+```
+
+#### 存储
+
+```sql
+-- 时间桶指标，7 天滚动
+CREATE TABLE time_bucket_metrics (
+    channel_id   INTEGER NOT NULL,
+    metrics_key  TEXT    NOT NULL,
+    bucket_start TEXT    NOT NULL,     -- ISO 8601，15 分钟对齐
+    bucket_json  TEXT    NOT NULL,
+    PRIMARY KEY (channel_id, metrics_key, bucket_start)
+);
+-- 自动清理：DELETE WHERE bucket_start < datetime('now', '-7 days')
+```
+
+#### 对调度的影响
+
+```text
+场景                              │ 调度行为
+──────────────────────────────────┼──────────────────────────────────────────
+trend=stable                      │ 正常，使用当前画像
+trend=improving                   │ 正常，画像质量档可能即将升级
+trend=degrading + shouldReevaluate│ 降权，同时触发画像重评估
+trend=volatile                    │ FastDecay 系数降低（衰减更快，回升更慢）
+当前处于 peakHours 低谷           │ 该 endpoint 的 SpeedTier 临时降一档，不标记 dead
+忙时质量低 + 闲时质量高           │ SmartRouter 在忙时自动倾向非低谷 endpoint
+```
+
+#### 与 HealthAnalyzer 的集成
+
+趋势检测是 HealthAnalyzer 的输入信号之一，不是独立判定：
+
+```text
+HealthState 判定 = L1 被动指标 + 趋势信号 + L2/L3 探测（如需要）
+
+具体：
+  - L1 成功率 < 50% → 直接 dead（不看趋势）
+  - L1 成功率 50-80% + trend=degrading → degraded，标记 shouldReevaluate
+  - L1 成功率 80-95% + trend=degrading + 连续 3 个桶恶化 → degraded
+  - L1 成功率 > 95% + trend=degrading → 保持 healthy，但在 UI 显示"质量下降趋势"
+  - L1 成功率正常 + 当前处于 peakHours → 保持 healthy，但 SpeedTier 临时降档
+```
+
+#### 更新频率
+
+```text
+时间桶写入：每次请求后增量更新 15 分钟桶（内存聚合，桶结束时刷 SQLite）
+趋势计算：每 15 分钟（桶结束时触发），不额外查询
+小时热力图：每小时更新一次（24 个 UTC 小时 × 过去 7 天的数据）
+```
+
 ## 4. 核心组件设计
 
 ### 4.1 组件总览
 
 ```text
-┌─────────────────────────────────────────────────────────┐
-│                    Channel Autopilot                     │
-│                                                         │
-│  ┌───────────┐  ┌───────────┐  ┌─────────────────────┐ │
-│  │ Discovery  │  │ Profiler  │  │ HealthAnalyzer      │ │
-│  │ (协议发现  │→│ (画像生成  │→│ (健康诊断/分层)      │ │
-│  │  模型发现) │  │  能力推导) │  │                     │ │
-│  └───────────┘  └───────────┘  └─────────────────────┘ │
-│        │              │               │                 │
-│        └──────────────┴───────────────┘                 │
-│                       ▼                                 │
-│              ┌─────────────────┐                        │
-│              │  ProfileStore   │ ← SQLite + 内存缓存    │
-│              └─────────────────┘                        │
-│                       ▼                                 │
-│              ┌─────────────────┐                        │
-│              │  SmartRouter    │ ← 注入 CandidateFilter │
-│              │ (任务分类→标签   │                        │
-│              │  匹配→排序)     │                        │
-│              └─────────────────┘                        │
-│                       ▼                                 │
-│              ┌─────────────────┐                        │
-│              │ Scheduler       │ (现有，不修改核心链路)  │
-│              │ SelectChannel   │                        │
-│              └─────────────────┘                        │
-└─────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────┐
+│                       Channel Autopilot                       │
+│                                                              │
+│  ┌───────────┐  ┌───────────┐  ┌──────────────────────────┐ │
+│  │ Discovery  │  │ Profiler  │  │ HealthAnalyzer           │ │
+│  │ (协议发现  │→│ (画像生成  │→│ (健康诊断/分层)           │ │
+│  │  模型发现) │  │  能力推导) │  │                          │ │
+│  └───────────┘  └───────────┘  └──────────┬───────────────┘ │
+│        │              │                    │                 │
+│        │              │         ┌──────────▼───────────┐     │
+│        │              │         │ QualityTrendMonitor  │     │
+│        │              │         │ (时序趋势/忙闲检测)  │     │
+│        │              │         └──────────┬───────────┘     │
+│        │              │                    │                 │
+│        └──────────────┴────────────────────┘                 │
+│                       ▼                                      │
+│              ┌─────────────────┐                             │
+│              │  ProfileStore   │ ← SQLite + 内存缓存         │
+│              │  (endpoint 级)  │   + TimeBucket 指标         │
+│              └─────────────────┘                             │
+│                       ▼                                      │
+│              ┌─────────────────┐                             │
+│              │  SmartRouter    │ ← 注入 CandidateFilter      │
+│              │ (任务分类→标签   │                              │
+│              │  匹配→排序)     │                              │
+│              └─────────────────┘                             │
+│                       ▼                                      │
+│              ┌─────────────────┐                             │
+│              │ Scheduler       │ (现有，不修改核心链路)       │
+│              │ SelectChannel   │                              │
+│              └─────────────────┘                             │
+└──────────────────────────────────────────────────────────────┘
 ```
 
 ### 4.2 Discovery — 协议与模型发现
@@ -1486,25 +1688,28 @@ type UpstreamConfig struct {
 
 ```text
 backend-go/internal/autopilot/
-├── key_endpoint_profile.go # KeyEndpointProfile 类型（画像最小单元）
-├── channel_profile.go      # ChannelProfile 聚合视图
-├── model_profile.go        # ModelProfile 类型
-├── request_profile.go      # RequestProfile + TaskClassifier
-├── profile_store.go        # SQLite 持久化 + 内存缓存（endpoint 级）
-├── group_change_detector.go # Key 分组变更检测
-├── profiler.go             # 画像推导逻辑（L1 被动信号为主）
-├── health_analyzer.go      # 健康诊断逻辑（被动优先 + L2 探测补充）
-├── fast_decay.go           # 白嫖/临时池快速衰减评分
-├── smart_router.go         # SmartRouter + CandidateFilter 构建
-├── model_resolver.go       # 模型自动映射 + CapabilityFloor 约束
-└── handlers.go             # API handlers
+├── key_endpoint_profile.go    # KeyEndpointProfile 类型（画像最小单元）
+├── channel_profile.go         # ChannelProfile 聚合视图
+├── model_profile.go           # ModelProfile 类型
+├── request_profile.go         # RequestProfile + TaskClassifier
+├── profile_store.go           # SQLite 持久化 + 内存缓存（endpoint 级）
+├── group_change_detector.go   # Key 分组变更检测
+├── time_series.go             # TimeBucketMetrics + 时序存储
+├── quality_trend_detector.go  # QualityTrend 检测（忙闲/趋势/时段模式）
+├── profiler.go                # 画像推导逻辑（L1 被动信号为主）
+├── health_analyzer.go         # 健康诊断逻辑（被动优先 + 趋势信号 + L2 探测）
+├── fast_decay.go              # 白嫖/临时池快速衰减评分
+├── smart_router.go            # SmartRouter + CandidateFilter 构建
+├── model_resolver.go          # 模型自动映射 + CapabilityFloor 约束
+└── handlers.go                # API handlers
 
 backend-go/internal/autopilot/
-├── autopilot_test.go       # 画像推导测试
-├── health_analyzer_test.go # 健康诊断测试
-├── fast_decay_test.go      # 快速衰减测试
-├── group_change_test.go    # 分组变更检测测试
-└── smart_router_test.go    # 路由策略测试
+├── autopilot_test.go          # 画像推导测试
+├── health_analyzer_test.go    # 健康诊断测试
+├── fast_decay_test.go         # 快速衰减测试
+├── group_change_test.go       # 分组变更检测测试
+├── quality_trend_test.go      # 趋势检测测试（忙闲模式识别）
+└── smart_router_test.go       # 路由策略测试
 
 frontend/src/components/
 ├── HealthCenter.vue        # 健康中心主视图
@@ -1545,3 +1750,5 @@ frontend/src/components/
 | Phase 1 无智能调度时画像价值不明显 | 用户感知弱 | 健康中心 + 标签系统本身就有独立价值；dry-run 诊断接口提前展示"如果启用自动调度会选谁" |
 | 自动 modelMapping 覆盖用户手动配置 | 用户设置被意外覆盖 | 显式 modelMapping 始终优先，不经过下界检查；autoManaged=false 时完全不触发自动映射 |
 | 被动信号在低流量渠道不足 | 新渠道/冷渠道无法诊断 | 低流量时自动降级为 L2 探测，探测频率随请求量动态调整 |
+| 上游忙闲时段质量差异大 | 闲时探测通过但忙时不可用 | TimeBucketMetrics 15 分钟桶 + QualityTrend 时段模式识别；忙时自动降档而非标记 dead；SmartRouter 在忙时倾向非低谷 endpoint |
+| 趋势检测误判（短期波动 vs 真实恶化） | 频繁触发重评估浪费资源 | degrading 需要同时满足 24h 和 7d 双基准下降才触发重评估；volatile 状态只调 FastDecay 系数，不触发重评估 |
