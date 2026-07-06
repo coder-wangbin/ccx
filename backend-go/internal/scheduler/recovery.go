@@ -63,10 +63,17 @@ type SelectionOptions struct {
 	HasImageContent    bool
 	AgentRole          string // "main" | "subagent" — 角色感知 override 查找与亲和隔离
 	CandidateFilter    CandidateFilterFunc
+	DryRun             bool // 只诊断选择结果，不更新 lastSelectedChannel 或 override TTL
 }
 
 func (s *ChannelScheduler) selectionResult(kind ChannelKind, upstream *config.UpstreamConfig, channelIndex int, reason string) *SelectionResult {
-	s.recordLastSelectedChannel(kind, channelIndex)
+	return s.selectionResultWithRecord(kind, upstream, channelIndex, reason, true)
+}
+
+func (s *ChannelScheduler) selectionResultWithRecord(kind ChannelKind, upstream *config.UpstreamConfig, channelIndex int, reason string, record bool) *SelectionResult {
+	if record {
+		s.recordLastSelectedChannel(kind, channelIndex)
+	}
 	return &SelectionResult{
 		Upstream:     upstream,
 		ChannelIndex: channelIndex,

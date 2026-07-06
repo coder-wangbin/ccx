@@ -63,6 +63,9 @@ func TestDiagnoseSchedulerSelectionReturnsSelectionTrace(t *testing.T) {
 	if resp.Trace.Selected == nil || resp.Trace.Selected.ChannelIndex != 1 {
 		t.Fatalf("trace.selected = %#v, want channel 1", resp.Trace.Selected)
 	}
+	if got := sch.GetCurrentChannelIndex(scheduler.ChannelKindMessages); got != 0 {
+		t.Fatalf("diagnose should not update current channel, got %d want 0", got)
+	}
 }
 
 func TestDiagnoseSchedulerSelectionReturnsContextError(t *testing.T) {

@@ -59,6 +59,7 @@ func DiagnoseSchedulerSelection(sch *scheduler.ChannelScheduler, kind scheduler.
 			ContextRequirement: diagnoseContextRequirement(req.ContextRequirement),
 			HasImageContent:    req.HasImageContent,
 			AgentRole:          strings.TrimSpace(req.AgentRole),
+			DryRun:             true,
 		})
 		if err != nil {
 			resp := gin.H{

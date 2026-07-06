@@ -77,7 +77,7 @@ func (s *ChannelScheduler) SelectChannelWithOptions(ctx context.Context, opts Se
 		return newSelectionTraceError(err, trace)
 	}
 	finish := func(upstream *config.UpstreamConfig, channelIndex int, reason string) *SelectionResult {
-		result := s.selectionResult(kind, upstream, channelIndex, reason)
+		result := s.selectionResultWithRecord(kind, upstream, channelIndex, reason, !opts.DryRun)
 		channelName := ""
 		if upstream != nil {
 			channelName = upstream.Name
@@ -233,7 +233,9 @@ func (s *ChannelScheduler) SelectChannelWithOptions(ctx context.Context, opts Se
 				if upstream != nil && s.channelIsRuntimeAvailable(upstream, kind, ch.Index) {
 					log.Printf("[%s-Override] 按手动排序选择渠道: [%d] %s (user: %s, role=%s, sequenceHead=%s)", prefix, ch.Index, ch.Name, maskUserID(userID), schedulerAgentRoleForLog(opts.AgentRole), formatOverrideSequenceHead(sequence, 3))
 					// Idle 续期：对话活跃时延长 override TTL
-					s.overrideManager.RefreshOverrideForUser(string(kind), userID)
+					if !opts.DryRun {
+						s.overrideManager.RefreshOverrideForUser(string(kind), userID)
+					}
 					return finish(upstream, ch.Index, "manual_override"), nil
 				}
 				if upstream == nil {
@@ -398,7 +400,7 @@ func (s *ChannelScheduler) SelectChannelWithOptions(ctx context.Context, opts Se
 	}
 
 	// 3. 所有健康渠道都失败，选择失败率最低的作为降级
-	result, err := s.selectFallbackChannel(activeChannels, failedChannels, kind)
+	result, err := s.selectFallbackChannelWithRecord(activeChannels, failedChannels, kind, !opts.DryRun)
 	if result != nil {
 		channelName := ""
 		if result.Upstream != nil {
@@ -927,6 +929,15 @@ func (s *ChannelScheduler) selectFallbackChannel(
 	failedChannels map[int]bool,
 	kind ChannelKind,
 ) (*SelectionResult, error) {
+	return s.selectFallbackChannelWithRecord(activeChannels, failedChannels, kind, true)
+}
+
+func (s *ChannelScheduler) selectFallbackChannelWithRecord(
+	activeChannels []ChannelInfo,
+	failedChannels map[int]bool,
+	kind ChannelKind,
+	record bool,
+) (*SelectionResult, error) {
 	var bestChannel *ChannelInfo
 	var bestUpstream *config.UpstreamConfig
 	bestFailureRate := float64(2) // 初始化为不可能的值
@@ -966,7 +977,7 @@ func (s *ChannelScheduler) selectFallbackChannel(
 		prefix := kindSchedulerLogPrefix(kind)
 		log.Printf("[%s-Fallback] 警告: 降级选择渠道: [%d] %s (失败率: %.1f%%)",
 			prefix, bestChannel.Index, bestUpstream.Name, bestFailureRate*100)
-		return s.selectionResult(kind, bestUpstream, bestChannel.Index, "fallback"), nil
+		return s.selectionResultWithRecord(kind, bestUpstream, bestChannel.Index, "fallback", record), nil
 	}
 
 	return nil, fmt.Errorf("所有渠道都不可用")

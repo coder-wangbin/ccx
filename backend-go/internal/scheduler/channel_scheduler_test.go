@@ -82,6 +82,49 @@ func createTestScheduler(t *testing.T, cfg config.Config) (*ChannelScheduler, fu
 	}
 }
 
+func TestSelectChannelDryRunDoesNotRecordLastSelectedChannel(t *testing.T) {
+	cfg := config.Config{
+		Upstream: []config.UpstreamConfig{
+			{
+				Name:     "first",
+				BaseURL:  "https://first.example.com",
+				APIKeys:  []string{"sk-first"},
+				Status:   "active",
+				Priority: 1,
+			},
+			{
+				Name:     "second",
+				BaseURL:  "https://second.example.com",
+				APIKeys:  []string{"sk-second"},
+				Status:   "active",
+				Priority: 2,
+			},
+		},
+	}
+
+	scheduler, cleanup := createTestScheduler(t, cfg)
+	defer cleanup()
+
+	if got := scheduler.GetCurrentChannelIndex(ChannelKindMessages); got != 0 {
+		t.Fatalf("初始 current channel = %d, want 0", got)
+	}
+
+	result, err := scheduler.SelectChannelWithOptions(context.Background(), SelectionOptions{
+		Kind:           ChannelKindMessages,
+		FailedChannels: map[int]bool{0: true},
+		DryRun:         true,
+	})
+	if err != nil {
+		t.Fatalf("dry-run 选择失败: %v", err)
+	}
+	if result.ChannelIndex != 1 {
+		t.Fatalf("dry-run result channel = %d, want 1", result.ChannelIndex)
+	}
+	if got := scheduler.GetCurrentChannelIndex(ChannelKindMessages); got != 0 {
+		t.Fatalf("dry-run 不应更新 current channel，got %d want 0", got)
+	}
+}
+
 // TestPromotedChannelBypassesHealthCheck 测试促销渠道绕过健康检查
 func TestPromotedChannelBypassesHealthCheck(t *testing.T) {
 	// 设置促销截止时间为 5 分钟后
