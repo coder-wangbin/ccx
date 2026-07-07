@@ -502,6 +502,16 @@ func main() {
 	overrideManager := conversation.NewOverrideManager(overrideTTL)
 	channelScheduler.SetConversationComponents(conversationTracker, overrideManager)
 
+	// 自动生成 Codex model_catalog.json（max_context_window 为 null，config override 不 clamp）
+	modelCatalogPath := filepath.Join(paths.StateDir, "model_catalog.json")
+	if err := config.WriteCodexModelCatalog(paths.StateDir); err != nil {
+		log.Printf("[CodexCatalog-Warn] 生成 model_catalog.json 失败: %v", err)
+	} else {
+		log.Printf("[CodexCatalog-Info] Codex model_catalog.json 已生成: %s", modelCatalogPath)
+		fmt.Printf("\n[Codex-Setup] 在 Codex 配置 (~/.codex/config.toml) 中加入:\n")
+		fmt.Printf("[Codex-Setup]   model_catalog_json = \"%s\"\n\n", modelCatalogPath)
+	}
+
 	// 启动 loadShed 后台 reaper（30s 推进到期状态）
 	channelScheduler.Start()
 
@@ -636,6 +646,10 @@ func main() {
 	healthHandler := handlers.HealthCheck(envCfg, cfgManager)
 	r.GET("/health", healthHandler)
 	r.GET("/:routePrefix/health", healthHandler)
+
+	// Codex 配置向导：返回 model_catalog_json 配置行
+	r.GET("/codex/setup", handlers.CodexSetupHandler(paths.StateDir))
+	r.GET("/:routePrefix/codex/setup", handlers.CodexSetupHandler(paths.StateDir))
 
 	// 配置保存端点
 	r.POST("/admin/config/save", handlers.SaveConfigHandler(cfgManager))
